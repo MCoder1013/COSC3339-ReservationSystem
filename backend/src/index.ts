@@ -1,12 +1,29 @@
 import express from 'express';
+import cors from 'cors'; // Required for Frontend-to-Backend communication
 
 
 const app = express();
-const PORT = process.env.PORT || 3000;
-app.use(express.json());
+
+// MIDDLEWARE
+app.use(cors()); // This tells the browser: "It's okay to accept requests from my frontend"
+app.use(express.json()); // This allows the backend to read JSON sent by your frontend
+
+// ROUTES
 app.get('/', (_req, res) => {
-  res.send('Welcome to the reservation system!');
+  res.send('Welcome to the reservation system API!');
 });
-app.listen(PORT, () => {
-  console.log(`Server is running on http://localhost:${PORT}`);
+
+// The "Health Check" route your frontend button calls
+app.get('/api/health', (req, res) => {
+  res.json({ 
+    status: 'Alive', 
+    message: 'Backend is talking to Frontend!',
+    timestamp: new Date().toISOString()
+  });
+});
+
+const PORT = 3000;
+
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 Backend is actually listening on http://localhost:${PORT}`);
 });
