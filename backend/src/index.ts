@@ -1,7 +1,8 @@
 import express from 'express';
 import cors from 'cors'; // Required for Frontend-to-Backend communication
-import bodyParser from 'body-parser';
-import argon2 from 'node-argon2';
+import * as argon2 from 'argon2';
+
+import * as database from './database.js'
 
 const app = express();
 
@@ -23,16 +24,22 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// from https://emailregex.com lol
+const emailRegex = /(?:[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*|"(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21\x23-\x5b\x5d-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])*")@(?:(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?|\[(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?|[a-z0-9-]*[a-z0-9]:(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21-\x5a\x53-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])+)\])/
+
 app.post('/register', async (req, res) => {
-  const username = req.body.username;
+  let email = req.body.email;
   const password = req.body.password;
 
-  const usernameValid = /^[a-zA-Z0-9_]{1,20}/.test(username);
-  if (!usernameValid) {
+  email = email.toLowerCase();
+
+  const emailValid = emailRegex.test(email);
+  if (!emailValid) {
     return res.json({
-      'error': 'invalid username'
+      'error': 'invalid email'
     });
   }
+
   const passwordValid = /^.{1,100}/.test(password);
   if (!passwordValid) {
     return res.json({
@@ -40,9 +47,13 @@ app.post('/register', async (req, res) => {
     });
   }
 
-  const hash = await argon2.hash(password);
+  const passwordHash = await argon2.hash(password);
 
-  // TODO: return an error if it's already in the database, and insert it otherwise
+  database.tryRegister(email, passwordHash);
+
+  res.json({
+    'message': 'Successfully registered!'
+  });
 })
 
 const PORT = 3000;
