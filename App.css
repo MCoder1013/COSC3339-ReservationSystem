@@ -1,0 +1,123 @@
+/* 1) Makes sizing predictable */
+* {
+  box-sizing: border-box;
+}
+
+/* 2) Page baseline */
+.page {
+  min-height: 100vh;         /* page fills full screen height */
+  display: flex;
+  flex-direction: column;    /* stack header, main, footer vertically */
+  font-family: Arial, sans-serif;
+}
+
+main {
+  flex: 1;   /* pushes footer to bottom */
+}
+
+/* ONLY centers content on auth pages like Sign In */
+.centeredContent {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+
+/* 3) The magic: a centered, responsive content width */
+.container {
+  width: min(1000px, 92vw); /* never wider than 1000px, but shrinks on phones */
+  margin: 0 auto;          /* centers the container */
+}
+
+/* Hero full-width background, content centered inside */
+.navbar {
+  background: navy;
+  color: white;
+  text-align: center;
+}
+
+/* Sections with breathing room */
+.section {
+  padding: 32px 0;
+  text-align: center;
+}
+
+/* Footer full width background, centered content */
+.footer {
+  background: lightgray;
+  padding: 16px 0;
+  text-align: center;
+}
+
+.headerRow {
+  display: flex;
+  justify-content: space-between; /* pushes button to right */
+  align-items: center;            /* keeps them vertically aligned */
+}
+
+.logo {
+  margin: 0;
+  width: 150px;
+  height: auto;
+}
+
+.siteTitle {
+  margin: 0;
+  font-size: 32px;
+  color: white;
+}
+
+.navLinks {
+  display: flex;
+  align-items: center;
+}
+
+button, .navButton {
+  padding: 10px 18px;
+  border-radius: 8px;
+  border: 1px solid white;
+  background: transparent;
+  color: white;
+  cursor: pointer;
+  text-decoration: none;  /* removes underline */ 
+}
+
+button:hover, .navButton:hover {
+  background: white;
+  color: navy;
+}
+
+.centerCard {
+  max-width: 400px;
+  margin: 0 auto;
+  background: rgba(162, 170, 252, 0.9);
+  color: navy;
+  padding: 24px;
+  border-radius: 12px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px; /* spacing between inputs */
+}
+
+.inventoryDisplay {
+  background: rgba(162, 170, 252, 0.9);
+  width: min(900px, 92vw);
+  margin: 24px auto 40px; /* ✅ bottom space before footer */
+
+  /* ✅ This controls how far down it goes */
+  min-height: calc(100vh - 260px);
+  max-height: calc(100vh - 260px);
+
+  overflow-y: auto; /* ✅ if content is too long, it scrolls inside the box */
+  background: rgba(162, 170, 252, 0.7);
+  border-radius: 12px;
+  padding: 24px;
+}
+
+
+
