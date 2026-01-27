@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors'; // Required for Frontend-to-Backend communication
-
+import bodyParser from 'body-parser';
+import argon2 from 'node-argon2';
 
 const app = express();
 
@@ -21,6 +22,28 @@ app.get('/api/health', (req, res) => {
     timestamp: new Date().toISOString()
   });
 });
+
+app.post('/register', async (req, res) => {
+  const username = req.body.username;
+  const password = req.body.password;
+
+  const usernameValid = /^[a-zA-Z0-9_]{1,20}/.test(username);
+  if (!usernameValid) {
+    return res.json({
+      'error': 'invalid username'
+    });
+  }
+  const passwordValid = /^.{1,100}/.test(password);
+  if (!passwordValid) {
+    return res.json({
+      'error': 'invalid password'
+    });
+  }
+
+  const hash = await argon2.hash(password);
+
+  // TODO: return an error if it's already in the database, and insert it otherwise
+})
 
 const PORT = 3000;
 
