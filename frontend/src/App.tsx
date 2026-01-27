@@ -1,47 +1,45 @@
-import { useState, useEffect } from 'react';
-import { fetchData } from './api';
+import "./App.css";
+import { Link } from "react-router-dom";
 
-
-function App() {
-  const [status, setStatus] = useState("Checking...");
-  const [isConnected, setIsConnected] = useState(false);
-
-  useEffect(() => {
-    fetchData('/api/health')
-      .then(data => {
-        if (data.status === 'Alive') {
-          setStatus("Connected to Backend");
-          setIsConnected(true);
-        }
-      })
-      .catch(() => {
-        setStatus("Connection Failed");
-        setIsConnected(false);
-      });
-  }, []);
+export default function App() {
+  const shipName = "Starlight Pearl Cruises";
 
   return (
-    <div style={{ padding: '20px', fontFamily: 'sans-serif' }}>
-      <h1>Reservation System</h1>
-      
-      {/* The Status Badge */}
-      <div style={{
-        display: 'inline-block',
-        padding: '10px 20px',
-        borderRadius: '20px',
-        backgroundColor: isConnected ? '#d4edda' : '#f8d7da',
-        color: isConnected ? '#155724' : '#721c24',
-        border: `1px solid ${isConnected ? '#c3e6cb' : '#f5c6cb'}`,
-        fontWeight: 'bold'
-      }}>
-        System Status: {status}
-      </div>
+    <div className="page">
+      <header className="navbar">
+        <div className="container headerRow">
+          <img src="images/StarlightPearlLogoWithName.png" 
+          alt="Starlight Pearl Cruises Logo" className="logo" />
+          <h1>{shipName}</h1>
+          <nav className="navLinks">
+            <Link className="navButton" to="/signin">Sign In</Link>
+            <Link className="navButton" to="/inventory">Inventory</Link>
+          </nav>
 
-      <div style={{ marginTop: '20px' }}>
-        <p>Welcome to the dashboard. Use the navigation to manage bookings.</p>
-      </div>
+        </div>
+      </header>
+
+      <main className="container">
+        <section className="section">
+          <h2>Sail Where the Stars Lead</h2>
+          <h3>Your ocean journey, guided by starlight.</h3>
+
+          <button>Book Your Trip</button>
+        </section>
+
+        {/* <section className="section">
+          <h2>Popular Destinations</h2>
+          <ul className="list">
+            <li>Bahamas</li>
+            <li>Alaska</li>
+            <li>Hawaii</li>
+          </ul>
+        </section> */}
+      </main>
+
+      <footer className="footer">
+        <div className="container">© 2026 {shipName}</div>
+      </footer>
     </div>
   );
 }
-
-export default App;
