@@ -1,63 +1,87 @@
-DROP DATABASE IF EXISTS cruise_reservation;
-CREATE DATABASE cruise_reservation;
-
-CREATE USER 'cruise_app'@'localhost' IDENTIFIED BY 'PutStrongPasswordHere';
-GRANT ALL PRIVILEGES ON cruise_reservation.* TO 'cruise_app'@'localhost';
-FLUSH PRIVILEGES;
+CREATE DATABASE IF NOT EXISTS cruise_reservation
+  DEFAULT CHARACTER SET utf8mb4
+  DEFAULT COLLATE utf8mb4_unicode_ci;
 
 USE cruise_reservation;
 
-CREATE TABLE users (
+-- 1) Users (auth)
+CREATE TABLE IF NOT EXISTS users (
   id INT AUTO_INCREMENT PRIMARY KEY,
   email VARCHAR(255) NOT NULL UNIQUE,
+  first_name VARCHAR(60) NOT NULL,
+  last_name VARCHAR(60) NOT NULL,
   password_hash VARCHAR(255) NOT NULL,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE rooms (
+
+-- 2) Cabins (rooms)
+CREATE TABLE IF NOT EXISTS cabins (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  name VARCHAR(100) not null,
-  deck VARCHAR(20) not null,
-  capacity int not null,
-  status enum('active','inactive') not null default 'active'
+  cabin_number VARCHAR(10) NOT NULL UNIQUE,   ## example  C101, B202
+  deck INT NOT NULL,
+  type ENUM('Economy','Oceanview','Balcony','Suite') NOT NULL,
+  capacity INT NOT NULL,
+  status ENUM('Available','Unavalible','Maintenance') NOT NULL DEFAULT 'Available'
 );
 
-CREATE TABLE people (
-id INT auto_increment primary key,
-name VARCHAR(100) NOT NULL,
-role VARCHAR(60) NOT NULL,
-shift ENUM('morning','afternoon','evening') NOT NULL,
-status ENUM('active','inactive') NOT NULL DEFAULT 'active'
-);
-
-CREATE TABLE resources (
+-- 3) Resources
+CREATE TABLE IF NOT EXISTS resources (
   id INT AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(100) NOT NULL,
+  category ENUM('Gear','Medical','Event','cleaning','Other') NOT NULL DEFAULT 'Other',
   quantity INT NOT NULL,
-  status ENUM('available','maintenance','retired') NOT NULL DEFAULT 'available'
+  status ENUM('Available','Out','Maintenance') NOT NULL DEFAULT 'Available'
 );
 
-INSERT INTO rooms (name, deck, capacity, status) VALUES
-('Excursion Briefing Room', 'Deck 5', 40, 'active'),
-('Gear Checkout Room', 'Deck 3', 10, 'active'),
-('Private Planning Room', 'Deck 6', 6, 'active');
+-- 4) Staff (people)
+CREATE TABLE IF NOT EXISTS staff (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(100) NOT NULL,
+  role ENUM('Nurse','Tour Guide','Security','Housekeeping','Other') NOT NULL DEFAULT 'Other',
+  email VARCHAR(255) NOT NULL UNIQUE,
+  shift ENUM('Morning','Day','Night') NOT NULL DEFAULT 'Day'
+);
 
-INSERT INTO people (name, role, shift, status) VALUES
-('Deshawn King', 'Excursion Guide', 'morning', 'active'),
-('Robert Del Papa', 'Dive Instructor', 'afternoon', 'active'),
-('Marcus Smart', 'Shore Photographer', 'evening', 'inactive');
+-- 5) Reservations (with foreign key constraints)
+CREATE TABLE IF NOT EXISTS reservations (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  cabin_id INT NULL,
+  resource_id INT NULL,
+  staff_id INT NULL,
+  start_time DATETIME NOT NULL,
+  end_time DATETIME NOT NULL,
+  status ENUM('Pending','Confirmed','Cancelled') NOT NULL DEFAULT 'Pending',
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-INSERT INTO resources (name, quantity, status) VALUES
-('Snorkel Set', 20, 'available'),
-('GoPro Kit', 4, 'available'),
-('Two-way Radio', 12, 'maintenance');
+  INDEX idx_res_user (user_id),
+  INDEX idx_res_cabin (cabin_id),
+  INDEX idx_res_resource (resource_id),
+  INDEX idx_res_staff (staff_id),
 
+  CONSTRAINT fk_res_user
+    FOREIGN KEY (user_id) REFERENCES users(id)
+    ON UPDATE CASCADE
+    ON DELETE RESTRICT,
 
-SHOW TABLES;
-SELECT * FROM rooms;
-SELECT * FROM people;
-SELECT * FROM resources;
+  CONSTRAINT fk_res_cabin
+    FOREIGN KEY (cabin_id) REFERENCES cabins(id)
+    ON UPDATE CASCADE
+    ON DELETE SET NULL,
 
+  CONSTRAINT fk_res_resource
+    FOREIGN KEY (resource_id) REFERENCES resources(id)
+    ON UPDATE CASCADE
+    ON DELETE SET NULL,
+
+  CONSTRAINT fk_res_staff
+    FOREIGN KEY (staff_id) REFERENCES staff(id)
+    ON UPDATE CASCADE
+    ON DELETE SET NULL
+);
+
+    
 
 
 
