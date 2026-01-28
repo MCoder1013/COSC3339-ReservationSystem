@@ -21,6 +21,9 @@ export async function tryRegister(email: string, passwordHash: string) {
     // TODO
 }
 
+// pulls the resources from the resources table in the SQL 
+// returns only the rows
+// throws error otherwise
 export async function pullResources(){
     try {
         const[rows] = await pool.query("SELECT * FROM resources");
