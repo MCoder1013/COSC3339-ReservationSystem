@@ -1,7 +1,8 @@
-import {Router, Request, Response } from 'express';
+import { Router, Request, Response } from 'express';
 import { pullResources } from '../database.js'; 
 
 const router = Router(); 
+
 // get all items from the resources table
 router.get('/', async(req: Request, res: Response) => {
     try{ 
