@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors'; // Required for Frontend-to-Backend communication
 import * as argon2 from 'argon2';
+import inventoryRoutes from "./routes/inventory.js";
 
 import * as database from './database.js'
 
@@ -55,6 +56,8 @@ app.post('/register', async (req, res) => {
     'message': 'Successfully registered!'
   });
 })
+// INVENTORY ROUTES
+app.use("/api/inventory", inventoryRoutes);
 
 const PORT = 3000;
 
