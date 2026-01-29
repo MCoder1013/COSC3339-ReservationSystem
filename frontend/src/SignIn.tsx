@@ -1,6 +1,7 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import "./App.css";
+const API_URL = import.meta.env.VITE_API_URL;
 
 export default function SignIn() {
   const shipName = "Starlight Pearl Cruises";
@@ -19,7 +20,7 @@ export default function SignIn() {
     
     try {
       // Send a POST request to the backend login route with email and password
-      const res = await fetch("http://localhost:3000/api/auth/login", {
+      const res = await fetch(`${API_URL}/api/auth/login`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
