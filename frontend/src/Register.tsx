@@ -24,7 +24,6 @@ export default function Register() {
     });
     if (res.message) {
       setRegisterMessage(res.message);
-      setTimeout(() => navigate("/signin"), 1500);
       setErrorMessage('');
     } else if (res.error) {
       setRegisterMessage('');

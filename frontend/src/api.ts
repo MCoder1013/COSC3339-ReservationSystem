@@ -6,7 +6,6 @@ export const fetchData = async (endpoint: string) => {
   return response.json();
 };
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const submitData = async (endpoint: string, data: any) => {
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
     method: "POST",
