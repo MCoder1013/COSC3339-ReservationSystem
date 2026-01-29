@@ -1,14 +1,10 @@
-# Node
 node_modules/
 npm-debug.log*
 
-# Compilations
 dist/
 build/
 
-# Secrets (IMPORTANT: Don't let Dr. Michaels see your DB keys!)
 .env
 .env.local
 
-# System
 .DS_Store

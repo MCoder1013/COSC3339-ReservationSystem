@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors'; // Required for Frontend-to-Backend communication
-
+import inventoryRoutes from "./routes/inventory.js";
+import authRoutes from "./routes/auth.js";
 
 const app = express();
 
@@ -21,6 +22,10 @@ app.get('/api/health', (req, res) => {
     timestamp: new Date().toISOString()
   });
 });
+
+// INVENTORY ROUTES
+app.use("/api/inventory", inventoryRoutes);
+app.use("/api/auth", authRoutes);
 
 const PORT = 3000;
 
