@@ -1,68 +1,48 @@
 import { Link, useNavigate } from "react-router-dom";
-import { useState } from "react";
 import "./App.css";
+import { submitData } from "./api";
+import { useState } from "react";
 
 export default function Register() {
   const shipName = "Starlight Pearl Cruises";
   const navigate = useNavigate();
 
-  // Variables to hold all information related to the users as they register
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+  const [registerMessage, setRegisterMessage] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-    setSuccess("");
-
-    // Confirm that both passwords are matching
-    if (password !== confirmPassword) {
-      setError("Passwords do not match.");
-      return;
-    }
-
-    try {
-       // Send a POST request to the backend registration
-      const res = await fetch("http://localhost:3000/api/auth/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ firstName, lastName, email, password }),
-      });
-
-      const data = await res.json();
-
-      // Throw error if something is incorrect 
-      if (!res.ok || data.error) {
-        setError(data.error || "Registration failed");
-        return;
-      }
-
-      // If successful creation of account then we redirect to login
-      setSuccess("Account created successfully!");
+  const onRegister: React.FormEventHandler<HTMLFormElement> = async (e) => {
+    e.preventDefault()
+    const target = e.target as HTMLFormElement
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const form = target.elements as any
+    const res = await submitData('/api/auth/register', {
+      firstName: form.firstName.value,
+      lastName: form.lastName.value,
+      email: form.email.value,
+      password: form.password.value,
+      confirmPassword: form.confirmPassword.value,
+    });
+    if (res.message) {
+      setRegisterMessage(res.message);
       setTimeout(() => navigate("/signin"), 1500);
-    } catch {
-      setError("Registration failed. Please try again.");
+      setErrorMessage('');
+    } else if (res.error) {
+      setRegisterMessage('');
+      setErrorMessage(res.error);
     }
-  };
+  }
 
   return (
     <div className="page">
       <header className="navbar">
         <div className="container headerRow">
-          <img
-            src="images/StarlightPearlLogoWithName.png"
-            alt="Starlight Pearl Cruises Logo"
-            className="logo"
-          />
+          <img src="images/StarlightPearlLogoWithName.png" 
+            alt="Starlight Pearl Cruises Logo" className="logo" />
           <h1>{shipName}</h1>
           <nav className="navLinks">
             <Link className="navButton" to="/">Home</Link>
           </nav>
+
         </div>
       </header>
 
@@ -70,82 +50,52 @@ export default function Register() {
         <section className="centerCard">
           <h2>Register</h2>
 
-          <form className="form" onSubmit={handleSubmit}>
+          <form className="form" onSubmit={onRegister}>
             <label className="label">
-              First Name:
-              <input
-                className="input"
-                type="text"
-                required
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-              />
+              First Name: 
+              <input className="input" type="text" placeholder="Your First Name" required name="firstName" />
             </label>
 
             <br />
 
             <label className="label">
-              Last Name:
-              <input
-                className="input"
-                type="text"
-                required
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-              />
+              Last Name: 
+              <input className="input" type="text" placeholder="Your Last Name" required name="lastName" />
             </label>
 
             <br />
 
             <label className="label">
-              Email:
-              <input
-                className="input"
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
+              Email: 
+              <input className="input" type="email" placeholder="you@example.com" required name="email" />
             </label>
 
             <br />
 
             <label className="label">
-              Password:
-              <input
-                className="input"
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
+              Password: 
+              <input className="input" type="password" placeholder="••••••••" required name="password" />
             </label>
 
             <br />
 
             <label className="label">
-              Confirm Password:
-              <input
-                className="input"
-                type="password"
-                required
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-              />
+              Confirm Password: 
+              <input className="input" type="password" placeholder="••••••••" required name="confirmPassword" />
             </label>
 
             <br />
-
-            {error && <p className="errorText">{error}</p>}
-            {success && <p className="successText">{success}</p>}
-
             <button className="primaryBtn" type="submit">Register</button>
+
+            {registerMessage ? <p className="register-message">{registerMessage}</p> : <></>}
+            {errorMessage ? <p className="error-message">{errorMessage}</p> : <></>}
           </form>
-
+          
           <br />
+          
+          <p> Already have an account? </p>
+          <Link className="navButton" to="/signin"> Sign In Here </Link>
 
-          <p>Already have an account?</p>
-          <Link className="navButton" to="/signin">Sign In Here</Link>
         </section>
       </main>
 
