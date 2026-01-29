@@ -3,6 +3,13 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+// ENUMS FOR DATABASE
+type RoomStatus = 'Available' | 'Unavailable' | 'Maintenance';
+type RoomType = 'Economy' | 'Oceanview' | 'Balcony' | "Suite";
+
+type Categories = 'Gear' | 'Medical' | 'Event' | 'Cleaning' | 'Other';
+type ResourceStatus = 'Available' | 'Out' | 'Maintenance';
+
 const pool = await mysql.createPool({
     host: 'localhost',
     user: process.env.DB_USER,
@@ -28,6 +35,39 @@ export async function pullResources(){
         return rows;
     } catch (error) {
         console.error("Error pulling inventory: ", error); 
+        throw error;
+    }
+}
+export async function pullRooms() {
+    try {
+        const[rows] = await pool.query("SELECT * FROM cabins");
+        return rows;
+    } catch (error) {
+        console.error("Error getting cabins: ", error);
+        throw error;
+    }
+}
+
+export async function addRoom(cabin_number: string, deck: number, type: RoomType, capacity: number, status: RoomStatus){
+    try {
+        const[results] = await pool.query("INSERT INTO rooms (cabin_number, deck, type, capacity, status) VALUES (?, ?, ?, ?, ?)", 
+            [cabin_number, deck, type, capacity, status]);
+
+        return results;
+    } catch(error) {
+        console.error("Error adding room: ", error); 
+        throw error;
+    }
+}
+
+export async function addResources(name: string, category: Categories, quantity: number, status: ResourceStatus){
+    try {
+        const[results] = await pool.query("INSERT INTO resources (name, category, quantity, status) VALUES (?, ?, ?, ?)", 
+            [name, category, quantity, status]);
+
+        return results;
+    } catch(error) {
+        console.error("Error adding resources: ", error); 
         throw error;
     }
 }
