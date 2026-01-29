@@ -4,21 +4,19 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const pool = await mysql.createPool({
-        host: 'localhost',
-        user: process.env.DB_USER,
-        database: 'cruise_reservation',
-        waitForConnections: true, 
-        connectionLimit: 10, 
-        password: process.env.DB_PASSWORD,
+    host: 'localhost',
+    user: process.env.DB_USER,
+    database: 'cruise_reservation',
+    waitForConnections: true, 
+    connectionLimit: 10, 
+    password: process.env.DB_PASSWORD,
 });
 
-export async function tryRegister(email: string, passwordHash: string) {
+export async function tryRegister(firstName: string, lastName: string, email: string, passwordHash: string) {
     const [results, fields] = await pool.query(
-        'INSERT INTO users (email, password_hash)',
-        [email, passwordHash]
+        'INSERT INTO users (first_name, last_name, email, password_hash)',
+        [firstName, lastName, email, passwordHash]
     );
-
-    // TODO
 }
 
 // pulls the resources from the resources table in the SQL 
