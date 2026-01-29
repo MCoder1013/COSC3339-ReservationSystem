@@ -1,4 +1,5 @@
 import mysql from 'mysql2/promise';
+import { RowDataPacket } from 'mysql2/promise';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -24,6 +25,15 @@ export async function tryRegister(firstName: string, lastName: string, email: st
         'INSERT INTO users (first_name, last_name, email, password_hash) values (?, ?, ?, ?)',
         [firstName, lastName, email, passwordHash]
     );
+}
+
+export async function getUserByEmail(email: string) {
+  const [rows]: [RowDataPacket[], any] = await pool.query(
+    `SELECT * FROM users WHERE email = ?`,
+    [email]
+  );
+
+  return rows[0]; // first user or undefined
 }
 
 // pulls the resources from the resources table in the SQL 
@@ -71,6 +81,3 @@ export async function addResources(name: string, category: Categories, quantity:
         throw error;
     }
 }
-
-
-
