@@ -24,7 +24,7 @@ app.get('/api/health', (req, res) => {
 });
 
 // INVENTORY ROUTES
-app.use("/api/inventory", inventoryRoutes);
+app.use("/api", inventoryRoutes);
 app.use("/api/auth", authRoutes);
 
 const PORT = 3000;
