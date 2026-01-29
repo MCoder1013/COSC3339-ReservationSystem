@@ -21,7 +21,7 @@ const pool = await mysql.createPool({
 
 export async function tryRegister(firstName: string, lastName: string, email: string, passwordHash: string) {
     const [results, fields] = await pool.query(
-        'INSERT INTO users (first_name, last_name, email, password_hash)',
+        'INSERT INTO users (first_name, last_name, email, password_hash) values (?, ?, ?, ?)',
         [firstName, lastName, email, passwordHash]
     );
 }
@@ -50,7 +50,7 @@ export async function pullRooms() {
 
 export async function addRoom(cabin_number: string, deck: number, type: RoomType, capacity: number, status: RoomStatus){
     try {
-        const[results] = await pool.query("INSERT INTO cabins (cabin_number, deck, type, capacity, status) VALUES (?, ?, ?, ?, ?)", 
+        const[results] = await pool.query("INSERT INTO rooms (cabin_number, deck, type, capacity, status) VALUES (?, ?, ?, ?, ?)", 
             [cabin_number, deck, type, capacity, status]);
 
         return results;
