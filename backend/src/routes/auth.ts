@@ -39,4 +39,43 @@ router.post('/register', async (req, res) => {
   });
 })
 
+// Additional login information for authorization
+router.post('/login', async (req: Request, res: Response) => {
+
+  // Extract email and password from the request body
+  let { email, password } = req.body;
+
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Missing email or password' });
+  }
+
+  email = email.toLowerCase();
+
+  try {
+    // Fetch the user from the database by email
+    const user = await database.getUserByEmail(email);
+
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    // Compare the provided password with the hashed password stored in the database
+    const passwordValid = await argon2.verify(user.password_hash, password);
+
+    if (!passwordValid) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    // If email exists and password matches, login is successful
+    res.json({
+      message: 'Login successful',
+      userId: user.id,
+      firstName: user.first_name
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Login failed' });
+  }
+});
+
 export default router; 
