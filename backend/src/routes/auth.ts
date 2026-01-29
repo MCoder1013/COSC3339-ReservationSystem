@@ -13,6 +13,7 @@ router.post('/register', async (req, res) => {
   const lastName = req.body.lastName;
   let email = req.body.email;
   const password = req.body.password;
+  const confirmPassword = req.body.confirmPassword;
 
   email = email.toLowerCase();
 
@@ -23,7 +24,13 @@ router.post('/register', async (req, res) => {
     });
   }
 
-  const passwordValid = /^.{1,100}/.test(password);
+  if (password != confirmPassword) {
+    return res.json({
+      'error': 'password and confirmed password do not match'
+    });
+  }
+
+  const passwordValid = /^.{1,100}$/.test(password);
   if (!passwordValid) {
     return res.json({
       'error': 'invalid password'
@@ -32,7 +39,19 @@ router.post('/register', async (req, res) => {
 
   const passwordHash = await argon2.hash(password);
 
-  await database.tryRegister(firstName, lastName, email, passwordHash);
+  try {
+    await database.tryRegister(firstName, lastName, email, passwordHash);
+  } catch (err) {
+    if ((err as any).code === 'ER_DUP_ENTRY') {
+      return res.status(400).json({
+        'error': 'User with that email already exists'
+      })
+    }
+    console.error('Unknown registration error:', err)
+    return res.status(400).json({
+      'error': 'Unknown error!'
+    })
+  }
 
   res.json({
     'message': 'Successfully registered!'

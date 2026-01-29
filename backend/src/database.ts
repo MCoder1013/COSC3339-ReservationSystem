@@ -21,7 +21,7 @@ const pool = await mysql.createPool({
 
 export async function tryRegister(firstName: string, lastName: string, email: string, passwordHash: string) {
     const [results, fields] = await pool.query(
-        'INSERT INTO users (first_name, last_name, email, password_hash)',
+        'INSERT INTO users (first_name, last_name, email, password_hash) values (?, ?, ?, ?)',
         [firstName, lastName, email, passwordHash]
     );
 }

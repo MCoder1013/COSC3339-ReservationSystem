@@ -119,5 +119,7 @@ button:hover, .navButton:hover {
   padding: 24px;
 }
 
-
+.error-message {
+  color: red;
+}
 
