@@ -9,10 +9,12 @@ const router = Router();
 const emailRegex = /(?:[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*|"(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21\x23-\x5b\x5d-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])*")@(?:(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?|\[(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?|[a-z0-9-]*[a-z0-9]:(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21-\x5a\x53-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])+)\])/
 
 router.post('/register', async (req, res) => {
+  console.log('got register with data', req.body)
   const firstName = req.body.firstName;
   const lastName = req.body.lastName;
   let email = req.body.email;
   const password = req.body.password;
+  const confirmPassword = req.body.confirmPassword;
 
   email = email.toLowerCase();
 
@@ -23,7 +25,13 @@ router.post('/register', async (req, res) => {
     });
   }
 
-  const passwordValid = /^.{1,100}/.test(password);
+  if (password != confirmPassword) {
+    return res.json({
+      'error': 'password and confirmed password do not match'
+    });
+  }
+
+  const passwordValid = /^.{1,100}$/.test(password);
   if (!passwordValid) {
     return res.json({
       'error': 'invalid password'
@@ -32,7 +40,15 @@ router.post('/register', async (req, res) => {
 
   const passwordHash = await argon2.hash(password);
 
-  await database.tryRegister(firstName, lastName, email, passwordHash);
+  try {
+    await database.tryRegister(firstName, lastName, email, passwordHash);
+  } catch (err) {
+    if ((err as any).code === 'ER_DUP_ENTRY') {
+      return res.status(400).json({
+        'error': 'User with that email already exists'
+      })
+    }
+  }
 
   res.json({
     'message': 'Successfully registered!'
