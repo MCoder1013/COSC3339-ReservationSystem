@@ -21,6 +21,7 @@ const shipName = "Starlight Pearl Cruises";
 
   // ✅ 4. Modal state
   const [showModal, setShowModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   
   // ✅ 5. Form data for rooms
   const [roomForm, setRoomForm] = useState({
@@ -38,6 +39,9 @@ const shipName = "Starlight Pearl Cruises";
     quantity: "",
     status: "Available"
   });
+
+  // ✅ 7. Delete form state
+  const [deleteId, setDeleteId] = useState("");
 
   // ✅ 7. Fetch data from backend API
   useEffect(() => {
@@ -67,6 +71,15 @@ const shipName = "Starlight Pearl Cruises";
     // Reset forms
     setRoomForm({ cabin_number: "", deck: "", type: "Economy", capacity: "", status: "Available" });
     setItemForm({ name: "", category: "Other", quantity: "", status: "Available" });
+  };
+
+  // ✅ 9. Handle delete submission
+  const handleDeleteSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    // TODO: Send delete request to backend
+    console.log(`Deleting ${activeCategory.slice(0, -1)} with ID:`, deleteId);
+    setShowDeleteModal(false);
+    setDeleteId("");
   };
 
   return (
@@ -106,7 +119,7 @@ const shipName = "Starlight Pearl Cruises";
         <button className="addButton" onClick={() => setShowModal(true)}>
           Add {activeCategory.slice(0, -1)}
         </button>
-        <button className="deleteButton">Delete {activeCategory.slice(0, -1)}</button>
+        <button className="deleteButton" onClick={() => setShowDeleteModal(true)}>Delete {activeCategory.slice(0, -1)}</button>
 
         {/* ✅ List changes dynamically */}
         <ul className="inventoryList">
@@ -241,6 +254,31 @@ const shipName = "Starlight Pearl Cruises";
 
               <button type="submit" className="submitButton">Submit</button>
               <button type="button" onClick={() => setShowModal(false)} className="cancelButton">Cancel</button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ✅ Modal for deleting rooms/items */}
+      {showDeleteModal && (
+        <div className="modal" onClick={() => setShowDeleteModal(false)}>
+          <div className="modalContent" onClick={(e) => e.stopPropagation()}>
+            <h3>Delete {activeCategory.slice(0, -1)}</h3>
+            
+            <form onSubmit={handleDeleteSubmit}>
+              <label>
+                ID:
+                <input
+                  type="text"
+                  placeholder="Enter ID"
+                  value={deleteId}
+                  onChange={(e) => setDeleteId(e.target.value)}
+                  required
+                />
+              </label>
+
+              <button type="submit" className="submitButton">Delete</button>
+              <button type="button" onClick={() => setShowDeleteModal(false)} className="cancelButton">Cancel</button>
             </form>
           </div>
         </div>
