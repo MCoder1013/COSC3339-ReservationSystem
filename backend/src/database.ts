@@ -38,6 +38,8 @@ export async function pullResources(){
         throw error;
     }
 }
+
+// pull all rooms from room table
 export async function pullRooms() {
     try {
         const[rows] = await pool.query("SELECT * FROM cabins");
@@ -48,6 +50,7 @@ export async function pullRooms() {
     }
 }
 
+// add a room
 export async function addRoom(cabin_number: string, deck: number, type: RoomType, capacity: number, status: RoomStatus){
     try {
         const[results] = await pool.query("INSERT INTO rooms (cabin_number, deck, type, capacity, status) VALUES (?, ?, ?, ?, ?)", 
@@ -60,6 +63,7 @@ export async function addRoom(cabin_number: string, deck: number, type: RoomType
     }
 }
 
+// add a resource
 export async function addResources(name: string, category: Categories, quantity: number, status: ResourceStatus){
     try {
         const[results] = await pool.query("INSERT INTO resources (name, category, quantity, status) VALUES (?, ?, ?, ?)", 
@@ -73,4 +77,31 @@ export async function addResources(name: string, category: Categories, quantity:
 }
 
 
+// Delete a room by its ID
+export async function deleteRoom(id: number) {
+    try {
+        const [results] = await pool.query(
+            "DELETE FROM cabins WHERE id = ?", 
+            [id]
+        );
+        return results;
+    } catch (error) {
+        console.error("Error deleting room: ", error);
+        throw error;
+    }
+}
+
+// delete resource by id
+export async function deleteResource(id: number) {
+    try {
+        const [results] = await pool.query(
+            "DELETE FROM resources WHERE id = ?", 
+            [id]
+        );
+        return results;
+    } catch (error) {
+        console.error("Error deleting resources: ", error); 
+        throw error;
+    }
+}
 
