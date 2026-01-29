@@ -108,11 +108,8 @@ router.post('/login', async (req: Request, res: Response) => {
     const token = jwt.sign({ id: user.id }, jwtSecret);
     res
       .cookie('jwt', token, {
-        // stay logged in for 30 days
-        expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-        // frontend doesn't need to be able to see the cookie, this limits the
-        // scope of xss attacks
-        httpOnly: true
+        httpOnly: true,
+        sameSite: 'lax'
       })
       .json({
         message: 'Login successful',
@@ -124,5 +121,13 @@ router.post('/login', async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Login failed' });
   }
 });
+
+export function getAuthenticatedUserId(req: Request): number | undefined {
+  console.log('cookies', req.cookies)
+  const cookie = req.cookies['jwt']
+  if (!cookie) return undefined
+  const decoded = jwt.verify(cookie, jwtSecret) as { id: number } | undefined;
+  return decoded?.id
+}
 
 export default router; 
