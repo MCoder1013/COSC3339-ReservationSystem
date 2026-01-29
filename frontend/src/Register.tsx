@@ -22,7 +22,9 @@ export default function Register() {
     });
     if (res.message) {
       setRegisterMessage(res.message);
+      setErrorMessage('');
     } else if (res.error) {
+      setRegisterMessage('');
       setErrorMessage(res.error);
     }
   }
