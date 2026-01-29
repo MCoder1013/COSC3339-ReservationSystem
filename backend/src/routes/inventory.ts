@@ -1,8 +1,9 @@
 import { Router, Request, Response } from 'express';
-import { pullResources, pullRooms, addRoom, addResources } from '../database.js'; 
+import { pullResources, pullRooms, addRoom, addResources, deleteRoom, deleteResource } from '../database.js'; 
 
 const router = Router(); 
 
+// pull items form database
 // get all items from the resources table
 router.get('/resources', async(req: Request, res: Response) => {
     try{ 
@@ -40,7 +41,6 @@ router.post("/rooms", async(req: Request, res: Response) => {
 
 
 
-// delete from inventory features
 router.post("/resources", async(req: Request, res: Response) => {
     const{ name, category, quantity, status } = req.body;
 
@@ -56,5 +56,38 @@ router.post("/resources", async(req: Request, res: Response) => {
     }
 });
 
+// delete from inventory features
+router.delete('/rooms/:id', async (req: Request, res: Response) => {
+    const idParam = req.params.id as string; 
+    const roomId = parseInt(idParam);
+
+    try {
+        const result: any = await deleteRoom(roomId); 
+
+        if(result.affectedRows === 0) {
+            return res.status(404).json({message: "Room not found" })
+        }
+        res.json({ message: "room deleted successfully"});
+    } catch (error) {
+        res.status(500).json({error: "failed to delete room"});
+    }
+});
+
+
+router.delete('/rooms/:id', async (req: Request, res: Response) => {
+    const idParam = req.params.id as string; 
+    const resourceId = parseInt(idParam);
+
+    try {
+        const result: any = await deleteResource(resourceId); 
+
+        if(result.affectedRows === 0) {
+            return res.status(404).json({message: "Resource not found" })
+        }
+        res.json({ message: "resource deleted successfully"});
+    } catch (error) {
+        res.status(500).json({error: "failed to delete resource"});
+    }
+});
 
 export default router; 
