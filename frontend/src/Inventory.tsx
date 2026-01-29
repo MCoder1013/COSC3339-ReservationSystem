@@ -6,7 +6,7 @@ export default function Inventory() {
 const shipName = "Starlight Pearl Cruises";
 
   // ✅ 1. Categories
-  const categories = ["Food", "Attractions", "Reservations"] as const;
+  const categories = ["Food", "Attractions"] as const;
 
   // ✅ 2. Current selected category
   const [activeCategory, setActiveCategory] =
@@ -16,7 +16,6 @@ const shipName = "Starlight Pearl Cruises";
   const inventoryData = {
     Food: ["Pizza Buffet", "Seafood Night", "Coffee Bar", "Ice Cream Deck"],
     Attractions: ["Water Slide", "Live Music Lounge", "Movie Theater", "Spa"],
-    Reservations: ["Room Booking", "Dinner Reservation", "Excursion Signup"],
   };
 
   return (
