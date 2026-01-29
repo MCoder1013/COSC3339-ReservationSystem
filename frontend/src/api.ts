@@ -7,13 +7,12 @@ export const fetchData = async (endpoint: string) => {
 };
 
 export const submitData = async (endpoint: string, data: any) => {
- const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
     method: "POST",
     body: JSON.stringify(data),
     headers: {
       'content-type': 'application/json'
     }
- });
-  if (!response.ok) throw new Error('Network response was not ok');
+  });
   return response.json();
 };
