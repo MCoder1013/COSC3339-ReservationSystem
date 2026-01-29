@@ -1,10 +1,11 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import "./App.css";
 import { submitData } from "./api";
 import { useState } from "react";
 
 export default function Register() {
   const shipName = "Starlight Pearl Cruises";
+  const navigate = useNavigate();
 
   const [registerMessage, setRegisterMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
@@ -12,6 +13,7 @@ export default function Register() {
   const onRegister: React.FormEventHandler<HTMLFormElement> = async (e) => {
     e.preventDefault()
     const target = e.target as HTMLFormElement
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const form = target.elements as any
     const res = await submitData('/api/auth/register', {
       firstName: form.firstName.value,
