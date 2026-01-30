@@ -1,0 +1,29 @@
+/* src/index.css */
+
+/* Simple reset so layout behaves like a normal website */
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+}
+
+body {
+  font-family: Arial, sans-serif;
+  background-image: url("/images/cruiseshipBackground.jpg");
+  background-size: cover;        /* fills the screen */
+  background-position: center;   /* keeps it centered */
+  background-repeat: no-repeat;  /* no tiling */
+  background-attachment: fixed;  /* stays in place while scrolling */
+
+  font-family: Arial, sans-serif;
+  color: #fff;      /* optional */
+}
+
+#root {
+  width: 100%;
+}
