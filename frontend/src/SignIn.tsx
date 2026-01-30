@@ -1,10 +1,12 @@
-import { Link} from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import "./App.css";
 import { submitData } from "./api";
 
 export default function SignIn() {
   const shipName = "Starlight Pearl Cruises";
+
+  const navigate = useNavigate();
 
   // The variables needed to check the sign-in values w/ database
   const [email, setEmail] = useState("");
@@ -34,6 +36,7 @@ export default function SignIn() {
       setError("");
       setEmail("");
       setPassword("");
+      setTimeout(() => { navigate('/inventory') }, 1000);
     } catch {
       // If error occurs this will be printed!
       setError("Login failed. Please check your credentials.");
