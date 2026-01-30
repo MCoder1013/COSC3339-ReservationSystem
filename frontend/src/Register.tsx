@@ -1,10 +1,12 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import "./App.css";
 import { submitData } from "./api";
 import { useState } from "react";
 
 export default function Register() {
   const shipName = "Starlight Pearl Cruises";
+
+  const navigate = useNavigate();
 
   const [registerMessage, setRegisterMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
@@ -24,6 +26,8 @@ export default function Register() {
     if (res.message) {
       setRegisterMessage(res.message);
       setErrorMessage('');
+
+      setTimeout(() => { navigate('/signin') }, 1500);
     } else if (res.error) {
       setRegisterMessage('');
       setErrorMessage(res.error);

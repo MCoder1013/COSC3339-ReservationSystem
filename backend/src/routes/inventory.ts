@@ -58,12 +58,11 @@ router.post("/resources", async(req: Request, res: Response) => {
 });
 
 // delete from inventory features
-router.delete('/rooms/:id', async (req: Request, res: Response) => {
-    const idParam = req.params.id as string; 
-    const roomId = parseInt(idParam);
+router.delete('/rooms/:cabin_number', async (req: Request, res: Response) => {
+    const cabin_number = req.params.cabin_number as string; 
 
     try {
-        const result: any = await deleteRoom(roomId); 
+        const result: any = await deleteRoom(cabin_number); 
 
         if(result.affectedRows === 0) {
             return res.status(404).json({message: "Room not found" })
@@ -75,12 +74,11 @@ router.delete('/rooms/:id', async (req: Request, res: Response) => {
 });
 
 
-router.delete('/rooms/:id', async (req: Request, res: Response) => {
-    const idParam = req.params.id as string; 
-    const resourceId = parseInt(idParam);
+router.delete('/resources/:name', async (req: Request, res: Response) => {
+    const name = req.params.name as string; 
 
     try {
-        const result: any = await deleteResource(resourceId); 
+        const result: any = await deleteResource(name); 
 
         if(result.affectedRows === 0) {
             return res.status(404).json({message: "Resource not found" })

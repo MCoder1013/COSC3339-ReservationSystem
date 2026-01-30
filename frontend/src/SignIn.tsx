@@ -1,4 +1,4 @@
-import { Link, useNavigate } from "react-router-dom";
+import { Link} from "react-router-dom";
 import { useState } from "react";
 import "./App.css";
 import { submitData } from "./api";
@@ -6,12 +6,12 @@ import { submitData } from "./api";
 export default function SignIn() {
   const shipName = "Starlight Pearl Cruises";
 
-  const navigate = useNavigate();
-
   // The variables needed to check the sign-in values w/ database
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+
+  const [logInMessage, setLogInMessage] = useState('');
 
   // Waiting for the sign-in button to be hit
   const handleSubmit = async (e: React.FormEvent) => {
@@ -24,17 +24,20 @@ export default function SignIn() {
       });
       if (data.error) {
         setError(data.error);
+        setLogInMessage("");
         return
       }
 
       // Parse the JSON response body from the backend
-      console.log("Logged in:", data);
-
-      // For now this is where we will transfer to if successful login
-      navigate("/inventory");
+      // console.log("Logged in:", data);
+      setLogInMessage("Successful login!");
+      setError("");
+      setEmail("");
+      setPassword("");
     } catch {
       // If error occurs this will be printed!
       setError("Login failed. Please check your credentials.");
+      setLogInMessage("");
     }
   };
 
@@ -88,6 +91,7 @@ export default function SignIn() {
             <br />
 
             {error && <p className="errorText">{error}</p>}
+            {logInMessage ? <p className="register-message">{logInMessage}</p> : <></>}
 
             <button className="primaryBtn" type="submit">Sign In</button>
           </form>
