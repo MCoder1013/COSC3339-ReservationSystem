@@ -63,7 +63,7 @@ export async function pullRooms() {
 // add a room
 export async function addRoom(cabin_number: string, deck: number, type: RoomType, capacity: number, status: RoomStatus){
     try {
-        const[results] = await pool.query("INSERT INTO rooms (cabin_number, deck, type, capacity, status) VALUES (?, ?, ?, ?, ?)", 
+        const[results] = await pool.query("INSERT INTO cabins (cabin_number, deck, type, capacity, status) VALUES (?, ?, ?, ?, ?)", 
             [cabin_number, deck, type, capacity, status]);
 
         return results;
@@ -87,30 +87,26 @@ export async function addResources(name: string, category: Categories, quantity:
 }
 
 
-// Delete a room by its ID
-export async function deleteRoom(id: number) {
+// Delete room by name instead of id since users won't know id
+export async function deleteRoom(cabin_number: string){
     try {
-        const [results] = await pool.query(
-            "DELETE FROM cabins WHERE id = ?", 
-            [id]
-        );
+        const[results] = await pool.query("DELETE FROM cabins WHERE cabin_number = ?", 
+            [cabin_number]);
         return results;
-    } catch (error) {
-        console.error("Error deleting room: ", error);
+    } catch(error) {
+        console.error("Error deleting room: ", error); 
         throw error;
     }
 }
 
-// delete resource by id
-export async function deleteResource(id: number) {
+// Delete resource by name instead of id since users won't know id
+export async function deleteResource(name: string){
     try {
-        const [results] = await pool.query(
-            "DELETE FROM resources WHERE id = ?", 
-            [id]
-        );
+        const[results] = await pool.query("DELETE FROM resources WHERE name = ?", 
+            [name]);
         return results;
-    } catch (error) {
-        console.error("Error deleting resources: ", error); 
+    } catch(error) {
+        console.error("Error deleting resource: ", error); 
         throw error;
     }
 }

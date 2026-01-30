@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import "./App.css";
 import { Link } from "react-router-dom";
 import { fetchData } from "./api";
+const API_URL = import.meta.env.VITE_API_URL;
 
 export default function Inventory() {
 const shipName = "Starlight Pearl Cruises";
@@ -14,9 +15,17 @@ const shipName = "Starlight Pearl Cruises";
     useState<(typeof categories)[number]>("Rooms");
   
   // ✅ 3. Inventory data from backend (or dummy data as fallback)
-  const [inventoryData, setInventoryData] = useState({
-    Rooms: ["Ocean View Suite", "Balcony Cabin", "Interior Room", "Family Suite"],
-    Items: ["Sunscreen", "Beach Towel", "Snorkel Gear", "Travel Pillow"],
+  // const [inventoryData, setInventoryData] = useState({
+  //   Rooms: ["Ocean View Suite", "Balcony Cabin", "Interior Room", "Family Suite"],
+  //   Items: ["Sunscreen", "Beach Towel", "Snorkel Gear", "Travel Pillow"],
+  // });
+
+  const [inventoryData, setInventoryData] = useState<{
+    Rooms: any[];
+    Items: any[];
+  }>({
+    Rooms: [],
+    Items: [],
   });
 
   // ✅ 4. Modal state
@@ -47,40 +56,84 @@ const shipName = "Starlight Pearl Cruises";
   useEffect(() => {
     const loadInventory = async () => {
       try {
-        const roomsData = await fetchData("/rooms");
-        const itemsData = await fetchData("/items");
+        const roomsData = await fetchData("/api/rooms");
+        const itemsData = await fetchData("/api/resources");
+
         setInventoryData({
           Rooms: roomsData,
           Items: itemsData,
         });
       } catch (error) {
         console.error("Error fetching inventory:", error);
-        // Keep dummy data if fetch fails
       }
     };
-    
+
     loadInventory();
   }, []);
 
+
   // ✅ 8. Handle form submission
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: Send data to backend
-    console.log(activeCategory === "Rooms" ? roomForm : itemForm);
-    setShowModal(false);
-    // Reset forms
-    setRoomForm({ cabin_number: "", deck: "", type: "Economy", capacity: "", status: "Available" });
-    setItemForm({ name: "", category: "Other", quantity: "", status: "Available" });
+
+    try {
+      const endpoint =
+        activeCategory === "Rooms" ? "/api/rooms" : "/api/resources";
+
+      const body =
+        activeCategory === "Rooms" ? roomForm : itemForm;
+
+      await fetch(`${API_URL}${endpoint}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      // 🔄 Refresh inventory
+      const roomsData = await fetchData("/api/rooms");
+      const itemsData = await fetchData("/api/resources");
+
+      setInventoryData({
+        Rooms: roomsData,
+        Items: itemsData,
+      });
+
+      setShowModal(false);
+    } catch (error) {
+      console.error("Failed to add inventory item:", error);
+    }
   };
 
   // ✅ 9. Handle delete submission
-  const handleDeleteSubmit = (e: React.FormEvent) => {
+  const handleDeleteSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: Send delete request to backend
-    console.log(`Deleting ${activeCategory.slice(0, -1)} with ID:`, deleteId);
-    setShowDeleteModal(false);
-    setDeleteId("");
+
+    try {
+      const endpoint =
+        activeCategory === "Rooms"
+          ? `/api/rooms/${deleteId}`
+          : `/api/resources/${deleteId}`;
+
+      await fetch(`${API_URL}${endpoint}`, {
+        method: "DELETE",
+      });
+
+      // 🔄 Refresh inventory
+      const roomsData = await fetchData("/api/rooms");
+      const itemsData = await fetchData("/api/resources");
+
+      setInventoryData({
+        Rooms: roomsData,
+        Items: itemsData,
+      });
+
+      setShowDeleteModal(false);
+      setDeleteId("");
+    } catch (error) {
+      console.error("Failed to delete item:", error);
+    }
   };
+
 
   return (
     <div className="page">
@@ -124,8 +177,16 @@ const shipName = "Starlight Pearl Cruises";
         {/* ✅ List changes dynamically */}
         <ul className="inventoryList">
           {inventoryData[activeCategory].map((item) => (
-            <li key={item} className="inventoryItem">
-              {item}
+            <li key={item.id} className="inventoryItem">
+              {activeCategory === "Rooms" ? (
+                <>
+                  Cabin {item.cabin_number} — Deck {item.deck} — {item.type} — {item.status}
+                </>
+              ) : (
+                <>
+                  {item.name} ({item.category}) — Qty: {item.quantity} — {item.status}
+                </>
+              )}
             </li>
           ))}
         </ul>
@@ -267,10 +328,10 @@ const shipName = "Starlight Pearl Cruises";
             
             <form onSubmit={handleDeleteSubmit}>
               <label>
-                ID:
+                {activeCategory === "Rooms" ? "Cabin Number:" : "Resource Name:"}
                 <input
                   type="text"
-                  placeholder="Enter ID"
+                  placeholder={activeCategory === "Rooms" ? "Enter cabin number (e.g., A101)" : "Enter resource name"}
                   value={deleteId}
                   onChange={(e) => setDeleteId(e.target.value)}
                   required
