@@ -1,7 +1,7 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import "./App.css";
-const API_URL = import.meta.env.VITE_API_URL;
+import { submitData } from "./api";
 
 export default function SignIn() {
   const shipName = "Starlight Pearl Cruises";
@@ -19,22 +19,15 @@ export default function SignIn() {
     setError("");
     
     try {
-      // Send a POST request to the backend login route with email and password
-      const res = await fetch(`${API_URL}/api/auth/login`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email, password }),
+      const data = await submitData('/api/auth/login', {
+        email, password
       });
-
-      // Throw error if something is incorrect 
-      if (!res.ok) {
-        throw new Error("Invalid email or password");
+      if (data.error) {
+        setError(data.error);
+        return
       }
 
       // Parse the JSON response body from the backend
-      const data = await res.json();
       console.log("Logged in:", data);
 
       // For now this is where we will transfer to if successful login

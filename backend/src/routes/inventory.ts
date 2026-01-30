@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { pullResources, pullRooms, addRoom, addResources, deleteRoom, deleteResource } from '../database.js'; 
+import { getAuthenticatedUserId } from './auth.js';
 
 const router = Router(); 
 
