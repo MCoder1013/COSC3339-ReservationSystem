@@ -1,0 +1,17 @@
+{
+    "prod": {
+        "driver": "mysql",
+        "user": {"ENV": "DB_USER"},
+        "password": {"ENV": "DB_PASSWORD"},
+        "database": "cruise_reservation",
+        "multipleStatements": true
+    },
+    "dev": {
+        "driver": "mysql",
+        "user": {"ENV": "DB_USER"},
+        "password": {"ENV": "DB_PASSWORD"},
+        "database": "cruise_reservation",
+        "multipleStatements": true
+    },
+    "sql-file": true
+}
