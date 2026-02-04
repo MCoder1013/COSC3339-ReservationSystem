@@ -63,6 +63,16 @@ export async function pullRooms() {
 // add a room
 export async function addRoom(cabin_number: string, deck: number, type: RoomType, capacity: number, status: RoomStatus){
     try {
+        if (capacity <= 0) {
+            throw new Error("Capacity must be greater than 0");
+        }
+        
+        const [existing]: any = await pool.query("SELECT cabin_number FROM cabins WHERE cabin_number = ?", [cabin_number]);
+        
+        if (existing.length > 0) {
+            throw new Error("Cabin number already exists");
+        }
+        
         const[results] = await pool.query("INSERT INTO cabins (cabin_number, deck, type, capacity, status) VALUES (?, ?, ?, ?, ?)", 
             [cabin_number, deck, type, capacity, status]);
 
@@ -76,6 +86,16 @@ export async function addRoom(cabin_number: string, deck: number, type: RoomType
 // add a resource
 export async function addResources(name: string, category: Categories, quantity: number, status: ResourceStatus){
     try {
+        if (quantity <= 0) {
+            throw new Error("Quantity must be greater than 0");
+        }
+
+        const [existing]: any = await pool.query("SELECT name FROM resources WHERE name = ?", [name]);
+        
+        if (existing.length > 0) {
+            throw new Error("Resource name already exists");
+        }
+        
         const[results] = await pool.query("INSERT INTO resources (name, category, quantity, status) VALUES (?, ?, ?, ?)", 
             [name, category, quantity, status]);
 

@@ -7,6 +7,8 @@ const API_URL = import.meta.env.VITE_API_URL;
 export default function Inventory() {
 const shipName = "Starlight Pearl Cruises";
 
+const [formError, setFormError] = useState<string>("");
+
   // ✅ 1. Categories
   const categories = ["Rooms", "Items"] as const;
 
@@ -76,6 +78,8 @@ const shipName = "Starlight Pearl Cruises";
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    setFormError("");
+
     try {
       const endpoint =
         activeCategory === "Rooms" ? "/api/rooms" : "/api/resources";
@@ -83,11 +87,43 @@ const shipName = "Starlight Pearl Cruises";
       const body =
         activeCategory === "Rooms" ? roomForm : itemForm;
 
-      await fetch(`${API_URL}${endpoint}`, {
+      const response = await fetch(`${API_URL}${endpoint}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        // Parse error message and provide specific feedback
+        const errorMessage = data.error || data.message || "Failed to add item";
+        
+        if (activeCategory === "Rooms") {
+          if (errorMessage.includes("Cabin number already exists")) {
+            setFormError(`Cabin number "${roomForm.cabin_number}" already exists. Please use a different cabin number.`);
+          } else if (errorMessage.includes("Capacity must be greater than 1")) {
+            setFormError("Capacity must be greater than 1 guest.");
+          } else if (errorMessage.includes("cabin_number")) {
+            setFormError("Please provide a valid cabin number.");
+          } else {
+            setFormError(errorMessage);
+          }
+        } else {
+          if (errorMessage.includes("Resource name already exists")) {
+            setFormError(`Resource name "${itemForm.name}" already exists. Please use a different name.`);
+          } else if (errorMessage.includes("Quantity must be greater than 1")) {
+            setFormError("Quantity must be greater than 1.");
+          } else if (errorMessage.includes("name")) {
+            setFormError("Please provide a valid resource name.");
+          } else if (errorMessage.includes("quantity")) {
+            setFormError("Please provide a valid quantity.");
+          } else {
+            setFormError(errorMessage);
+          }
+        }
+        return;
+      }
 
       // 🔄 Refresh inventory
       const roomsData = await fetchData("/api/rooms");
@@ -98,9 +134,11 @@ const shipName = "Starlight Pearl Cruises";
         Items: itemsData,
       });
 
+      setFormError("");
       setShowModal(false);
     } catch (error) {
       console.error("Failed to add inventory item:", error);
+      setFormError("An error occurred. Please try again.");
     }
   };
 
@@ -313,8 +351,21 @@ const shipName = "Starlight Pearl Cruises";
                 </>
               )}
 
-              <button type="submit" className="submitButton">Submit</button>
-              <button type="button" onClick={() => setShowModal(false)} className="cancelButton">Cancel</button>
+              {formError && (
+                <div className="errorMessage" style={{
+                  backgroundColor: '#fee',
+                  border: '1px solid #fcc',
+                  color: '#c33',
+                  padding: '10px',
+                  borderRadius: '4px',
+                  marginBottom: '15px'
+                }}>
+                  {formError}
+                </div>
+              )}
+
+              <button type="submit" onClick={() => {setFormError("");}} className="submitButton">Submit</button>
+              <button type="button" onClick={() => { setShowModal(false); setFormError("");}} className="cancelButton">Cancel</button>
             </form>
           </div>
         </div>
