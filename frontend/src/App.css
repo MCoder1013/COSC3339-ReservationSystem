@@ -105,7 +105,7 @@ button:hover, .navButton:hover {
 }
 
 .inventoryDisplay {
-  background: rgba(162, 170, 252, 0.9);
+  background: rgba(110, 122, 255, 0.95);
   width: min(900px, 92vw);
   margin: 24px auto 40px; /* ✅ bottom space before footer */
 
@@ -114,7 +114,7 @@ button:hover, .navButton:hover {
   max-height: calc(100vh - 260px);
 
   overflow-y: auto; /* ✅ if content is too long, it scrolls inside the box */
-  background: rgba(162, 170, 252, 0.7);
+  background: rgba(110, 122, 255, 0.95);
   border-radius: 12px;
   padding: 24px;
 }
