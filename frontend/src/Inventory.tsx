@@ -241,6 +241,7 @@ const shipName = "Starlight Pearl Cruises";
                     Capacity:
                     <input
                       type="number"
+                      min="1"
                       placeholder="Number of guests"
                       value={roomForm.capacity}
                       onChange={(e) => setRoomForm({...roomForm, capacity: e.target.value})}
@@ -292,6 +293,7 @@ const shipName = "Starlight Pearl Cruises";
                     Quantity:
                     <input
                       type="number"
+                      min="1"
                       placeholder="Quantity"
                       value={itemForm.quantity}
                       onChange={(e) => setItemForm({...itemForm, quantity: e.target.value})}
