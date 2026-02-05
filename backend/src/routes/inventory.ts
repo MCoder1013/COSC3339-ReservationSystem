@@ -44,7 +44,7 @@ router.post("/rooms", async(req: Request, res: Response) => {
             message: "Room added successfully!", 
             roomId: (result as any).insertId
         }); 
-    } catch (error) {
+    } catch (error: any) {
         console.error(error);
         res.status(400).json({ error: "Error when adding a room"});
     }
@@ -59,7 +59,7 @@ router.post("/resources", async(req: Request, res: Response) => {
             message: "Resource added",
             resourceId: (result as any).insertId
         });
-    } catch(error) {
+    } catch(error: any) {
         console.error(error);
         res.status(400).json({ error: "Error when adding a resource"});
     }

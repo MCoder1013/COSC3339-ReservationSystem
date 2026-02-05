@@ -6,7 +6,7 @@
   "scripts": {
     "install-all": "npm install && node migrations/internal/create_database.js && npx db-migrate up",
     "dev": "npm run install-all && tsx watch src/index.ts",
-    "build": "tsc",
+    "build": "npm run install-all && tsc",
     "start": "node dist/index.js"
   },
   "keywords": [],
