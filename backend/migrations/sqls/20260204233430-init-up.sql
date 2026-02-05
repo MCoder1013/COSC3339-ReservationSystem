@@ -1,9 +1,3 @@
-CREATE DATABASE IF NOT EXISTS cruise_reservation
-  DEFAULT CHARACTER SET utf8mb4
-  DEFAULT COLLATE utf8mb4_unicode_ci;
-
-USE cruise_reservation;
-
 -- 1) Users (auth)
 CREATE TABLE IF NOT EXISTS users (
   id INT AUTO_INCREMENT PRIMARY KEY,
@@ -80,9 +74,3 @@ CREATE TABLE IF NOT EXISTS reservations (
     ON UPDATE CASCADE
     ON DELETE SET NULL
 );
-
-    
-
-
-
-
