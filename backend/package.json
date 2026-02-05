@@ -4,8 +4,9 @@
   "description": "",
   "main": "dist/index.js",
   "scripts": {
-    "dev": "npm install && npx db-migrate up && tsx watch src/index.ts",
-    "build": "npx db-migrate up && tsc",
+    "install-all": "npm install && node migrations/internal/create_database.js && npx db-migrate up",
+    "dev": "npm run install-all && tsx watch src/index.ts",
+    "build": "tsc",
     "start": "node dist/index.js"
   },
   "keywords": [],

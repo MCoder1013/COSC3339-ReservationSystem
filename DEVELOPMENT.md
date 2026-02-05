@@ -35,3 +35,5 @@ The `up` file is the one that gets run automatically. Editing the `down` migrati
 
 To manually run a migration (which is usually unnecessary), run `npx db-migrate up`.
 To undo the last migration (if the `down.sql` is implemented), use `npx db-migrate down`.
+
+You shouldn't edit old migrations since those won't be applied automatically, just create a new one instead.
