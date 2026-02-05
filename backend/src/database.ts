@@ -63,6 +63,10 @@ export async function pullRooms() {
 // add a room
 export async function addRoom(cabin_number: string, deck: number, type: RoomType, capacity: number, status: RoomStatus){
     try {
+        if (!cabin_number || cabin_number.trim() === '') {
+            throw new Error("Please provide a valid cabin number");
+        }
+
         if (capacity <= 0) {
             throw new Error("Capacity must be greater than 0");
         }
@@ -86,6 +90,10 @@ export async function addRoom(cabin_number: string, deck: number, type: RoomType
 // add a resource
 export async function addResources(name: string, category: Categories, quantity: number, status: ResourceStatus){
     try {
+        if (!name || name.trim() === '') {
+            throw new Error("Please provide a valid resource name");
+        }
+
         if (quantity <= 0) {
             throw new Error("Quantity must be greater than 0");
         }
