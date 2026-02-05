@@ -46,7 +46,7 @@ router.post("/rooms", async(req: Request, res: Response) => {
         }); 
     } catch (error) {
         console.error(error);
-        res.status(400).json({ error: error.message || "Error when adding a room"});
+        res.status(400).json({ error: "Error when adding a room"});
     }
 }); 
 
@@ -61,7 +61,7 @@ router.post("/resources", async(req: Request, res: Response) => {
         });
     } catch(error) {
         console.error(error);
-        res.status(400).json({ error: error.message || "Error when adding a resource"});
+        res.status(400).json({ error: "Error when adding a resource"});
     }
 });
 
@@ -77,7 +77,7 @@ router.post("/staff", async(req: Request, res: Response) =>  {
 
     } catch(error) {
         console.error(error); 
-        res.status(500).json({ error: "Error adding staff member"})
+        res.status(500).json({error: "Error adding staff member"})
     }
 });
 
