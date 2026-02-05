@@ -1,5 +1,4 @@
 import { Router, Request, Response } from 'express';
-import { pullResources } from '../database.js';
 import * as argon2 from 'argon2';
 import * as database from '../database.js'
 import jwt from 'jsonwebtoken';
@@ -10,9 +9,10 @@ const router = Router();
 const emailRegex = /(?:[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*|"(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21\x23-\x5b\x5d-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])*")@(?:(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?|\[(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?|[a-z0-9-]*[a-z0-9]:(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21-\x5a\x53-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])+)\])/
 
 // TODO: store user sessions in the database!
-const jwtSecret = process.env.JWT_SECRET ?? 'devsecret'
+let jwtSecret: string = process.env.JWT_SECRET ?? ''
 if (!jwtSecret) {
   console.warn('No JWT_SECRET environment variable is set, please set something if you\'re running in prod')
+  jwtSecret = 'devsecret'
 }
 
 router.post('/register', async (req, res) => {
@@ -39,19 +39,23 @@ router.post('/register', async (req, res) => {
 
   if (password.length > 100) {
     return res.status(400).json({
-      'error': 'Password is too long'
+      error: 'Password is too long'
     });
   } else if (password.length < 8) {
     return res.status(400).json({
-      'error': 'Password is too short'
+      error: 'Password is too short'
+    });
+  } else if (!(/[a-zA-Z]/.test(password))) {
+    return res.status(400).json({
+      error: 'Password must contain letters'
     });
   } else if (!(/[0-9]/.test(password))) {
     return res.status(400).json({
-      'error': 'Password must contain numbers'
+      error: 'Password must contain numbers'
     });
   } else if (!(/[@$!%*#?&]/.test(password))) {
     return res.status(400).json({
-      'error': 'Password must contain a special character'
+      error: 'Password must contain a special character'
     });
   }
 
@@ -62,17 +66,17 @@ router.post('/register', async (req, res) => {
   } catch (err) {
     if ((err as any).code === 'ER_DUP_ENTRY') {
       return res.status(400).json({
-        'error': 'User with that email already exists'
+        error: 'User with that email already exists'
       })
     }
     console.error('Unknown registration error:', err)
     return res.status(400).json({
-      'error': 'Unknown error!'
+      error: 'Unknown error!'
     })
   }
 
   res.json({
-    'message': 'Successfully registered!'
+    message: 'Successfully registered!'
   });
 })
 
@@ -123,7 +127,6 @@ router.post('/login', async (req: Request, res: Response) => {
 });
 
 export function getAuthenticatedUserId(req: Request): number | undefined {
-  console.log('cookies', req.cookies)
   const cookie = req.cookies['jwt']
   if (!cookie) return undefined
   const decoded = jwt.verify(cookie, jwtSecret) as { id: number } | undefined;
