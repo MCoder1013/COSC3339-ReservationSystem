@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { pullResources, pullRooms, addRoom, addResources, deleteRoom, deleteResource } from '../database.js'; 
+import { pullResources, pullRooms, addRoom, addResources, deleteRoom, deleteResource, addStaff, pullStaff, deleteStaff } from '../database.js'; 
 import { getAuthenticatedUserId } from './auth.js';
 
 const router = Router(); 
@@ -24,6 +24,16 @@ router.get('/rooms', async(req: Request, res: Response) => {
     }
 });
 
+router.get('/staff', async(req: Request, res: Response) => {
+    try {
+        const staff = await pullStaff();
+        res.json(staff); 
+
+    } catch (error) {
+        res.status(500).json({error: "Failed to load staff members"})
+    }
+});
+
 // add to inventory features 
 router.post("/rooms", async(req: Request, res: Response) => {
     const{ cabin_number, deck, type, capacity, status } = req.body; 
@@ -36,11 +46,9 @@ router.post("/rooms", async(req: Request, res: Response) => {
         }); 
     } catch (error) {
         console.error(error);
-        res.status(500).json({ error: "Error when adding a room"});
+        res.status(400).json({ error: error.message || "Error when adding a room"});
     }
 }); 
-
-
 
 router.post("/resources", async(req: Request, res: Response) => {
     const{ name, category, quantity, status } = req.body;
@@ -49,11 +57,27 @@ router.post("/resources", async(req: Request, res: Response) => {
         const result = await addResources(name, category, quantity, status); 
         res.status(201).json({
             message: "Resource added",
-            roomId: (result as any).insertId
+            resourceId: (result as any).insertId
         });
     } catch(error) {
         console.error(error);
-        res.status(500).json({ error: "Error when adding a resource"});
+        res.status(400).json({ error: error.message || "Error when adding a resource"});
+    }
+});
+
+router.post("/staff", async(req: Request, res: Response) =>  { 
+    const{ id, name, role, email, shift } = req.body; 
+
+    try {
+        const result = await addStaff(id, name, role, email, shift); 
+        res.status(201).json({
+            message: "Staff member added", 
+            staffId: (result as any).insertId
+        });
+
+    } catch(error) {
+        console.error(error); 
+        res.status(500).json({ error: "Error adding staff member"})
     }
 });
 
@@ -88,5 +112,24 @@ router.delete('/resources/:name', async (req: Request, res: Response) => {
         res.status(500).json({error: "failed to delete resource"});
     }
 });
+
+router.delete('/staff/:id', async (req: Request, res: Response) => {
+    const id = Number(req.params.id); 
+
+    if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid ID format" });
+    }
+    try {
+        const result: any = await deleteStaff(id); 
+
+        if(result.affectedRows === 0) {
+            return res.status(404).json({message: "staff member not found" })
+        }
+        res.json({ message: "staff member deleted successfully"});
+    } catch (error) {
+        res.status(500).json({error: "failed to delete staff member"});
+    }
+});
+
 
 export default router; 

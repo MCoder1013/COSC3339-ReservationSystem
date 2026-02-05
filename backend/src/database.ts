@@ -11,6 +11,9 @@ type RoomType = 'Economy' | 'Oceanview' | 'Balcony' | "Suite";
 type Categories = 'Gear' | 'Medical' | 'Event' | 'Cleaning' | 'Other';
 type ResourceStatus = 'Available' | 'Out' | 'Maintenance';
 
+type role = 'Nurse' | 'Tour Guide' | 'Security' | 'Housekeeping' | 'Other';
+type shift = 'Morning' | 'Day' | 'Night';
+
 const pool = await mysql.createPool({
     host: 'localhost',
     user: process.env.DB_USER,
@@ -60,9 +63,30 @@ export async function pullRooms() {
     }
 }
 
+// pull all staff from staff table
+export async function pullStaff() {
+    try{
+        const[rows] = await pool.query("SELECT * FROM staff"); 
+        return rows; 
+    } catch (error) {
+        console.error("Error getting staff members: ", error);
+        throw error; 
+    }
+};
+
 // add a room
 export async function addRoom(cabin_number: string, deck: number, type: RoomType, capacity: number, status: RoomStatus){
     try {
+        if (capacity <= 0) {
+            throw new Error("Capacity must be greater than 0");
+        }
+        
+        const [existing]: any = await pool.query("SELECT cabin_number FROM cabins WHERE cabin_number = ?", [cabin_number]);
+        
+        if (existing.length > 0) {
+            throw new Error("Cabin number already exists");
+        }
+        
         const[results] = await pool.query("INSERT INTO cabins (cabin_number, deck, type, capacity, status) VALUES (?, ?, ?, ?, ?)", 
             [cabin_number, deck, type, capacity, status]);
 
@@ -76,6 +100,16 @@ export async function addRoom(cabin_number: string, deck: number, type: RoomType
 // add a resource
 export async function addResources(name: string, category: Categories, quantity: number, status: ResourceStatus){
     try {
+        if (quantity <= 0) {
+            throw new Error("Quantity must be greater than 0");
+        }
+
+        const [existing]: any = await pool.query("SELECT name FROM resources WHERE name = ?", [name]);
+        
+        if (existing.length > 0) {
+            throw new Error("Resource name already exists");
+        }
+        
         const[results] = await pool.query("INSERT INTO resources (name, category, quantity, status) VALUES (?, ?, ?, ?)", 
             [name, category, quantity, status]);
 
@@ -85,8 +119,25 @@ export async function addResources(name: string, category: Categories, quantity:
         throw error;
     }
 }
+// CREATE TABLE IF NOT EXISTS staff (
+//   id INT AUTO_INCREMENT PRIMARY KEY,
+//   name VARCHAR(100) NOT NULL,
+//   role ENUM('Nurse','Tour Guide','Security','Housekeeping','Other') NOT NULL DEFAULT 'Other',
+//   email VARCHAR(255) NOT NULL UNIQUE,
+//   shift ENUM('Morning','Day','Night') NOT NULL DEFAULT 'Day'
+// );
+// add a staff member
+export async function addStaff(id:number, name: string, role: role, email: String, shift:shift){
+    try {
+        const[results] = await pool.query("INSERT INTO staff (id, name, role, email, shift) VALUES (?, ?, ?, ?, ?)", 
+            [id, name, role, email, shift]);
 
-
+        return results;
+    } catch(error) {
+        console.error("Error adding staff: ", error); 
+        throw error;
+    }
+}
 // Delete room by name instead of id since users won't know id
 export async function deleteRoom(cabin_number: string){
     try {
@@ -110,4 +161,18 @@ export async function deleteResource(name: string){
         throw error;
     }
 }
+
+// Delete resource by name instead of id since users won't know id
+export async function deleteStaff(id: number){
+    try {
+        const[results] = await pool.query("DELETE FROM staff WHERE id = ?", 
+            [id]);
+        return results;
+    } catch(error) {
+        console.error("Error deleting resource: ", error); 
+        throw error;
+    }
+}
+
+
 
