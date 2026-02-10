@@ -14,6 +14,8 @@ type ResourceStatus = 'Available' | 'Out' | 'Maintenance';
 type role = 'Nurse' | 'Tour Guide' | 'Security' | 'Housekeeping' | 'Other';
 type shift = 'Morning' | 'Day' | 'Night';
 
+type ReservationStatus = 'Pending' | 'Confirmed' | 'Cancelled'; 
+
 const pool = await mysql.createPool({
     host: 'localhost',
     user: process.env.DB_USER,
@@ -135,7 +137,7 @@ export async function addResources(name: string, category: Categories, quantity:
 //   shift ENUM('Morning','Day','Night') NOT NULL DEFAULT 'Day'
 // );
 // add a staff member
-export async function addStaff(id:number, name: string, role: role, email: String, shift:shift){
+export async function addStaff(id:number, name: string, role: role, email: string, shift:shift){
     try {
         const[results] = await pool.query("INSERT INTO staff (id, name, role, email, shift) VALUES (?, ?, ?, ?, ?)", 
             [id, name, role, email, shift]);
@@ -144,6 +146,19 @@ export async function addStaff(id:number, name: string, role: role, email: Strin
     } catch(error) {
         console.error("Error adding staff: ", error); 
         throw error;
+    }
+}
+
+export async function addReservation(id: number, user_id: number, cabin_id: number, resource_id: number, staff_id: number, start_time: string, end_time: string, status: ReservationStatus, created_at: string) {
+    try {
+        const[results] = await pool.query("INSERT INTO reservations (id, user_id, cabin_id, resource_id, staff_id, start_time, end_time, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", 
+            [id, user_id, cabin_id, resource_id, staff_id, start_time, end_time, status, created_at]
+        );
+        return results;
+    }
+    catch(error) {
+        console.error("Error adding staff: ", error); 
+        throw error; 
     }
 }
 // Delete room by name instead of id since users won't know id
@@ -177,10 +192,20 @@ export async function deleteStaff(id: number){
             [id]);
         return results;
     } catch(error) {
-        console.error("Error deleting resource: ", error); 
+        console.error("Error deleting staff member: ", error); 
         throw error;
     }
 }
 
 
+export async function deleteReservation(id: number) {
+    try { 
+        const[results] = await pool.query("DELETE FROM reservations WHERE id = ? ",
+        [id]);
+    }
+    catch(error) {
+        console.error("Error deleting reservation");
+        throw error; 
+    }
+}
 
