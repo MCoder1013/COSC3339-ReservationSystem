@@ -46,10 +46,13 @@ router.post("/rooms", async(req: Request, res: Response) => {
         }); 
     } catch (error: any) {
         console.error(error);
-        res.status(400).json({ error: error.message || "Error when adding a room"});
+        res.status(400).json({ error: "Error when adding a room"});
     }
 }); 
 
+// router.post("/reservations", async(req: Request, res: Response) => {
+//     const{ }
+// })
 router.post("/resources", async(req: Request, res: Response) => {
     const{ name, category, quantity, status } = req.body;
 
@@ -61,7 +64,7 @@ router.post("/resources", async(req: Request, res: Response) => {
         });
     } catch(error: any) {
         console.error(error);
-        res.status(400).json({ error: error.message || "Error when adding a resource"});
+        res.status(400).json({ error: "Error when adding a resource"});
     }
 });
 
@@ -77,7 +80,7 @@ router.post("/staff", async(req: Request, res: Response) =>  {
 
     } catch(error) {
         console.error(error); 
-        res.status(500).json({ error: "Error adding staff member"})
+        res.status(500).json({error: "Error adding staff member"})
     }
 });
 
@@ -130,6 +133,7 @@ router.delete('/staff/:id', async (req: Request, res: Response) => {
         res.status(500).json({error: "failed to delete staff member"});
     }
 });
+
 
 
 export default router; 

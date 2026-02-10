@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS cabins (
 -- 3) Resources
 CREATE TABLE IF NOT EXISTS resources (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  name VARCHAR(100) NOT NULL UNIQUE,
+  name VARCHAR(100) NOT NULL,
   category ENUM('Gear','Medical','Event','cleaning','Other') NOT NULL DEFAULT 'Other',
   quantity INT NOT NULL,
   status ENUM('Available','Out','Maintenance') NOT NULL DEFAULT 'Available'
