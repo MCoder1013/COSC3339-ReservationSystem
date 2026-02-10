@@ -50,6 +50,9 @@ router.post("/rooms", async(req: Request, res: Response) => {
     }
 }); 
 
+// router.post("/reservations", async(req: Request, res: Response) => {
+//     const{ }
+// })
 router.post("/resources", async(req: Request, res: Response) => {
     const{ name, category, quantity, status } = req.body;
 
@@ -130,6 +133,7 @@ router.delete('/staff/:id', async (req: Request, res: Response) => {
         res.status(500).json({error: "failed to delete staff member"});
     }
 });
+
 
 
 export default router; 
