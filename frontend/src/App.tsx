@@ -1,8 +1,9 @@
 import "./App.css";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 export default function App() {
   const shipName = "Starlight Pearl Cruises";
+  const navigate = useNavigate();
 
   return (
     <div className="page">
@@ -24,7 +25,7 @@ export default function App() {
           <h2>Sail Where the Stars Lead</h2>
           <h3>Your ocean journey, guided by starlight.</h3>
 
-          <button>Book Your Trip</button>
+          <button onClick={() => navigate("/signin")}>Book Your Trip</button>
         </section>
 
         {/* <section className="section">

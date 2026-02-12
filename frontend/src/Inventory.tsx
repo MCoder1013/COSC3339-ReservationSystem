@@ -9,18 +9,12 @@ const shipName = "Starlight Pearl Cruises";
 
 const [formError, setFormError] = useState<string>("");
 
-  // ✅ 1. Categories
+  //tabs
   const categories = ["Rooms", "Items"] as const;
 
-  // ✅ 2. Current selected category
+  //current selected tab
   const [activeCategory, setActiveCategory] =
     useState<(typeof categories)[number]>("Rooms");
-  
-  // ✅ 3. Inventory data from backend (or dummy data as fallback)
-  // const [inventoryData, setInventoryData] = useState({
-  //   Rooms: ["Ocean View Suite", "Balcony Cabin", "Interior Room", "Family Suite"],
-  //   Items: ["Sunscreen", "Beach Towel", "Snorkel Gear", "Travel Pillow"],
-  // });
 
   const [inventoryData, setInventoryData] = useState<{
     Rooms: any[];
@@ -30,11 +24,11 @@ const [formError, setFormError] = useState<string>("");
     Items: [],
   });
 
-  // ✅ 4. Modal state
+  //modal state
   const [showModal, setShowModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   
-  // ✅ 5. Form data for rooms
+  //form data for rooms
   const [roomForm, setRoomForm] = useState({
     cabin_number: "",
     deck: "",
@@ -43,7 +37,7 @@ const [formError, setFormError] = useState<string>("");
     status: "Available"
   });
   
-  // ✅ 6. Form data for items
+  //form data for items
   const [itemForm, setItemForm] = useState({
     name: "",
     category: "Other",
@@ -51,10 +45,10 @@ const [formError, setFormError] = useState<string>("");
     status: "Available"
   });
 
-  // ✅ 7. Delete form state
+  //delete form state
   const [deleteId, setDeleteId] = useState("");
 
-  // ✅ 7. Fetch data from backend API
+  //fetch data from backend API
   useEffect(() => {
     const loadInventory = async () => {
       try {
@@ -74,7 +68,7 @@ const [formError, setFormError] = useState<string>("");
   }, []);
 
 
-  // ✅ 8. Handle form submission
+  //form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -125,7 +119,7 @@ const [formError, setFormError] = useState<string>("");
         return;
       }
 
-      // 🔄 Refresh inventory
+      //refresh inventory
       const roomsData = await fetchData("/api/rooms");
       const itemsData = await fetchData("/api/resources");
 
@@ -142,7 +136,7 @@ const [formError, setFormError] = useState<string>("");
     }
   };
 
-  // ✅ 9. Handle delete submission
+  //handle delete submission
   const handleDeleteSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -156,7 +150,7 @@ const [formError, setFormError] = useState<string>("");
         method: "DELETE",
       });
 
-      // 🔄 Refresh inventory
+      //refresh inventory
       const roomsData = await fetchData("/api/rooms");
       const itemsData = await fetchData("/api/resources");
 
@@ -191,7 +185,7 @@ const [formError, setFormError] = useState<string>("");
         <main className="container section inventoryDisplay">
         <h2>Inventory</h2>
 
-        {/* ✅ Buttons to switch categories */}
+        {/*Buttons to switch categories */}
         <div className="tabButtons">
           {categories.map((category) => (
             <button
@@ -206,31 +200,57 @@ const [formError, setFormError] = useState<string>("");
 
           <br />
 
-        {/* ✅ Add/Delete buttons */}
+        {/*Add/Delete buttons */}
         <button className="addButton" onClick={() => setShowModal(true)}>
           Add {activeCategory.slice(0, -1)}
         </button>
         <button className="deleteButton" onClick={() => setShowDeleteModal(true)}>Delete {activeCategory.slice(0, -1)}</button>
 
-        {/* ✅ List changes dynamically */}
-        <ul className="inventoryList">
-          {inventoryData[activeCategory].map((item) => (
-            <li key={item.id} className="inventoryItem">
-              {activeCategory === "Rooms" ? (
-                <>
-                  Cabin {item.cabin_number} — Deck {item.deck} — {item.type} — {item.status}
-                </>
-              ) : (
-                <>
-                  {item.name} ({item.category}) — Qty: {item.quantity} — {item.status}
-                </>
-              )}
-            </li>
-          ))}
-        </ul>
-      </main>
+        {/*changes table dynamically */}
+        <table className="inventoryTable">
+          <thead>
+            {activeCategory === "Rooms" ? (
+              <tr>
+                <th>Cabin</th>
+                <th>Deck</th>
+                <th>Status</th>
+              </tr>
+            ) : (
+              <tr>
+                <th>Name</th>
+                <th>Category</th>
+                <th>Quantity</th>
+                <th>Status</th>
+              </tr>
+            )}
+          </thead>
 
-      {/* ✅ Modal for adding rooms/items */}
+          <tbody>
+            {inventoryData[activeCategory].map((item) =>
+              activeCategory === "Rooms" ? (
+                <tr key={item.id}>
+                  <td>{item.cabin_number}</td>
+                  <td>{item.deck}</td>
+                  <td>{item.status}</td>
+                </tr>
+              ) : (
+                <tr key={item.id}>
+                  <td>{item.name}</td>
+                  <td>{item.category}</td>
+                  <td>{item.quantity}</td>
+                  <td>{item.status}</td>
+                </tr>
+              )
+            )}
+          </tbody>
+        </table>
+
+      </main>
+      <footer className="footer">
+        <div className="container">© 2026 {shipName}</div>
+      </footer>
+
+      {/*modal for adding rooms/items */}
       {showModal && (
         <div className="modal" onClick={() => setShowModal(false)}>
           <div className="modalContent" onClick={(e) => e.stopPropagation()}>
@@ -293,7 +313,7 @@ const [formError, setFormError] = useState<string>("");
                       onChange={(e) => setRoomForm({...roomForm, status: e.target.value})}
                     >
                       <option value="Available">Available</option>
-                      <option value="Unavalible">Unavalible</option>
+                      <option value="Unavailable">Unavailable</option>
                       <option value="Maintenance">Maintenance</option>
                     </select>
                   </label>
@@ -352,14 +372,7 @@ const [formError, setFormError] = useState<string>("");
               )}
 
               {formError && (
-                <div className="errorMessage" style={{
-                  backgroundColor: '#fee',
-                  border: '1px solid #fcc',
-                  color: '#c33',
-                  padding: '10px',
-                  borderRadius: '4px',
-                  marginBottom: '15px'
-                }}>
+                <div className="errorMessage">
                   {formError}
                 </div>
               )}
@@ -371,7 +384,7 @@ const [formError, setFormError] = useState<string>("");
         </div>
       )}
 
-      {/* ✅ Modal for deleting rooms/items */}
+      {/*modal for deleting rooms/items */}
       {showDeleteModal && (
         <div className="modal" onClick={() => setShowDeleteModal(false)}>
           <div className="modalContent" onClick={(e) => e.stopPropagation()}>
