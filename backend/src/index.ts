@@ -22,8 +22,8 @@ app.get('/', (_req, res) => {
 
 // The "Health Check" route your frontend button calls
 app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'Alive', 
+  res.json({
+    status: 'Alive',
     message: 'Backend is talking to Frontend!',
     timestamp: new Date().toISOString()
   });
