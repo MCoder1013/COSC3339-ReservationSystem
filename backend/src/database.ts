@@ -11,8 +11,8 @@ type RoomType = 'Economy' | 'Oceanview' | 'Balcony' | "Suite";
 type Categories = 'Gear' | 'Medical' | 'Event' | 'Cleaning' | 'Other';
 type ResourceStatus = 'Available' | 'Out' | 'Maintenance';
 
-type role = 'Nurse' | 'Tour Guide' | 'Security' | 'Housekeeping' | 'Other';
-type shift = 'Morning' | 'Day' | 'Night';
+type Role = 'Nurse' | 'Tour Guide' | 'Security' | 'Housekeeping' | 'Other';
+type Shift = 'Morning' | 'Day' | 'Night';
 
 type ReservationStatus = 'Pending' | 'Confirmed' | 'Cancelled';
 
@@ -76,21 +76,32 @@ export async function pullStaff() {
     }
 };
 
+interface NewRoom {
+    cabin_number: string
+    deck: number
+    type: RoomType
+    capacity: number
+    status: RoomStatus
+}
+
 // add a room
-export async function addRoom(cabin_number: string, deck: number, type: RoomType, capacity: number, status: RoomStatus) {
+export async function addRoom(r: NewRoom) {
     try {
-        if (capacity <= 0) {
+        if (r.capacity <= 0) {
             throw new Error("Capacity must be greater than 0");
         }
 
-        const [existing]: any = await pool.query("SELECT cabin_number FROM cabins WHERE cabin_number = ?", [cabin_number]);
+        const [existing]: any = await pool.query(
+            "SELECT cabin_number FROM cabins WHERE cabin_number = ?",
+            [r.cabin_number]
+        );
 
         if (existing.length > 0) {
             throw new Error("Cabin number already exists");
         }
 
         const [results] = await pool.query("INSERT INTO cabins (cabin_number, deck, type, capacity, status) VALUES (?, ?, ?, ?, ?)",
-            [cabin_number, deck, type, capacity, status]);
+            [r.cabin_number, r.deck, r.type, r.capacity, r.status]);
 
         return results;
     } catch (error) {
@@ -121,6 +132,14 @@ export async function addResources(name: string, category: Categories, quantity:
         throw error;
     }
 }
+
+interface NewStaff {
+    name: string
+    role: Role
+    email: string
+    shift: Shift
+}
+
 // CREATE TABLE IF NOT EXISTS staff (
 //   id INT AUTO_INCREMENT PRIMARY KEY,
 //   name VARCHAR(100) NOT NULL,
@@ -129,10 +148,10 @@ export async function addResources(name: string, category: Categories, quantity:
 //   shift ENUM('Morning','Day','Night') NOT NULL DEFAULT 'Day'
 // );
 // add a staff member
-export async function addStaff(id: number, name: string, role: role, email: string, shift: shift) {
+export async function addStaff(s: NewStaff) {
     try {
-        const [results] = await pool.query("INSERT INTO staff (id, name, role, email, shift) VALUES (?, ?, ?, ?, ?)",
-            [id, name, role, email, shift]);
+        const [results] = await pool.query("INSERT INTO staff (name, role, email, shift) VALUES (?, ?, ?, ?)",
+            [s.name, s.role, s.email, s.shift]);
 
         return results;
     } catch (error) {
@@ -181,11 +200,11 @@ interface Reservation {
     status: ReservationStatus
     created_at: string
 }
-export async function listReservations(): Promise<Reservation[]> {
-    // don't show reservations from the past. required info: Reservation ID,
-    // Name of Item Reserved, User Email, Start Date, End Date
+export async function pullReservations(): Promise<Reservation[]> {
+    // required info: Reservation ID, Name of Item Reserved, User Email, Start
+    // Date, End Date. also, it shouldn't show reservations from the past.
 
-    const [rows, fieldPackets]: [RowDataPacket[], mysql.FieldPacket[]] = await pool.query(
+    const [rows]: [RowDataPacket[], mysql.FieldPacket[]] = await pool.query(
         `SELECT
             r.id, user_id, cabin_id, resource_id, staff_id, start_time, end_time, r.status, r.created_at, u.email
         FROM
@@ -193,12 +212,10 @@ export async function listReservations(): Promise<Reservation[]> {
             users u
         WHERE
             r.user_id = u.id AND
-            r.end_time < NOW()
+            r.end_time > NOW()
         `
     );
 
-    console.log('queryResult, rows:', rows, fieldPackets);
-    // rows[0].
     return rows as Reservation[];
 }
 

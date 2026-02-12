@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { pullResources, pullRooms, addRoom, addResources, deleteRoom, deleteResource, addStaff, pullStaff, deleteStaff, addReservation, deleteReservation, listReservations } from '../database.js';
+import { pullResources, pullRooms, addRoom, addResources, deleteRoom, deleteResource, addStaff, pullStaff, deleteStaff, addReservation, deleteReservation, pullReservations } from '../database.js';
 
 const router = Router();
 
@@ -26,8 +26,8 @@ router.get('/rooms', async (req: Request, res: Response) => {
 router.get('/staff', async (req: Request, res: Response) => {
     try {
         const staff = await pullStaff();
-        res.json(staff);
 
+        res.json(staff);
     } catch (error) {
         res.status(500).json({ error: "Failed to load staff members" })
     }
@@ -38,7 +38,8 @@ router.post("/rooms", async (req: Request, res: Response) => {
     const { cabin_number, deck, type, capacity, status } = req.body;
 
     try {
-        const result = await addRoom(cabin_number, deck, type, capacity, status);
+        const result = await addRoom({ cabin_number, deck, type, capacity, status });
+
         res.status(201).json({
             message: "Room added successfully!",
             roomId: (result as any).insertId
@@ -50,11 +51,11 @@ router.post("/rooms", async (req: Request, res: Response) => {
 });
 
 router.post("/reservations", async (req: Request, res: Response) => {
-    console.log('req.body', req.body)
     const { user_id, cabin_id, resource_id, staff_id, start_time, end_time } = req.body;
 
     try {
         const result = await addReservation({ user_id, cabin_id, resource_id, staff_id, start_time, end_time });
+
         res.status(201).json({
             message: "Reservation added suceessfuly",
             reservationId: (result as any).insertId
@@ -67,7 +68,8 @@ router.post("/reservations", async (req: Request, res: Response) => {
 
 
 router.get("/reservations", async (req: Request, res: Response) => {
-    const result = await listReservations();
+    const result = await pullReservations();
+
     res.status(200).json(result);
 })
 
@@ -87,10 +89,10 @@ router.post("/resources", async (req: Request, res: Response) => {
 });
 
 router.post("/staff", async (req: Request, res: Response) => {
-    const { id, name, role, email, shift } = req.body;
+    const { name, role, email, shift } = req.body;
 
     try {
-        const result = await addStaff(id, name, role, email, shift);
+        const result = await addStaff({ name, role, email, shift });
         res.status(201).json({
             message: "Staff member added",
             staffId: (result as any).insertId
