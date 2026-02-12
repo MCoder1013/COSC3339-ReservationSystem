@@ -68,6 +68,9 @@ export default function ReservationTable() {
             <Link className="navButton" to="/">
               Home
             </Link>
+            <Link className="navButton" to="/user-reservations">
+              User Reservations
+            </Link>
           </nav>
         </div>
       </header>

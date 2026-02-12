@@ -2,12 +2,16 @@ import express from 'express';
 import cors from 'cors'; // Required for Frontend-to-Backend communication
 import inventoryRoutes from "./routes/inventory.js";
 import authRoutes from "./routes/auth.js";
+import reservationRoutes from "./routes/reservations.js";
 import cookieParser from 'cookie-parser';
 
 const app = express();
 
 // MIDDLEWARE
-app.use(cors()); // This tells the browser: "It's okay to accept requests from my frontend"
+app.use(cors({
+  origin: true, // Allow requests from frontend
+  credentials: true // Allow cookies to be sent
+})); // This tells the browser: "It's okay to accept requests from my frontend"
 app.use(express.json()); // This allows the backend to read JSON sent by your frontend
 app.use(cookieParser())
 
@@ -28,6 +32,7 @@ app.get('/api/health', (req, res) => {
 // INVENTORY ROUTES
 app.use("/api", inventoryRoutes);
 app.use("/api/auth", authRoutes);
+app.use("/api", reservationRoutes);
 
 const PORT = 3000;
 
