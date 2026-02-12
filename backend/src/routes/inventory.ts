@@ -51,6 +51,7 @@ router.post("/rooms", async (req: Request, res: Response) => {
 });
 
 router.post("/reservations", async (req: Request, res: Response) => {
+    // Need a safe way to get the user id and add it in since we are not getting that from the frontend
     const { user_id, cabin_id, resource_id, staff_id, start_time, end_time } = req.body;
 
     try {

@@ -87,6 +87,10 @@ interface NewRoom {
 // add a room
 export async function addRoom(r: NewRoom) {
     try {
+        if (r.cabin_number == ' ' || r.cabin_number == ''){
+            throw new Error("Can't have empty name");
+        }
+        
         if (r.capacity <= 0) {
             throw new Error("Capacity must be greater than 0");
         }
@@ -174,13 +178,59 @@ interface NewReservation {
 }
 export async function addReservation(r: NewReservation) {
     try {
+        // const start = new Date(r.start_time);
+        // const end = new Date(r.end_time);
+
+        // if (start >= end) {
+        //     throw new Error("End time must be after start time");
+        // }
+
+        // const [conflicts]: any = await pool.query(
+        //     `
+        //     SELECT id FROM reservations
+        //     WHERE cabin_id = ?
+        //     AND status != 'cancelled'
+        //     AND (
+        //             (? < end_time) AND (? > start_time)
+        //         )
+        //     `,
+        //     [r.cabin_id, r.start_time, r.end_time]
+        // );
+
+        // if (conflicts.length > 0) {
+        //     throw new Error("Cabin is already reserved for this time range");
+        // }
+
+        // const [[resource]]: any = await pool.query(
+        //     "SELECT quantity FROM resources WHERE id = ?",
+        //     [r.resource_id]
+        // );
+
+        // if (!resource) {
+        //     throw new Error("Resource does not exist");
+        // }
+
+        // const [activeReservations]: any = await pool.query(
+        //     `
+        //     SELECT COUNT(*) as count FROM reservations
+        //     WHERE resource_id = ?
+        //     AND status != 'cancelled'
+        //     AND (? < end_time AND ? > start_time)
+        //     `,
+        //     [r.resource_id, r.start_time, r.end_time]
+        // );
+
+        // if (activeReservations[0].count >= resource.quantity) {
+        //     throw new Error("Resource is fully booked for this time");
+        // }
+        
         const [results] = await pool.query(
             "INSERT INTO reservations (user_id, cabin_id, resource_id, staff_id, start_time, end_time) VALUES (?, ?, ?, ?, ?, ?)",
             [
                 r.user_id,
-                r.cabin_id,
-                r.resource_id,
-                r.staff_id,
+                r.cabin_id || null,
+                r.resource_id || null,
+                r.staff_id || null,
                 r.start_time,
                 r.end_time,
             ]
@@ -188,7 +238,7 @@ export async function addReservation(r: NewReservation) {
         return results;
     }
     catch (error) {
-        console.error("Error adding staff: ", error);
+        console.error("Error adding reservation: ", error);
         throw error;
     }
 }

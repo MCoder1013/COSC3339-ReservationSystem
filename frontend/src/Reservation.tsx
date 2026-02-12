@@ -130,22 +130,30 @@ export default function Reservation() {
       try {
         // TODO: Replace with actual reservation API endpoint when available
         const reservationData = {
-          itemId: itemReservationForm.itemId,
-          quantity: quantity,
-          startDateTime: startDateTime,
-          endDateTime: endDateTime,
+          resource_id: itemReservationForm.itemId,
+          start_time: startDateTime,
+          end_time: endDateTime,
         };
 
-        console.log("Reservation Data:", reservationData);
+        console.log(reservationData);
+
+        // console.log("Reservation Data:", reservationData);
         
         // Placeholder for actual API call
-        // const response = await fetch(`${API_URL}/api/reservations`, {
-        //   method: "POST",
-        //   headers: { "Content-Type": "application/json" },
-        //   body: JSON.stringify(reservationData),
-        // });
+        const response = await fetch(`${API_URL}/api/reservations`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(reservationData),
+        });
 
-        alert("Reservation submitted successfully! (API endpoint not yet implemented)");
+        if (!response.ok) {
+          throw new Error(`Failed to create reservation: ${response.status}`);
+        }
+
+        const result = await response.json();
+        console.log("Reservation created:", result);
+
+        alert("Reservation submitted successfully!");
         
         // Reset form
         setItemReservationForm({ itemId: "", quantity: "" });
