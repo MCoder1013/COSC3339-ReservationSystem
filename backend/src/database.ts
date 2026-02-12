@@ -236,11 +236,11 @@ interface NewReservation {
 export async function addReservation(r: NewReservation) {
     const connection: PoolConnection = await pool.getConnection(); 
     try {
-
+            
         await connection.beginTransaction();
-        await checkStaffTime(r, connection);
-        await checkCabinTime(r, connection);
-        await checkResourceCount(r, connection);
+        if (r.cabin_id) await checkCabinTime(r, connection);
+        if (r.resource_id) await checkResourceCount(r, connection);
+        if (r.staff_id) await checkStaffTime(r, connection);
 
         const [results] = await connection.query(
             "INSERT INTO reservations (user_id, cabin_id, resource_id, staff_id, start_time, end_time) VALUES (?, ?, ?, ?, ?, ?)",
