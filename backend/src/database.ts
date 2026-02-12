@@ -269,3 +269,29 @@ export async function deleteReservation(id: number) {
     }
 }
 
+// Get all item reservations for a specific user
+export async function getUserItemReservations(userId: number) {
+    try {
+        const [rows] = await pool.query(`
+            SELECT 
+                r.id,
+                u.first_name,
+                u.last_name,
+                res.name AS resource_name,
+                res.category,
+                r.start_time,
+                r.end_time,
+                r.status
+            FROM reservations r
+            JOIN users u ON r.user_id = u.id
+            JOIN resources res ON r.resource_id = res.id
+            WHERE r.user_id = ? AND r.resource_id IS NOT NULL
+            ORDER BY r.start_time DESC
+        `, [userId]);
+        return rows;
+    } catch (error) {
+        console.error("Error getting user item reservations: ", error);
+        throw error;
+    }
+}
+
