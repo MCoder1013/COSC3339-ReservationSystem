@@ -36,7 +36,7 @@ export default function SignIn() {
       setError("");
       setEmail("");
       setPassword("");
-      setTimeout(() => { navigate('/inventory') }, 1000);
+      setTimeout(() => { navigate('/reservation') }, 1000);
     } catch {
       // If error occurs this will be printed!
       setError("Login failed. Please check your credentials.");
