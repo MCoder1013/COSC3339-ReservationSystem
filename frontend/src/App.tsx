@@ -15,6 +15,7 @@ export default function App() {
           <nav className="navLinks">
             <Link className="navButton" to="/signin">Sign In</Link>
             <Link className="navButton" to="/inventory">Inventory</Link>
+            <Link className="navButton" to="/reservations">Reservations</Link>
           </nav>
 
         </div>
