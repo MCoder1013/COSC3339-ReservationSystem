@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect } from "react";
 import "./App.css";
 import { Link } from "react-router-dom";
@@ -46,39 +47,43 @@ export default function Reservation() {
   const [endDateTime, setEndDateTime] = useState<Value>(new Date());
 
   //package reservation form state
-  const [packageReservationForm, setPackageReservationForm] = useState({
-    packageId: "",
-  });
+  // const [packageReservationForm, setPackageReservationForm] = useState({
+  //   packageId: "",
+  // });
 
   //fetch available items from backend API
-  useEffect(() => {
-    const loadAvailableItems = async () => {
-      try {
-        const itemsData = await fetchData("/api/resources");
-        //shows only currently available items from database
-        const available = itemsData.filter((item: any) => item.status === "Available");
-        setAvailableItems(available);
-      } catch (error) {
-        console.error("Error fetching available items:", error);
-      }
-    };
+  const loadAvailableItems = async () => {
+    try {
+      const itemsData = await fetchData("/api/resources");
+      //shows only currently available items from database
+      const available = itemsData.filter((item: any) => item.status === "Available");
+      setAvailableItems(available);
+    } catch (error) {
+      console.error("Error fetching available items:", error);
+    }
+  };
 
+  useEffect(() => {
     loadAvailableItems();
   }, []);
+
+  useEffect(() => {
+    setFormError("");
+  }, [activeCategory]);
   
   //fetch available rooms from backend API
-  useEffect(() => {
-    const loadAvailableRooms = async () => {
-      try {
-        const roomsData = await fetchData("/api/rooms");
-        //shows only currently available rooms from database
-        const available = roomsData.filter((room: any) => room.status === "Available");
-        setAvailableRooms(available);
-      } catch (error) {
-        console.error("Error fetching available rooms:", error);
-      }
-    };
+  const loadAvailableRooms = async () => {
+    try {
+      const roomsData = await fetchData("/api/rooms");
+      //shows only currently available rooms from database
+      const available = roomsData.filter((room: any) => room.status === "Available");
+      setAvailableRooms(available);
+    } catch (error) {
+      console.error("Error fetching available rooms:", error);
+    }
+  };
 
+  useEffect(() => {
     loadAvailableRooms();
   }, []);
 
@@ -88,15 +93,15 @@ export default function Reservation() {
     
     if (itemReservationForm.itemId && itemReservationForm.quantity) {
       const selectedItem = availableItems.find((item) => String(item.id) === String(itemReservationForm.itemId));
-      console.log("Selected Item:", selectedItem);
-      console.log("Entered Quantity:", itemReservationForm.quantity);
-      console.log("Available Quantity:", selectedItem?.quantity);
+      // console.log("Selected Item:", selectedItem);
+      // console.log("Entered Quantity:", itemReservationForm.quantity);
+      // console.log("Available Quantity:", selectedItem?.quantity);
       
       if (selectedItem) {
         const quantity = parseInt(itemReservationForm.quantity);
-        console.log("Parsed Quantity:", quantity, "Type:", typeof quantity);
-        console.log("Selected Item Quantity:", selectedItem.quantity, "Type:", typeof selectedItem.quantity);
-        console.log("Comparison Result:", quantity > selectedItem.quantity);
+        // console.log("Parsed Quantity:", quantity, "Type:", typeof quantity);
+        // console.log("Selected Item Quantity:", selectedItem.quantity, "Type:", typeof selectedItem.quantity);
+        // console.log("Comparison Result:", quantity > selectedItem.quantity);
         
         if (!isNaN(quantity) && quantity > selectedItem.quantity) {
           errorMessage = `Quantity exceeds available amount. Available: ${selectedItem.quantity}`;
@@ -172,7 +177,9 @@ export default function Reservation() {
           resource_id: Number(itemReservationForm.itemId),
           start_time: formatForMySQL(start!),
           end_time: formatForMySQL(end!),
+          quantity_reserved: quantity,
         };
+        console.log(reservationData)
         
         const response = await fetch(`${API_URL}/api/reservations`, {
           method: "POST",
@@ -187,12 +194,16 @@ export default function Reservation() {
            throw new Error(`Failed to create reservation: ${response.status}`);
         }
 
-        alert("Reservation submitted successfully!");
-        
         // Reset form
         setItemReservationForm({ itemId: "", quantity: "" });
         setStartDateTime(new Date());
         setEndDateTime(new Date());
+        
+        // Refresh available items to show updated quantities
+        await loadAvailableItems();
+        
+        // Refresh available items to show updated quantities
+        await loadAvailableItems();
       } 
       catch (error) {
         console.error("Failed to create reservation:", error);
@@ -236,14 +247,17 @@ export default function Reservation() {
         const start = getDate(startDateTime, 0);
         const end = getDate(endDateTime, 0);
         const formatForMySQL = (date: Date) => {
-          return date.toISOString().slice(0, 19).replace('T', ' ');
+          return formatInTimeZone(date, 'America/Chicago', 'yyyy-MM-dd HH:mm:ss');
         };
 
         const reservationData = {
           cabin_id: Number(roomReservationForm.cabinId),
           start_time: formatForMySQL(start!),
           end_time: formatForMySQL(end!),
+          quantity_reserved: 1,
         };
+
+        console.log(reservationData);
         
         const response = await fetch(`${API_URL}/api/reservations`, {
           method: "POST",
@@ -253,21 +267,25 @@ export default function Reservation() {
         });
 
         if (!response.ok) {
-           const errorData = await response.json();
-           console.error("Backend error:", errorData);
-           throw new Error(`Failed to create reservation: ${response.status}`);
+          const errorData = await response.json();
+          console.error("Backend error:", errorData);
+          throw new Error(errorData.error || "Failed to create reservation");
         }
-
-        alert("Room reservation submitted successfully!");
         
         // Reset form
         setRoomReservationForm({ cabinId: "" });
         setStartDateTime(new Date());
         setEndDateTime(new Date());
+        
+        // Refresh available rooms to show updated availability
+        await loadAvailableRooms();
+        
+        // Refresh available rooms to show updated availability
+        await loadAvailableRooms();
       } 
-      catch (error) {
+      catch (error: any) {
         console.error("Failed to create reservation:", error);
-        setFormError("An error occurred. Please try again.");
+        setFormError(error.message);
       }
     } else {
       // Packages tab - placeholder for future implementation
