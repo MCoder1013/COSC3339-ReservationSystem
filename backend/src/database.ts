@@ -273,6 +273,41 @@ export async function pullReservations(): Promise<Reservation[]> {
     return rows as Reservation[];
 }
 
+// Get all reservations with full details (rooms and resources joined)
+export async function getAllReservationsWithDetails() {
+    try {
+        const [rows] = await pool.query(`
+            SELECT 
+                r.id,
+                r.user_id,
+                r.cabin_id,
+                r.resource_id,
+                r.staff_id,
+                r.start_time,
+                r.end_time,
+                r.status,
+                u.first_name,
+                u.last_name,
+                u.email,
+                c.cabin_number,
+                c.type,
+                c.deck,
+                c.capacity,
+                res.name AS resource_name,
+                res.category
+            FROM reservations r
+            LEFT JOIN users u ON r.user_id = u.id
+            LEFT JOIN cabins c ON r.cabin_id = c.id
+            LEFT JOIN resources res ON r.resource_id = res.id
+            ORDER BY r.start_time DESC
+        `);
+        return rows;
+    } catch (error) {
+        console.error("Error getting all reservations with details: ", error);
+        throw error;
+    }
+}
+
 // Delete room by name instead of id since users won't know id
 export async function deleteRoom(cabin_number: string) {
     try {
@@ -344,4 +379,3 @@ export async function getUserItemReservations(userId: number) {
         throw error;
     }
 }
-
