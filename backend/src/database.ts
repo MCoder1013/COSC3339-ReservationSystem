@@ -248,9 +248,18 @@ export async function addReservation(r: NewReservation) {
     try {
 
         await connection.beginTransaction();
-        await checkStaffTime(r, connection);
-        await checkCabinTime(r, connection);
-        await checkResourceCount(r, connection);
+
+        if (r.staff_id != null) {
+            await checkStaffTime(r, connection);
+        }
+
+        if (r.cabin_id != null) {
+            await checkCabinTime(r, connection);
+        }
+
+        if (r.resource_id != null) {
+            await checkResourceCount(r, connection);
+        }
 
         const [results] = await connection.query(
             "INSERT INTO reservations (user_id, cabin_id, resource_id, staff_id, start_time, end_time, quantity_reserved) VALUES (?, ?, ?, ?, ?, ?, ?)",
@@ -326,6 +335,7 @@ export async function getAllReservationsWithDetails() {
                 r.start_time,
                 r.end_time,
                 r.status,
+                r.quantity_reserved,
                 u.first_name,
                 u.last_name,
                 u.email,
@@ -347,6 +357,30 @@ export async function getAllReservationsWithDetails() {
         throw error;
     }
 }
+
+export async function getReservationsByUser(user_id: number) {
+  const [rows] = await pool.query(`
+    SELECT 
+      r.id,
+      r.start_time,
+      r.end_time,
+      r.resource_id,
+      r.cabin_id,
+      r.quantity_reserved,
+      u.email,
+      res.name AS resource_name,
+      c.cabin_number
+    FROM reservations r
+    JOIN users u ON r.user_id = u.id
+    LEFT JOIN resources res ON r.resource_id = res.id
+    LEFT JOIN cabins c ON r.cabin_id = c.id
+    WHERE r.user_id = ?
+    ORDER BY r.start_time DESC
+  `, [user_id]);
+
+  return rows;
+}
+
 
 // Delete room by name instead of id since users won't know id
 export async function deleteRoom(cabin_number: string) {

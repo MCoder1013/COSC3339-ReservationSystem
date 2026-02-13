@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect } from "react";
 import "./App.css";
 import { Link } from "react-router-dom";
@@ -33,43 +34,88 @@ export default function ReservationTable() {
     return date.toLocaleDateString() + " " + date.toLocaleTimeString();
   };
 
-  // Fetch reservations from backend API
+  const loadReservations = async () => {
+    setLoading(true);
+    try {
+      const allReservations = await fetchData("/api/reservations");
+      
+      const now = new Date();
+
+      const itemReservations = allReservations
+        .filter(
+          (res: any) => 
+            res.resource_id !== null && 
+            res.cabin_id === null &&
+            new Date(res.end_time) >= now
+        )
+        .sort((a: any, b: any) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+
+      const roomReservations = allReservations
+        .filter(
+          (res: any) => 
+            res.cabin_id !== null && 
+            res.resource_id === null &&
+            new Date(res.end_time) >= now
+        )
+        .sort((a: any, b: any) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+
+      const packageReservations: any[] = [];
+
+      setReservationData({
+        Items: itemReservations,
+        Rooms: roomReservations,
+        Packages: packageReservations,
+      });
+    } catch (error) {
+      console.error("Error fetching reservations:", error);
+      setFormError("Failed to load reservations");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const loadReservations = async () => {
-      setLoading(true);
-      try {
-        // Fetch all reservations
-        const allReservations = await fetchData("/api/reservations");
-
-        // Filter reservations by type
-        // Items: resource_id is not null, cabin_id is null
-        const itemReservations = allReservations.filter(
-          (res: any) => res.resource_id !== null && res.cabin_id === null
-        );
-
-        // Rooms: cabin_id is not null, resource_id is null
-        const roomReservations = allReservations.filter(
-          (res: any) => res.cabin_id !== null && res.resource_id === null
-        );
-
-        // Packages placeholder (for future implementation)
-        const packageReservations: any[] = [];
-
-        setReservationData({
-          Items: itemReservations,
-          Rooms: roomReservations,
-          Packages: packageReservations,
-        });
-      } catch (error) {
-        console.error("Error fetching reservations:", error);
-        setFormError("Failed to load reservations");
-      } finally {
-        setLoading(false);
-      }
-    };
-
     loadReservations();
   }, []);
+
+  const handleDeleteReservation = async (reservationId: number) => {
+    try {
+      console.log("Deleting reservation:", reservationId);
+      
+      const response = await fetch(`${API_URL}/api/reservations/${reservationId}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+
+      if (response.ok) {
+        await loadReservations();
+        setFormError("");
+        return;
+      }
+
+      let errorMessage = `Failed to delete reservation (Status: ${response.status})`;
+      try {
+        const errorData = await response.json();
+        if (errorData.message) {
+          errorMessage = errorData.message;
+        } else if (errorData.error) {
+          errorMessage = errorData.error;
+        }
+      } catch (jsonError) {
+        console.log(jsonError);
+      }
+
+      setFormError(errorMessage);
+      
+      await loadReservations();
+      
+    } catch (error) {
+      console.error("Exception during delete:", error);
+      setFormError("Failed to delete reservation. Please try again.");
+      
+      await loadReservations();
+    }
+  };
 
   return (
     <div className="page">
@@ -115,8 +161,8 @@ export default function ReservationTable() {
         )}
 
         {activeCategory === "Packages" ? (
-          <div style={{ textAlign: "center", padding: "40px", fontSize: "18px", color: "#666" }}>
-            <p>Coming Soon</p>
+          <div style={{ textAlign: "center", padding: "40px", fontSize: "18px", color: "white" }}>
+            <p>Package Reservations Coming Soon!</p>
           </div>
         ) : loading ? (
           <p>Loading reservations...</p>
@@ -128,31 +174,31 @@ export default function ReservationTable() {
             <thead>
               {activeCategory === "Items" ? (
                 <tr>
-                  <th>Guest Name</th>
-                  <th>Resource Name</th>
-                  <th>Category</th>
+                  <th>Reservation ID</th>
+                  <th>Item Reserved</th>
+                  <th>Quantity</th>
+                  <th>User Email</th>
                   <th>Start Date</th>
                   <th>End Date</th>
-                  <th>Status</th>
+                  <th>Actions</th>
                 </tr>
               ) : activeCategory === "Rooms" ? (
                 <tr>
-                  <th>Guest Name</th>
+                  <th>Reservation ID</th>
                   <th>Cabin Number</th>
-                  <th>Type</th>
-                  <th>Deck</th>
-                  <th>Capacity</th>
+                  <th>User Email</th>
                   <th>Check-In</th>
                   <th>Check-Out</th>
-                  <th>Status</th>
+                  <th>Actions</th>
                 </tr>
               ) : (
                 <tr>
-                  <th>Guest Name</th>
+                  <th>Reservation ID</th>
                   <th>Package Name</th>
+                  <th>User Email</th>
                   <th>Start Date</th>
                   <th>End Date</th>
-                  <th>Status</th>
+                  <th>Actions</th>
                 </tr>
               )}
             </thead>
@@ -161,23 +207,36 @@ export default function ReservationTable() {
               {reservationData[activeCategory].map((reservation) =>
                 activeCategory === "Items" ? (
                   <tr key={reservation.id}>
-                    <td>{`${reservation.first_name} ${reservation.last_name}`}</td>
+                    <td>{reservation.id}</td>
                     <td>{reservation.resource_name}</td>
-                    <td>{reservation.category}</td>
+                    <td>{reservation.quantity_reserved}</td>
+                    <td>{reservation.email}</td>
                     <td>{formatDateTime(reservation.start_time)}</td>
                     <td>{formatDateTime(reservation.end_time)}</td>
-                    <td>{reservation.status}</td>
+                    <td>
+                      <button 
+                        className="deleteButton"
+                        onClick={() => handleDeleteReservation(reservation.id)}
+                      >
+                        Delete
+                      </button>
+                    </td>
                   </tr>
                 ) : activeCategory === "Rooms" ? (
                   <tr key={reservation.id}>
-                    <td>{`${reservation.first_name} ${reservation.last_name}`}</td>
+                    <td>{reservation.id}</td>
                     <td>{reservation.cabin_number}</td>
-                    <td>{reservation.type}</td>
-                    <td>{reservation.deck}</td>
-                    <td>{reservation.capacity}</td>
+                    <td>{reservation.email}</td>
                     <td>{formatDateTime(reservation.start_time)}</td>
                     <td>{formatDateTime(reservation.end_time)}</td>
-                    <td>{reservation.status}</td>
+                    <td>
+                      <button 
+                        className="deleteButton"
+                        onClick={() => handleDeleteReservation(reservation.id)}
+                      >
+                        Delete
+                      </button>
+                    </td>
                   </tr>
                 ) : null
               )}

@@ -1,7 +1,10 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 import { useState, useEffect } from "react";
 import "./App.css";
 import { Link } from "react-router-dom";
 import { fetchData } from "./api";
+const API_URL = import.meta.env.VITE_API_URL;
 
 export default function ReservationTable() {
   const shipName = "Starlight Pearl Cruises";
@@ -30,14 +33,12 @@ export default function ReservationTable() {
     const date = new Date(dateString);
     return date.toLocaleDateString() + " " + date.toLocaleTimeString();
   };
-
-  // Fetch reservations from backend API
-  useEffect(() => {
-    const loadReservations = async () => {
+  
+  const loadReservations = async () => {
       setLoading(true);
       setFormError("");
       try {
-        const allData = await fetchData("/api/reservations");
+        const allData = await fetchData("/api/my-reservations");
 
         const itemsData = allData.filter(
           (res: any) => res.resource_id !== null && res.cabin_id === null
@@ -64,10 +65,51 @@ export default function ReservationTable() {
       } finally {
         setLoading(false);
       }
-    };
+  };
 
+  // Fetch reservations from backend API
+  useEffect(() => {
     loadReservations();
   }, []);
+
+  const handleDeleteReservation = async (reservationId: number) => {
+    try {
+      console.log("Deleting reservation:", reservationId);
+      
+      const response = await fetch(`${API_URL}/api/reservations/${reservationId}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+
+      if (response.ok) {
+        await loadReservations();
+        setFormError("");
+        return;
+      }
+
+      let errorMessage = `Failed to delete reservation (Status: ${response.status})`;
+      try {
+        const errorData = await response.json();
+        if (errorData.message) {
+          errorMessage = errorData.message;
+        } else if (errorData.error) {
+          errorMessage = errorData.error;
+        }
+      } catch (jsonError) {
+        console.log(jsonError);
+      }
+
+      setFormError(errorMessage);
+      
+      await loadReservations();
+      
+    } catch (error) {
+      console.error("Exception during delete:", error);
+      setFormError("Failed to delete reservation. Please try again.");
+      
+      await loadReservations();
+    }
+  };
 
   return (
     <div className="page">
@@ -128,8 +170,8 @@ export default function ReservationTable() {
         )}
 
        {activeCategory === "Packages" ? (
-          <div style={{ textAlign: "center", padding: "40px", fontSize: "18px", color: "#666" }}>
-            <p>Coming Soon</p>
+          <div style={{ textAlign: "center", padding: "40px", fontSize: "18px", color: "white" }}>
+            <p>Package Reservations Coming Soon!</p>
           </div>
         ) : loading ? (
           <p>Loading your reservations...</p>
@@ -143,23 +185,22 @@ export default function ReservationTable() {
             <thead>
               {activeCategory === "Items" ? (
                 <tr>
-                  <th>Guest Name</th>
-                  <th>Resource Name</th>
-                  <th>Category</th>
+                  <th>Reservation ID</th>
+                  <th>Item Reserved</th>
+                  <th>Quantity</th>
+                  <th>User Email</th>
                   <th>Start Date</th>
                   <th>End Date</th>
-                  <th>Status</th>
+                  <th>Actions</th>
                 </tr>
               ) : activeCategory === "Rooms" ? (
                 <tr>
-                  <th>Guest Name</th>
+                  <th>Reservation ID</th>
                   <th>Cabin Number</th>
-                  <th>Type</th>
-                  <th>Deck</th>
-                  <th>Capacity</th>
+                  <th>User Email</th>
                   <th>Check-In</th>
                   <th>Check-Out</th>
-                  <th>Status</th>
+                  <th>Actions</th>
                 </tr>
               ) : null}
             </thead>
@@ -168,23 +209,36 @@ export default function ReservationTable() {
               {reservationData[activeCategory].map((reservation) =>
                 activeCategory === "Items" ? (
                   <tr key={reservation.id}>
-                    <td>{`${reservation.first_name} ${reservation.last_name}`}</td>
+                    <td>{reservation.id}</td>
                     <td>{reservation.resource_name}</td>
-                    <td>{reservation.category}</td>
+                    <td>{reservation.quantity_reserved}</td>
+                    <td>{reservation.email}</td>
                     <td>{formatDateTime(reservation.start_time)}</td>
                     <td>{formatDateTime(reservation.end_time)}</td>
-                    <td>{reservation.status}</td>
+                    <td>
+                      <button 
+                        className="deleteButton"
+                        onClick={() => handleDeleteReservation(reservation.id)}
+                      >
+                        Delete
+                      </button>
+                    </td>
                   </tr>
                 ) : activeCategory === "Rooms" ? (
                   <tr key={reservation.id}>
-                    <td>{`${reservation.first_name} ${reservation.last_name}`}</td>
+                    <td>{reservation.id}</td>
                     <td>{reservation.cabin_number}</td>
-                    <td>{reservation.type}</td>
-                    <td>{reservation.deck}</td>
-                    <td>{reservation.capacity}</td>
+                    <td>{reservation.email}</td>
                     <td>{formatDateTime(reservation.start_time)}</td>
                     <td>{formatDateTime(reservation.end_time)}</td>
-                    <td>{reservation.status}</td>
+                    <td>
+                      <button 
+                        className="deleteButton"
+                        onClick={() => handleDeleteReservation(reservation.id)}
+                      >
+                        Delete
+                      </button>
+                    </td>
                   </tr>
                 ) : null
               )}
