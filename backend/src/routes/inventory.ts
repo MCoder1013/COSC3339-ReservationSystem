@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { pullResources, pullRooms, addRoom, addResources, deleteRoom, deleteResource, addStaff, pullStaff, deleteStaff, addReservation, deleteReservation, pullReservations } from '../database.js';
+import { pullResources, pullRooms, addRoom, addResources, deleteRoom, deleteResource, addStaff, pullStaff, deleteStaff } from '../database.js';
 
 const router = Router();
 
@@ -49,29 +49,6 @@ router.post("/rooms", async (req: Request, res: Response) => {
         res.status(400).json({ error: "Error when adding a room" });
     }
 });
-
-router.post("/reservations", async (req: Request, res: Response) => {
-    const { user_id, cabin_id, resource_id, staff_id, start_time, end_time } = req.body;
-
-    try {
-        const result = await addReservation({ user_id, cabin_id, resource_id, staff_id, start_time, end_time });
-
-        res.status(201).json({
-            message: "Reservation added suceessfuly",
-            reservationId: (result as any).insertId
-        });
-    } catch (error: any) {
-        console.error(error);
-        res.status(400).json({ error: "Error when adding reservation" });
-    }
-})
-
-
-router.get("/reservations", async (req: Request, res: Response) => {
-    const result = await pullReservations();
-
-    res.status(200).json(result);
-})
 
 router.post("/resources", async (req: Request, res: Response) => {
     const { name, category, quantity, status } = req.body;
@@ -151,24 +128,6 @@ router.delete('/staff/:id', async (req: Request, res: Response) => {
         res.json({ message: "staff member deleted successfully" });
     } catch (error) {
         res.status(500).json({ error: "failed to delete staff member" });
-    }
-});
-
-router.delete('/reservations/:id', async (req: Request, res: Response) => {
-    const id = Number(req.params.id);
-
-    if (isNaN(id)) {
-        return res.status(400).json({ message: "Invalid ID format" });
-    }
-    try {
-        const result: any = await deleteReservation(id);
-
-        if (result.affectedRows === 0) {
-            return res.status(404).json({ message: "reservation not found" })
-        }
-        res.json({ message: "reservation deleted successfully" });
-    } catch (error) {
-        res.status(500).json({ error: "failed to delete reservation" });
     }
 });
 

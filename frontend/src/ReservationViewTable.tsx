@@ -9,7 +9,7 @@ export default function ReservationTable() {
   const [formError, setFormError] = useState<string>("");
 
   // tabs
-  const categories = ["Items", "Packages"] as const;
+  const categories = ["Items", "Rooms", "Packages"] as const;
 
   // current selected tab
   const [activeCategory, setActiveCategory] =
@@ -17,9 +17,11 @@ export default function ReservationTable() {
 
   const [reservationData, setReservationData] = useState<{
     Items: any[];
+    Rooms: any[];
     Packages: any[];
   }>({
     Items: [],
+    Rooms: [],
     Packages: [],
   });
 
@@ -36,12 +38,27 @@ export default function ReservationTable() {
     const loadReservations = async () => {
       setLoading(true);
       try {
-        const itemsData = await fetchData("/api/reservations/items");
-        const packagesData = await fetchData("/api/reservations/packages");
+        // Fetch all reservations
+        const allReservations = await fetchData("/api/reservations");
+
+        // Filter reservations by type
+        // Items: resource_id is not null, cabin_id is null
+        const itemReservations = allReservations.filter(
+          (res: any) => res.resource_id !== null && res.cabin_id === null
+        );
+
+        // Rooms: cabin_id is not null, resource_id is null
+        const roomReservations = allReservations.filter(
+          (res: any) => res.cabin_id !== null && res.resource_id === null
+        );
+
+        // Packages placeholder (for future implementation)
+        const packageReservations: any[] = [];
 
         setReservationData({
-          Items: itemsData,
-          Packages: packagesData,
+          Items: itemReservations,
+          Rooms: roomReservations,
+          Packages: packageReservations,
         });
       } catch (error) {
         console.error("Error fetching reservations:", error);
@@ -104,7 +121,7 @@ export default function ReservationTable() {
         ) : loading ? (
           <p>Loading reservations...</p>
         ) : reservationData[activeCategory].length === 0 ? (
-          <p>No items reservations found.</p>
+          <p>No {activeCategory.toLowerCase()} reservations found.</p>
         ) : (
           /* Changes table dynamically */
           <table className="inventoryTable">
@@ -118,13 +135,21 @@ export default function ReservationTable() {
                   <th>End Date</th>
                   <th>Status</th>
                 </tr>
-              ) : (
+              ) : activeCategory === "Rooms" ? (
                 <tr>
                   <th>Guest Name</th>
                   <th>Cabin Number</th>
                   <th>Type</th>
                   <th>Deck</th>
                   <th>Capacity</th>
+                  <th>Check-In</th>
+                  <th>Check-Out</th>
+                  <th>Status</th>
+                </tr>
+              ) : (
+                <tr>
+                  <th>Guest Name</th>
+                  <th>Package Name</th>
                   <th>Start Date</th>
                   <th>End Date</th>
                   <th>Status</th>
@@ -143,7 +168,7 @@ export default function ReservationTable() {
                     <td>{formatDateTime(reservation.end_time)}</td>
                     <td>{reservation.status}</td>
                   </tr>
-                ) : (
+                ) : activeCategory === "Rooms" ? (
                   <tr key={reservation.id}>
                     <td>{`${reservation.first_name} ${reservation.last_name}`}</td>
                     <td>{reservation.cabin_number}</td>
@@ -154,7 +179,7 @@ export default function ReservationTable() {
                     <td>{formatDateTime(reservation.end_time)}</td>
                     <td>{reservation.status}</td>
                   </tr>
-                )
+                ) : null
               )}
             </tbody>
           </table>
