@@ -15,8 +15,6 @@ ALTER TABLE cabins
 ALTER TABLE resources
   ADD CONSTRAINT chk_resource_name_not_blank CHECK (CHAR_LENGTH(TRIM(name)) > 0);
 
-ALTER TABLE cabins
-  ADD CONSTRAINT chk_cabin_number_not_blank CHECK (CHAR_LENGTH(TRIM(cabin_number)) > 0);
 
 ALTER TABLE staff
   ADD CONSTRAINT chk_staff_name_not_blank CHECK (CHAR_LENGTH(TRIM(name)) > 0);
