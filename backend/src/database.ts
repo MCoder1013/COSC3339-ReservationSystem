@@ -23,6 +23,7 @@ const pool = await mysql.createPool({
     waitForConnections: true,
     connectionLimit: 10,
     password: process.env.DB_PASSWORD,
+    timezone: 'America/Chicago',
 });
 
 export async function tryRegister(firstName: string, lastName: string, email: string, passwordHash: string) {
