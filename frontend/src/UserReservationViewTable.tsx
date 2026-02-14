@@ -35,19 +35,27 @@ export default function ReservationTable() {
   };
   
   const loadReservations = async () => {
+
       setLoading(true);
       setFormError("");
       try {
         const allData = await fetchData("/api/my-reservations");
 
-        const itemsData = allData.filter(
-          (res: any) => res.resource_id !== null && res.cabin_id === null
-        );
+        const now = new Date();
 
-        // Rooms: cabin_id is not null, resource_id is null
+        const itemsData = allData.filter(
+          (res: any) => 
+            res.resource_id !== null && 
+          res.cabin_id === null && 
+          new Date(res.end_time) >= now
+        ).sort((a: any, b: any) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+
         const roomsData = allData.filter(
-          (res: any) => res.cabin_id !== null && res.resource_id === null
-        );
+          (res: any) => 
+            res.cabin_id !== null && 
+          res.resource_id === null && 
+          new Date(res.end_time) >= now
+        ).sort((a: any, b: any) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
 
         setReservationData({
           Items: itemsData,
