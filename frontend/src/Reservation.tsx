@@ -170,7 +170,7 @@ export default function Reservation() {
         const start = getDate(startDateTime, 0);
         const end = getDate(endDateTime, 0);
         const formatForMySQL = (date: Date) => {
-          return formatInTimeZone(date, 'America/Chicago', 'yyyy-MM-dd HH:mm:ss');
+          return formatInTimeZone(date, 'UTC', 'yyyy-MM-dd HH:mm:ss');
         };
 
         const reservationData = {
@@ -247,7 +247,7 @@ export default function Reservation() {
         const start = getDate(startDateTime, 0);
         const end = getDate(endDateTime, 0);
         const formatForMySQL = (date: Date) => {
-          return formatInTimeZone(date, 'America/Chicago', 'yyyy-MM-dd HH:mm:ss');
+          return formatInTimeZone(date, 'UTC', 'yyyy-MM-dd HH:mm:ss');
         };
 
         const reservationData = {
