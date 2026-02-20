@@ -9,12 +9,12 @@ ALTER TABLE reservations
 
 ALTER TABLE reservations
   ADD CONSTRAINT chk_qty_reserved
-  CHECK (quantity_reserved > 0);
+  CHECK (quantity_reserved >= 0);
 
 -- Add other constraints
 ALTER TABLE cabins
   ADD CONSTRAINT chk_cabin_capacity_positive
-  CHECK (capacity > 0);
+  CHECK (capacity >= 0);
 
 ALTER TABLE resources
   ADD CONSTRAINT chk_resource_name_not_blank
