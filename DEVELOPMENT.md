@@ -18,23 +18,34 @@ cd frontend
 npm run dev
 ```
 
+# Database
+
+The database uses PostgreSQL, and it's installed and ran automatically when the backend is started.
+
+To connect to the database through the terminal, you can install PostgreSQL
+from https://www.postgresql.org/download/ and then run
+`psql postgresql://localhost/cruise_reservation -U user`
+and then enter either whatever password is in your `.env`, or "pass" if there is none.
+
 ## Database schema migrations
 
-This exists to make database updates be applied to everyone automatically. Each update to the database is represented as a separate "migration".
+To modify the schema of the database, you'll have to make migration.
 
-To create a migration, run the following commands (replacing MIGRATION_NAME with a short description):
+These are written as individual SQL files so the migration code can apply them individually.
+
+To create a migration, run the following commands (replacing `migration-name-here` with a short name, similar to a branch name):
 
 ```sh
 cd backend
-npx db-migrate create MIGRATION_NAME
+npm run migrate new migration-name-here
 ```
 
-Then, edit the new file that got created in `backend/migrations/sqls/` with your migration name and that ends in `-up.sql`.
+Then, edit the new file that got created in `backend/migrations/sqls/` with your migration name.
 
-The `up` file is the one that gets run automatically and is where you should put your SQL that updates the database.
-Editing the `down` migration is optional, that's just used if you want to allow a database update to be undone.
+When you finish writing the migration, use `npm run migrate` to run all new migrations.
+If there's an error, then the changes will get rolled back so you can edit the migration and try again.
 
-To manually run a migration (which is usually unnecessary), run `npx db-migrate up`.
-To undo the last migration (if the `down.sql` is implemented), use `npx db-migrate down`.
+Note that for convenience, using `npm run dev` will also run all new migrations.
 
-You shouldn't edit old migrations since those won't be applied automatically, just create a new one instead.
+Also, be aware that you should not edit old migrations, because those won't be applied automatically.
+If you've already pushed the change to GitHub, make a new migration instead.
