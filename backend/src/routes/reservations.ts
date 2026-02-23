@@ -14,7 +14,7 @@ router.post("/reservations", async (req: Request, res: Response) => {
     }
 
     try {
-        const result = await addReservation({
+        const reservationId = await addReservation({
             user_id,
             cabin_id: cabin_id ??  null,
             resource_id: resource_id ?? null,
@@ -26,7 +26,7 @@ router.post("/reservations", async (req: Request, res: Response) => {
 
         res.status(201).json({
             message: "Reservation added successfully",
-            reservationId: (result as any).insertId
+            reservationId
         });
     } catch (error: any) {
         console.error(error);
@@ -43,7 +43,7 @@ router.delete('/reservations/:id', async (req: Request, res: Response) => {
         return res.status(400).json({ message: "Invalid ID format" });
     }
     try {
-        const result: any = await deleteReservation(id);
+        await deleteReservation(id);
 
         res.json({ message: "reservation deleted successfully" });
     } catch (error) {

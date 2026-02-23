@@ -26,7 +26,6 @@ router.get('/rooms', async (req: Request, res: Response) => {
 router.get('/staff', async (req: Request, res: Response) => {
     try {
         const staff = await pullStaff();
-
         res.json(staff);
     } catch (error) {
         res.status(500).json({ error: "Failed to load staff members" })
@@ -38,11 +37,10 @@ router.post("/rooms", async (req: Request, res: Response) => {
     const { cabin_number, deck, type, capacity, status } = req.body;
 
     try {
-        const result = await addRoom({ cabin_number, deck, type, capacity, status });
-
+        const roomId = await addRoom({ cabin_number, deck, type, capacity, status });
         res.status(201).json({
             message: "Room added successfully!",
-            roomId: (result as any).insertId
+            roomId
         });
     } catch (error: any) {
         console.error(error);
@@ -54,10 +52,10 @@ router.post("/resources", async (req: Request, res: Response) => {
     const { name, category, quantity, status } = req.body;
 
     try {
-        const result = await addResources(name, category, quantity, status);
+        const resourceId = await addResources(name, category, quantity, status);
         res.status(201).json({
             message: "Resource added",
-            resourceId: (result as any).insertId
+            resourceId
         });
     } catch (error: any) {
         console.error(error);
@@ -69,12 +67,11 @@ router.post("/staff", async (req: Request, res: Response) => {
     const { name, role, email, shift } = req.body;
 
     try {
-        const result = await addStaff({ name, role, email, shift });
+        const staffId = await addStaff({ name, role, email, shift });
         res.status(201).json({
             message: "Staff member added",
-            staffId: (result as any).insertId
+            staffId
         });
-
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: "Error adding staff member" })
@@ -83,14 +80,14 @@ router.post("/staff", async (req: Request, res: Response) => {
 
 // delete from inventory features
 router.delete('/rooms/:cabin_number', async (req: Request, res: Response) => {
-    const cabin_number = req.params.cabin_number as string;
+    const cabinNumber = req.params.cabin_number as string;
 
     try {
-        const result: any = await deleteRoom(cabin_number);
-
-        if (result.affectedRows === 0) {
+        const deletedRoomId = await deleteRoom(cabinNumber);
+        if (deletedRoomId === undefined) {
             return res.status(404).json({ message: "Room not found" })
         }
+
         res.json({ message: "room deleted successfully" });
     } catch (error) {
         res.status(500).json({ error: "failed to delete room" });
@@ -102,11 +99,11 @@ router.delete('/resources/:name', async (req: Request, res: Response) => {
     const name = req.params.name as string;
 
     try {
-        const result: any = await deleteResource(name);
-
-        if (result.affectedRows === 0) {
+        const resourceId = await deleteResource(name);
+        if (resourceId !== undefined) {
             return res.status(404).json({ message: "Resource not found" })
         }
+
         res.json({ message: "resource deleted successfully" });
     } catch (error) {
         res.status(500).json({ error: "failed to delete resource" });
@@ -115,14 +112,14 @@ router.delete('/resources/:name', async (req: Request, res: Response) => {
 
 router.delete('/staff/:id', async (req: Request, res: Response) => {
     const id = Number(req.params.id);
-
     if (isNaN(id)) {
         return res.status(400).json({ message: "Invalid ID format" });
     }
-    try {
-        const result: any = await deleteStaff(id);
 
-        if (result.affectedRows === 0) {
+    try {
+        const found = await deleteStaff(id);
+
+        if (found === undefined) {
             return res.status(404).json({ message: "staff member not found" })
         }
         res.json({ message: "staff member deleted successfully" });
@@ -130,7 +127,6 @@ router.delete('/staff/:id', async (req: Request, res: Response) => {
         res.status(500).json({ error: "failed to delete staff member" });
     }
 });
-
 
 
 export default router; 

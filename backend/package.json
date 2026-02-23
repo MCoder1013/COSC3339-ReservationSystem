@@ -4,7 +4,8 @@
   "description": "",
   "main": "dist/index.js",
   "scripts": {
-    "install-all": "npm install && node migrations/internal/create_database.js && npx db-migrate up",
+    "migrate": "node migrations",
+    "install-all": "npm install && npm run migrate",
     "dev": "npm run install-all && tsx watch src/index.ts",
     "build": "npm run install-all && tsc",
     "start": "node dist/index.js"
@@ -26,11 +27,10 @@
     "argon2": "^0.44.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
-    "db-migrate": "^0.11.14",
-    "db-migrate-mysql": "^3.0.0",
     "dotenv": "^17.2.3",
+    "embedded-postgres": "^18.2.0-beta.16",
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",
-    "mysql2": "^3.16.2"
+    "postgres": "git+https://github.com/sep2/postgres#5d9f86eced805ed4fdf3aa4f3f6cd7528c7993f6"
   }
 }
