@@ -60,3 +60,4 @@ Sample data is included to demonstrate system functionality.
 - Database Design & Documentation: Bart Vallejo, Deshawn King
 - Backend Development: Matias Botero, Matthew DeVaney
 - Frontend Development: Lindsey Soltis, Dean Roggenbauer
+
