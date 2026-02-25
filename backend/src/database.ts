@@ -33,6 +33,8 @@ const sql = postgres({
     host: 'localhost',
     database: 'cruise_reservation'
 });
+// ensures that dates are always handled as utc
+process.env.TZ = 'UTC'
 
 export async function tryRegister(firstName: string, lastName: string, email: string, passwordHash: string) {
     const result = await sql`
