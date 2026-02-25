@@ -18,7 +18,7 @@ const pg = new EmbeddedPostgres(pgOptions);
 try {
   await pg.initialise();
 } catch (err) {
-  // Database already exists.
+  // Probably means that the database already exists.
   console.log('Failed to initialize:', err)
 }
 await pg.start();
@@ -49,6 +49,9 @@ try {
     throw err
 }
 sql = connectPg('cruise_reservation')
+
+await sql`ALTER SYSTEM SET TIMEZONE = 'UTC'`
+process.env.TZ = 'UTC'
 
 try {
   await sql`
