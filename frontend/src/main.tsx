@@ -1,10 +1,12 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { AuthProvider } from "./AuthContext";
 import App from "./App";
 import SignIn from "./SignIn";
 import Register from "./Register";
 import Inventory from "./Inventory";
+import Profile from "./Profile";
 import ReservationTable from "./ReservationViewTable";
 import UserReservationTable from "./UserReservationViewTable";
 import Reservation from "./Reservation";
@@ -13,16 +15,18 @@ import "./index.css";
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<App />} />
-        <Route path="/signin" element={<SignIn />} />
-        <Route path="/register" element={<Register />} />
-        <Route path="/inventory" element={<Inventory />} />
-        <Route path="/reservations" element={<ReservationTable />} />
-        <Route path="/user-reservations" element={<UserReservationTable />} />
-        <Route path="/reservation" element={<Reservation />} />
-      </Routes>
+      <AuthProvider>
+        <Routes>
+          <Route path="/" element={<App />} />
+          <Route path="/signin" element={<SignIn />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="/inventory" element={<Inventory />} />
+          <Route path="/reservations" element={<ReservationTable />} />
+          <Route path="/user-reservations" element={<UserReservationTable />} />
+          <Route path="/reservation" element={<Reservation />} />
+          <Route path="/profile" element={<Profile />} />
+        </Routes>
+      </AuthProvider>
     </BrowserRouter>
   </React.StrictMode>
 );
-

@@ -21,6 +21,8 @@ router.post('/register', async (req, res) => {
   let email = req.body.email;
   const password = req.body.password;
   const confirmPassword = req.body.confirmPassword;
+  const employeeCode = req.body.employeeCode;
+  const role = employeeCode === process.env.EMPLOYEE_CODE ? "staff" : "normal";
 
   email = email.toLowerCase();
 
@@ -62,7 +64,7 @@ router.post('/register', async (req, res) => {
   const passwordHash = await argon2.hash(password);
 
   try {
-    await database.tryRegister(firstName, lastName, email, passwordHash);
+    await database.tryRegister(firstName, lastName, email, passwordHash, role);
   } catch (err) {
     if ((err as any).code === 'ER_DUP_ENTRY') {
       return res.status(400).json({
@@ -118,11 +120,80 @@ router.post('/login', async (req: Request, res: Response) => {
       .json({
         message: 'Login successful',
         userId: user.id,
-        firstName: user.first_name
+        firstName: user.first_name,
+        role: user.user_role
       });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Login failed' });
+  }
+});
+
+router.post('/signout', (req: Request, res: Response) => {
+  res.clearCookie('jwt').json({ message: 'Signed out successfully' });
+});
+
+router.get('/me', async (req: Request, res: Response) => {
+  const token = req.cookies?.jwt;
+  if (!token) return res.status(401).json({ error: 'Not authenticated' });
+
+  try {
+    const decoded = jwt.verify(token, jwtSecret) as { id: number };
+    const user = await database.getUserById(decoded.id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    res.json({
+      id: user.id,
+      firstName: user.first_name,
+      lastName: user.last_name,
+      email: user.email,
+      biography: user.biography,
+      profilePicture: user.profile_picture,
+      role: user.user_role,
+    });
+  } catch {
+    res.status(401).json({ error: 'Invalid token' });
+  }
+});
+
+import multer from "multer";
+import path from "path";
+import fs from "fs";
+
+const uploadDir = "uploads/profiles";
+if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, uploadDir),
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    cb(null, `${Date.now()}${ext}`);
+  },
+});
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max
+  fileFilter: (req, file, cb) => {
+    const allowed = ["image/jpeg", "image/png", "image/webp"];
+    allowed.includes(file.mimetype) ? cb(null, true) : cb(new Error("Invalid file type"));
+  },
+});
+
+router.post('/update-profile', upload.single('profilePicture'), async (req: Request, res: Response) => {
+  const token = req.cookies?.jwt;
+  if (!token) return res.status(401).json({ error: 'Not authenticated' });
+
+  try {
+    const decoded = jwt.verify(token, jwtSecret) as { id: number };
+    const { biography } = req.body;
+    const profilePicture = req.file ? `/uploads/profiles/${req.file.filename}` : req.body.profilePicture;
+
+    await database.updateUserProfile(decoded.id, biography, profilePicture);
+    res.json({ message: 'Profile updated successfully', profilePicture });
+  } catch (err) {
+    console.error("Update profile error:", err);
+    res.status(500).json({ error: 'Failed to update profile' });
   }
 });
 

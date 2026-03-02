@@ -68,7 +68,9 @@ main {
   align-items: center;
 }
 
-button, .navButton {
+button, .navButton, button.navButton {
+  font-size: inherit;
+  font-family: inherit;
   padding: 10px 18px;
   border-radius: 8px;
   border: 1px solid white;
@@ -313,4 +315,26 @@ button:hover, .navButton:hover {
 
 .react-datetime-picker__button {
   color: navy !important;
+}
+
+.profileImage {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+  margin: 0 auto 1rem auto;
+}
+
+.profileImagePlaceholder {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  background-color: #ccc;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 1rem auto;
+  font-size: 0.85rem;
+  color: #555;
 }

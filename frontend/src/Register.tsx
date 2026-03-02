@@ -87,6 +87,12 @@ export default function Register() {
             </label>
 
             <br />
+            <label className="label">
+              Employee Code: 
+              <input className="input" type="text" placeholder="ab65nw" required name="employeeCode" />
+            </label>
+
+            <br />
             <button className="primaryBtn" type="submit">Register</button>
 
             {registerMessage ? <p className="register-message">{registerMessage}</p> : <></>}

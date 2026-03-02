@@ -131,8 +131,11 @@ export default function ReservationTable() {
             <Link className="navButton" to="/">
               Home
             </Link>
-            <Link className="navButton" to="/user-reservations">
-              User Reservations
+            <Link className="navButton" to="/inventory">
+              Inventory
+            </Link>
+            <Link className="navButton" to="/profile">
+             Profile
             </Link>
           </nav>
         </div>
