@@ -187,9 +187,16 @@ router.post('/update-profile', upload.single('profilePicture'), async (req: Requ
   try {
     const decoded = jwt.verify(token, jwtSecret) as { id: number };
     const { biography } = req.body;
-    const profilePicture = req.file ? `/uploads/profiles/${req.file.filename}` : req.body.profilePicture;
+    const profilePicture = req.file ? `/uploads/profiles/${req.file.filename}` : null;
 
-    await database.updateUserProfile(decoded.id, biography, profilePicture);
+    if (biography !== undefined && profilePicture) {
+      await database.updateUserProfile(decoded.id, biography, profilePicture);
+    } else if (biography !== undefined) {
+      await database.updateUserBiography(decoded.id, biography);
+    } else if (profilePicture) {
+      await database.updateUserProfilePicture(decoded.id, profilePicture);
+    }
+
     res.json({ message: 'Profile updated successfully', profilePicture });
   } catch (err) {
     console.error("Update profile error:", err);

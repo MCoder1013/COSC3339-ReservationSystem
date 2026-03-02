@@ -63,6 +63,15 @@ export async function updateUserProfile(id: number, biography: string, profilePi
     WHERE id = ${id}
   `;
 }
+
+export async function updateUserBiography(id: number, biography: string) {
+  await sql`UPDATE users SET biography = ${biography} WHERE id = ${id}`;
+}
+
+export async function  updateUserProfilePicture(id: number, profilePicture: string) {
+  await sql`UPDATE users SET profile_picture = ${profilePicture} WHERE id = ${id}`;
+}
+
 // pulls the resources from the resources table in the SQL 
 // returns only the rows
 // throws error otherwise

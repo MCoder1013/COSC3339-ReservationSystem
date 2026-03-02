@@ -22,6 +22,7 @@ export default function Register() {
       email: form.email.value,
       password: form.password.value,
       confirmPassword: form.confirmPassword.value,
+      employeeCode: form.employeeCode.value,
     });
     if (res.message) {
       setRegisterMessage(res.message);
@@ -89,7 +90,7 @@ export default function Register() {
             <br />
             <label className="label">
               Employee Code: 
-              <input className="input" type="text" placeholder="ab65nw" required name="employeeCode" />
+              <input className="input" type="text" placeholder="Leave blank if not an employee" name="employeeCode" />
             </label>
 
             <br />
