@@ -90,7 +90,7 @@ export default function Register() {
             <br />
             <label className="label">
               Employee Code: 
-              <input className="input" type="text" placeholder="Leave blank if not an employee" name="employeeCode" />
+              <input className="input" type="text" placeholder="Leave blank if not employee" name="employeeCode" />
             </label>
 
             <br />
