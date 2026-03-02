@@ -55,6 +55,7 @@ router.delete('/reservations/:id', async (req: Request, res: Response) => {
 router.get("/reservations", async (req: Request, res: Response) => {
     try {
         const result = await getAllReservationsWithDetails();
+
         res.status(200).json(result);
     } catch (error) {
         console.error("Error fetching all reservations:", error);

@@ -33,6 +33,8 @@ const sql = postgres({
     host: 'localhost',
     database: 'cruise_reservation'
 });
+// ensures that dates are always handled as utc
+process.env.TZ = 'UTC'
 
 export async function tryRegister(firstName: string, lastName: string, email: string, passwordHash: string) {
     const result = await sql`
@@ -235,28 +237,37 @@ async function checkResourceCount(
     r: NewReservation,
     sql: TransactionSql<{}>
 ) {
-    const countRows = await sql`
-        SELECT COUNT(*) as count
-        FROM reservations
-        WHERE resource_id = ${r.resource_id}
-            AND start_time < ${r.end_time}
-            AND end_time > ${r.start_time}
-    `;
-
-    const overlappingCount = countRows[0].count;
-
     const resourceRows = await sql`
-        SELECT quantity FROM resources WHERE id = ${r.resource_id}
+        SELECT quantity FROM resources WHERE id = ${r.resource_id} FOR UPDATE
     `;
 
     if (resourceRows.length === 0) {
         throw new Error("Resource not found");
     }
 
-    const quantity = resourceRows[0].quantity;
+    const itemQuantity = resourceRows[0].quantity;
 
-    if (overlappingCount >= quantity) {
-        throw new Error("Not enough resource quantity available.");
+    if (!r.quantity_reserved || r.quantity_reserved <= 0) {
+        throw new Error("Quantity reserved must be greater than 0!");
+    }
+
+    const sameTimeReservations = await sql`
+        SELECT quantity_reserved 
+        FROM reservations
+        WHERE resource_id = ${r.resource_id}
+            AND start_time < ${r.end_time}
+            AND end_time > ${r.start_time}
+    `;
+
+    const totalOverlaps = sameTimeReservations.reduce(
+        (sum, reservation) => sum + reservation.quantity_reserved,
+        0
+    );
+
+    const availableQuantity = itemQuantity - totalOverlaps;
+
+    if (r.quantity_reserved > availableQuantity) {
+        throw new Error("Not enough quantity available");
     }
 }
 
@@ -294,13 +305,6 @@ export async function addReservation(r: NewReservation): Promise<number> {
         `;
         const newId = result[0].id
 
-        if (r.resource_id) {
-            await sql`
-                UPDATE resources
-                SET quantity = quantity - ${r.quantity_reserved || 1}
-                WHERE id = ${r.resource_id}
-            `;
-        }
 
         return newId
     });
@@ -433,22 +437,10 @@ export async function deleteStaff(id: number): Promise<number | undefined> {
 
 export async function deleteReservation(id: number): Promise<void> {
     return await sql.begin(async sql => {
-        // Get reservation details before deleting
-        const [reservation] = await sql`
-            SELECT resource_id, quantity_reserved FROM reservations WHERE id = ${id}
-        `;
-
         // Delete the reservation
         await sql`DELETE FROM reservations WHERE id = ${id}`;
 
-        // Restore quantity if it was a resource reservation
-        if (reservation.resource_id) {
-            await sql`
-                UPDATE resources
-                SET quantity = quantity + ${reservation.quantity_reserved}
-                WHERE id = ${reservation.resource_id}
-            `;
-        }
+    
     })
 }
 // Get all item reservations for a specific user
