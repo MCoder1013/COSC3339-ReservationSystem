@@ -1,6 +1,6 @@
 import "./App.css";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "./useAuth";
+import { useAuth } from "./AuthContext";
 import NavBar from "./NavBar";
 
 export default function App() {
@@ -14,16 +14,13 @@ export default function App() {
 
       <main className="container">
         {!user ? (
-          // Unsigned in: Browse and Book options
+          // Unsigned in: Book option only
           <section className="section">
             <h2>Sail Where the Stars Lead</h2>
             <h3>Your ocean journey, guided by starlight.</h3>
             <p>Explore our exclusive cruise amenities and book your perfect vacation.</p>
             
             <div className="homeActionButtons">
-              <button onClick={() => navigate("/inventory")} className="primaryBtn">
-                Browse Inventory
-              </button>
               <button onClick={() => navigate("/signin")} className="primaryBtn">
                 Book Your Trip
               </button>
@@ -53,13 +50,15 @@ export default function App() {
                   </button>
                 </div>
                 
-                <div className="dashboardCard">
-                  <h3>Browse Inventory</h3>
-                  <p>Explore available items and amenities</p>
-                  <button onClick={() => navigate("/inventory")} className="primaryBtn">
-                    Browse
-                  </button>
-                </div>
+                {user.role === "staff" && (
+                  <div className="dashboardCard">
+                    <h3>Browse Inventory</h3>
+                    <p>Explore available items and amenities</p>
+                    <button onClick={() => navigate("/inventory")} className="primaryBtn">
+                      Browse
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </section>

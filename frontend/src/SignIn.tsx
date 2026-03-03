@@ -2,7 +2,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import "./App.css";
 import { submitData } from "./api";
-import { useAuth } from "./useAuth";
+import { useAuth } from "./AuthContext";
 import NavBar from "./NavBar";
 
 export default function SignIn() {
@@ -32,7 +32,8 @@ export default function SignIn() {
       // Store user info in auth state
       login({
         userId: data.userId,
-        firstName: data.firstName
+        firstName: data.firstName,
+        role: data.role
       });
 
       setLogInMessage("Successful login!");

@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { useAuth } from "./useAuth";
+import { useAuth } from "./AuthContext";
 import { useState } from "react";
 import UserProfileModal from "./UserProfileModal";
 import "./NavBar.css";
@@ -23,8 +23,8 @@ export default function NavBar({ shipName }: NavBarProps) {
           <h1>{shipName}</h1>
           <nav className="navLinks">
             {!isHomePage && <Link className="navButton" to="/">Home</Link>}
-            <Link className="navButton" to="/inventory">Inventory</Link>
-            <Link className="navButton" to="/reservations">Reservations</Link>
+            {user?.role === "staff" && <Link className="navButton" to="/inventory">Inventory</Link>}
+            {user?.role === "staff" && <Link className="navButton" to="/reservations">Reservations</Link>}
             {user ? (
               <button 
                 className="userIconBtn"

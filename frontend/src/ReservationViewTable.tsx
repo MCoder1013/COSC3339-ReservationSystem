@@ -38,15 +38,12 @@ export default function ReservationTable() {
     setLoading(true);
     try {
       const allReservations = await fetchData("/api/reservations");
-      
-      const now = new Date();
 
       const itemReservations = allReservations
         .filter(
           (res: any) => 
             res.resource_id !== null && 
-            res.cabin_id === null &&
-            new Date(res.end_time) >= now
+            res.cabin_id === null
         )
         .sort((a: any, b: any) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
 
@@ -54,8 +51,7 @@ export default function ReservationTable() {
         .filter(
           (res: any) => 
             res.cabin_id !== null && 
-            res.resource_id === null &&
-            new Date(res.end_time) >= now
+            res.resource_id === null
         )
         .sort((a: any, b: any) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
 

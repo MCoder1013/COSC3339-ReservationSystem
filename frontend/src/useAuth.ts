@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 export interface User {
   userId: number;
   firstName: string;
+  role: string;
 }
 
 export const useAuth = () => {

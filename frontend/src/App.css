@@ -341,13 +341,13 @@ button:hover, .navButton:hover {
 
 .dashboardContent h2 {
   font-size: 36px;
-  color: navy;
+  color: white;
   margin-bottom: 8px;
 }
 
 .dashboardSubtitle {
   font-size: 20px;
-  color: #666;
+  color: white;
   margin-bottom: 40px;
   font-style: italic;
 }
@@ -360,7 +360,7 @@ button:hover, .navButton:hover {
 }
 
 .dashboardCard {
-  background: linear-gradient(135deg, rgba(162, 170, 251, 0.1) 0%, rgba(110, 122, 255, 0.1) 100%);
+  background: linear-gradient(135deg, rgba(162, 170, 251, 0.6) 0%, rgba(110, 122, 255, 0.9) 100%);
   border: 2px solid rgba(106, 122, 255, 0.3);
   border-radius: 12px;
   padding: 28px;
@@ -377,13 +377,13 @@ button:hover, .navButton:hover {
 }
 
 .dashboardCard h3 {
-  color: navy;
+  color: white;
   font-size: 22px;
   margin: 0;
 }
 
 .dashboardCard p {
-  color: #555;
+  color: white;
   font-size: 15px;
   margin: 0;
   flex-grow: 1;

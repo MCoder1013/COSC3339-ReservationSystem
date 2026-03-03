@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "./useAuth";
+import { useAuth } from "./AuthContext";
 import "./UserProfileModal.css";
 
 interface UserProfile {
@@ -80,6 +80,7 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
   const { logout } = useAuth();
   const [activeTab, setActiveTab] = useState<"reservations" | "editinfo">("reservations");
   const [reservationCategory, setReservationCategory] = useState<"Items" | "Rooms" | "Packages">("Items");
+  const [timePeriod, setTimePeriod] = useState<"Past" | "Current" | "Future">("Future");
   const [userProfile, setUserProfile] = useState<UserProfile>(DUMMY_USER_PROFILE);
   const [itemsReservations, setItemsReservations] = useState<ItemReservation[]>(DUMMY_ITEMS_RESERVATIONS);
   const [roomsReservations, setRoomsReservations] = useState<RoomReservation[]>(DUMMY_ROOMS_RESERVATIONS);
@@ -104,6 +105,27 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
     return date.toLocaleDateString() + " " + date.toLocaleTimeString();
   };
 
+  // Filter reservations by time period
+  const filterByTimePeriod = <T extends { start_time: string; end_time: string }>(reservations: T[]): T[] => {
+    const now = new Date();
+    
+    return reservations.filter((res) => {
+      const startTime = new Date(res.start_time);
+      const endTime = new Date(res.end_time);
+      
+      if (timePeriod === "Past") {
+        // Past: end time is before now
+        return endTime < now;
+      } else if (timePeriod === "Current") {
+        // Current: now is between start and end time
+        return startTime <= now && endTime >= now;
+      } else {
+        // Future: start time is after now
+        return startTime > now;
+      }
+    });
+  };
+
   const handleIconChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -125,7 +147,7 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
   const handleLogout = () => {
     logout();
     onClose();
-    navigate("/");
+    navigate("/", { replace: true });
   };
 
   if (!isOpen) return null;
@@ -180,65 +202,95 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
                 </button>
               </div>
 
+              {/* Time period tabs for Past, Current, Future */}
+              {reservationCategory !== "Packages" && (
+                <div className="timePeriodTabs">
+                  <button
+                    className={`timePeriodBtn ${timePeriod === "Past" ? "active" : ""}`}
+                    onClick={() => setTimePeriod("Past")}
+                  >
+                    Past
+                  </button>
+                  <button
+                    className={`timePeriodBtn ${timePeriod === "Current" ? "active" : ""}`}
+                    onClick={() => setTimePeriod("Current")}
+                  >
+                    Current
+                  </button>
+                  <button
+                    className={`timePeriodBtn ${timePeriod === "Future" ? "active" : ""}`}
+                    onClick={() => setTimePeriod("Future")}
+                  >
+                    Future
+                  </button>
+                </div>
+              )}
+
               {/* Content for each category */}
               {reservationCategory === "Items" && (
-                itemsReservations.length === 0 ? (
-                  <p className="noDataMessage">You have no items reservations yet.</p>
-                ) : (
-                  <table className="reservationsTable">
-                    <thead>
-                      <tr>
-                        <th>Reservation ID</th>
-                        <th>Item Reserved</th>
-                        <th>Quantity</th>
-                        <th>User Email</th>
-                        <th>Start Date</th>
-                        <th>End Date</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {itemsReservations.map((res) => (
-                        <tr key={res.id}>
-                          <td>{res.id}</td>
-                          <td>{res.resource_name}</td>
-                          <td>{res.quantity_reserved}</td>
-                          <td>{res.email}</td>
-                          <td>{formatDateTime(res.start_time)}</td>
-                          <td>{formatDateTime(res.end_time)}</td>
+                (() => {
+                  const filteredItems = filterByTimePeriod(itemsReservations);
+                  return filteredItems.length === 0 ? (
+                    <p className="noDataMessage">You have no {timePeriod.toLowerCase()} items reservations.</p>
+                  ) : (
+                    <table className="reservationsTable">
+                      <thead>
+                        <tr>
+                          <th>Reservation ID</th>
+                          <th>Item Reserved</th>
+                          <th>Quantity</th>
+                          <th>User Email</th>
+                          <th>Start Date</th>
+                          <th>End Date</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )
+                      </thead>
+                      <tbody>
+                        {filteredItems.map((res) => (
+                          <tr key={res.id}>
+                            <td>{res.id}</td>
+                            <td>{res.resource_name}</td>
+                            <td>{res.quantity_reserved}</td>
+                            <td>{res.email}</td>
+                            <td>{formatDateTime(res.start_time)}</td>
+                            <td>{formatDateTime(res.end_time)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  );
+                })()
               )}
 
               {reservationCategory === "Rooms" && (
-                roomsReservations.length === 0 ? (
-                  <p className="noDataMessage">You have no rooms reservations yet.</p>
-                ) : (
-                  <table className="reservationsTable">
-                    <thead>
-                      <tr>
-                        <th>Reservation ID</th>
-                        <th>Cabin Number</th>
-                        <th>User Email</th>
-                        <th>Check-In</th>
-                        <th>Check-Out</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {roomsReservations.map((res) => (
-                        <tr key={res.id}>
-                          <td>{res.id}</td>
-                          <td>{res.cabin_number}</td>
-                          <td>{res.email}</td>
-                          <td>{formatDateTime(res.start_time)}</td>
-                          <td>{formatDateTime(res.end_time)}</td>
+                (() => {
+                  const filteredRooms = filterByTimePeriod(roomsReservations);
+                  return filteredRooms.length === 0 ? (
+                    <p className="noDataMessage">You have no {timePeriod.toLowerCase()} rooms reservations.</p>
+                  ) : (
+                    <table className="reservationsTable">
+                      <thead>
+                        <tr>
+                          <th>Reservation ID</th>
+                          <th>Cabin Number</th>
+                          <th>User Email</th>
+                          <th>Check-In</th>
+                          <th>Check-Out</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )
+                      </thead>
+                      <tbody>
+                        {filteredRooms.map((res) => (
+                          <tr key={res.id}>
+                            <td>{res.id}</td>
+                            <td>{res.cabin_number}</td>
+                            <td>{res.email}</td>
+                            <td>{formatDateTime(res.start_time)}</td>
+                            <td>{formatDateTime(res.end_time)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  );
+                })()
               )}
 
               {reservationCategory === "Packages" && (

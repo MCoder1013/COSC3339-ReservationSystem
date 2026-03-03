@@ -75,12 +75,99 @@ export default function Reservation() {
     return hours * 60 + minutes;
   };
 
+  const formatTimeLabel = (timeStr: string): string => {
+    const [hours, minutes] = timeStr.split(":").map(Number);
+    const period = hours >= 12 ? "PM" : "AM";
+    const hour12 = hours % 12 === 0 ? 12 : hours % 12;
+    return `${hour12}:${String(minutes).padStart(2, "0")} ${period}`;
+  };
+
+  const isSameCalendarDay = (left: Date, right: Date) => {
+    return (
+      left.getFullYear() === right.getFullYear() &&
+      left.getMonth() === right.getMonth() &&
+      left.getDate() === right.getDate()
+    );
+  };
+
+  const getNextHalfHourMinutes = (reference: Date) => {
+    const minutesOfDay = reference.getHours() * 60 + reference.getMinutes();
+    const onExactBoundary = reference.getMinutes() % 30 === 0 && reference.getSeconds() === 0 && reference.getMilliseconds() === 0;
+    if (onExactBoundary) return minutesOfDay;
+    return Math.floor(minutesOfDay / 30) * 30 + 30;
+  };
+
   // Format datetime from date and time string
   const combineDateAndTime = (date: Date, timeStr: string): Date => {
     const [hours, minutes] = timeStr.split(":").map(Number);
     const combined = new Date(date);
     combined.setHours(hours, minutes, 0, 0);
     return combined;
+  };
+
+  const getDayBounds = (date: Date) => {
+    const dayStart = new Date(date);
+    dayStart.setHours(0, 0, 0, 0);
+
+    const dayEnd = new Date(date);
+    dayEnd.setHours(23, 59, 59, 999);
+
+    return { dayStart, dayEnd };
+  };
+
+  const getMinutesOfDay = (dateTime: Date) => {
+    return dateTime.getHours() * 60 + dateTime.getMinutes();
+  };
+
+  const getItemReservationsForDay = async (itemId: string, date: Date) => {
+    const { dayStart, dayEnd } = getDayBounds(date);
+    const allReservations = await fetchData(`/api/reservations?resource_id=${itemId}`);
+
+    return allReservations
+      .filter((res: any) => {
+        if (res.resource_id !== Number(itemId)) return false;
+        const start = new Date(res.start_time);
+        const end = new Date(res.end_time);
+        return start <= dayEnd && end >= dayStart;
+      })
+      .map((res: any) => ({
+        startMinutes: getMinutesOfDay(new Date(res.start_time)),
+        endMinutes: getMinutesOfDay(new Date(res.end_time)),
+        quantityReserved: Number(res.quantity_reserved) || 0,
+      }));
+  };
+
+  const getRoomReservationsForDay = async (cabinId: string, date: Date) => {
+    const { dayStart, dayEnd } = getDayBounds(date);
+    const allReservations = await fetchData(`/api/reservations?cabin_id=${cabinId}`);
+
+    return allReservations
+      .filter((res: any) => {
+        if (res.cabin_id !== Number(cabinId)) return false;
+        const start = new Date(res.start_time);
+        const end = new Date(res.end_time);
+        return start <= dayEnd && end >= dayStart;
+      })
+      .map((res: any) => ({
+        startMinutes: getMinutesOfDay(new Date(res.start_time)),
+        endMinutes: getMinutesOfDay(new Date(res.end_time)),
+      }));
+  };
+
+  const getReservedItemQuantityAtMinute = (
+    reservations: { startMinutes: number; endMinutes: number; quantityReserved: number }[],
+    minute: number
+  ) => {
+    return reservations
+      .filter((res) => minute >= res.startMinutes && minute <= res.endMinutes)
+      .reduce((sum, res) => sum + res.quantityReserved, 0);
+  };
+
+  const isRoomReservedAtMinute = (
+    reservations: { startMinutes: number; endMinutes: number }[],
+    minute: number
+  ) => {
+    return reservations.some((res) => minute >= res.startMinutes && minute <= res.endMinutes);
   };
 
   // Fetch existing reservations for an item on a specific date and calculate available start times
@@ -97,15 +184,7 @@ export default function Reservation() {
         return;
       }
 
-      // Fetch all reservations for this item
-      const allReservations = await fetchData(`/api/reservations?resource_id=${itemId}`);
-      
-      // Filter reservations for the selected date
-      const dateStr = date.toISOString().split("T")[0];
-      const dayReservations = allReservations.filter((res: any) => {
-        const resStartDate = new Date(res.start_time).toISOString().split("T")[0];
-        return resStartDate === dateStr && res.resource_id === Number(itemId);
-      });
+      const dayReservations = await getItemReservationsForDay(itemId, date);
 
       // Get the selected item's total quantity
       const selectedItem = availableItems.find((item) => String(item.id) === itemId);
@@ -114,38 +193,16 @@ export default function Reservation() {
       // Generate all time slots
       const allSlots = generateTimeSlots();
       const availableSlots: string[] = [];
+      const now = new Date();
+      const minAllowedMinutes = isSameCalendarDay(date, now) ? getNextHalfHourMinutes(now) : 0;
 
-      // For each time slot, check if quantity is available
+      // For each start slot, capacity at that slot must support requested quantity
       for (const timeSlot of allSlots) {
         const slotMinutes = timeToMinutes(timeSlot);
-        let isAvailable = true;
+        if (slotMinutes < minAllowedMinutes) continue;
 
-        // Check against all existing reservations
-        for (const res of dayReservations) {
-          const resStartTime = new Date(res.start_time);
-          const resEndTime = new Date(res.end_time);
-          const resStartMinutes = resStartTime.getHours() * 60 + resStartTime.getMinutes();
-          const resEndMinutes = resEndTime.getHours() * 60 + resEndTime.getMinutes();
-
-          // Check if there's an overlap at this time slot
-          if (slotMinutes >= resStartMinutes && slotMinutes < resEndMinutes) {
-            // There's an overlap - check if enough quantity is available
-            const totalReservedAtThisTime = dayReservations
-              .filter((r: any) => {
-                const rStartMin = new Date(r.start_time).getHours() * 60 + new Date(r.start_time).getMinutes();
-                const rEndMin = new Date(r.end_time).getHours() * 60 + new Date(r.end_time).getMinutes();
-                return slotMinutes >= rStartMin && slotMinutes < rEndMin;
-              })
-              .reduce((sum: number, r: any) => sum + r.quantity_reserved, 0);
-
-            if (totalReservedAtThisTime + quantity_num > totalQuantity) {
-              isAvailable = false;
-              break;
-            }
-          }
-        }
-
-        if (isAvailable) {
+        const reservedQtyAtSlot = getReservedItemQuantityAtMinute(dayReservations, slotMinutes);
+        if (reservedQtyAtSlot + quantity_num <= totalQuantity) {
           availableSlots.push(timeSlot);
         }
       }
@@ -171,14 +228,7 @@ export default function Reservation() {
         return;
       }
 
-      // Fetch all reservations for this item
-      const allReservations = await fetchData(`/api/reservations?resource_id=${itemId}`);
-      
-      const dateStr = date.toISOString().split("T")[0];
-      const dayReservations = allReservations.filter((res: any) => {
-        const resStartDate = new Date(res.start_time).toISOString().split("T")[0];
-        return resStartDate === dateStr && res.resource_id === Number(itemId);
-      });
+      const dayReservations = await getItemReservationsForDay(itemId, date);
 
       const selectedItem = availableItems.find((item) => String(item.id) === itemId);
       const totalQuantity = selectedItem ? selectedItem.quantity : 0;
@@ -186,33 +236,26 @@ export default function Reservation() {
       const allSlots = generateTimeSlots();
       const startTimeMinutes = timeToMinutes(startTime);
       const availableSlots: string[] = [];
+      const now = new Date();
+      const minAllowedMinutes = isSameCalendarDay(date, now) ? getNextHalfHourMinutes(now) : 0;
 
-      // End time must be after start time
+      if (startTimeMinutes < minAllowedMinutes) {
+        setAvailableItemEndTimes([]);
+        return;
+      }
+
+      // End time must be after start time and must keep full interval capacity-valid
       for (const timeSlot of allSlots) {
-        const slotMinutes = timeToMinutes(timeSlot);
-        if (slotMinutes <= startTimeMinutes) continue;
+        const endMinutes = timeToMinutes(timeSlot);
+        if (endMinutes <= startTimeMinutes || endMinutes < minAllowedMinutes) continue;
 
         let isAvailable = true;
 
-         // Check against all existing reservations
-        for (const res of dayReservations) {
-          const resEndTime = new Date(res.end_time);
-          const resEndMinutes = resEndTime.getHours() * 60 + resEndTime.getMinutes();
-
-          // Check if there's an overlap from startTime to this timeSlot
-          if (slotMinutes <= resEndMinutes && startTimeMinutes < resEndMinutes) {
-            const totalReservedInRange = dayReservations
-              .filter((r: any) => {
-                const rStartMin = new Date(r.start_time).getHours() * 60 + new Date(r.start_time).getMinutes();
-                const rEndMin = new Date(r.end_time).getHours() * 60 + new Date(r.end_time).getMinutes();
-                return !(rEndMin <= startTimeMinutes || rStartMin >= slotMinutes);
-              })
-              .reduce((sum: number, r: any) => sum + r.quantity_reserved, 0);
-
-            if (totalReservedInRange + quantity_num > totalQuantity) {
-              isAvailable = false;
-              break;
-            }
+        for (let minute = startTimeMinutes; minute < endMinutes; minute += 30) {
+          const reservedQtyAtMinute = getReservedItemQuantityAtMinute(dayReservations, minute);
+          if (reservedQtyAtMinute + quantity_num > totalQuantity) {
+            isAvailable = false;
+            break;
           }
         }
 
@@ -236,38 +279,19 @@ export default function Reservation() {
     }
 
     try {
-      // Fetch all reservations for this room
-      const allReservations = await fetchData(`/api/reservations?cabin_id=${cabinId}`);
-      
-      const dateStr = date.toISOString().split("T")[0];
-      const dayReservations = allReservations.filter((res: any) => {
-        const resStartDate = new Date(res.start_time).toISOString().split("T")[0];
-        return resStartDate === dateStr && res.cabin_id === Number(cabinId);
-      });
+      const dayReservations = await getRoomReservationsForDay(cabinId, date);
 
       const allSlots = generateTimeSlots();
       const availableSlots: string[] = [];
+      const now = new Date();
+      const minAllowedMinutes = isSameCalendarDay(date, now) ? getNextHalfHourMinutes(now) : 0;
 
-      // For each time slot, check if room is available
+      // For each start slot, room must not already be reserved
       for (const timeSlot of allSlots) {
         const slotMinutes = timeToMinutes(timeSlot);
-        let isAvailable = true;
+        if (slotMinutes < minAllowedMinutes) continue;
 
-        // Check against all existing reservations
-        for (const res of dayReservations) {
-          const resStartTime = new Date(res.start_time);
-          const resEndTime = new Date(res.end_time);
-          const resStartMinutes = resStartTime.getHours() * 60 + resStartTime.getMinutes();
-          const resEndMinutes = resEndTime.getHours() * 60 + resEndTime.getMinutes();
-
-          // Check if there's an overlap at this time slot
-          if (slotMinutes >= resStartMinutes && slotMinutes < resEndMinutes) {
-            isAvailable = false;
-            break;
-          }
-        }
-
-        if (isAvailable) {
+        if (!isRoomReservedAtMinute(dayReservations, slotMinutes)) {
           availableSlots.push(timeSlot);
         }
       }
@@ -287,32 +311,28 @@ export default function Reservation() {
     }
 
     try {
-      const allReservations = await fetchData(`/api/reservations?cabin_id=${cabinId}`);
-      
-      const dateStr = date.toISOString().split("T")[0];
-      const dayReservations = allReservations.filter((res: any) => {
-        const resStartDate = new Date(res.start_time).toISOString().split("T")[0];
-        return resStartDate === dateStr && res.cabin_id === Number(cabinId);
-      });
+      const dayReservations = await getRoomReservationsForDay(cabinId, date);
 
       const allSlots = generateTimeSlots();
       const startTimeMinutes = timeToMinutes(startTime);
       const availableSlots: string[] = [];
+      const now = new Date();
+      const minAllowedMinutes = isSameCalendarDay(date, now) ? getNextHalfHourMinutes(now) : 0;
 
-      // End time must be after start time
+      if (startTimeMinutes < minAllowedMinutes) {
+        setAvailableRoomEndTimes([]);
+        return;
+      }
+
+      // End time must be after start time and no overlap in the full interval
       for (const timeSlot of allSlots) {
-        const slotMinutes = timeToMinutes(timeSlot);
-        if (slotMinutes <= startTimeMinutes) continue;
+        const endMinutes = timeToMinutes(timeSlot);
+        if (endMinutes <= startTimeMinutes || endMinutes < minAllowedMinutes) continue;
 
         let isAvailable = true;
 
-        // Check against all existing reservations
-        for (const res of dayReservations) {
-          const resEndTime = new Date(res.end_time);
-          const resEndMinutes = resEndTime.getHours() * 60 + resEndTime.getMinutes();
-
-          // Check if there's an overlap from startTime to this timeSlot
-          if (slotMinutes <= resEndMinutes && startTimeMinutes < resEndMinutes) {
+        for (let minute = startTimeMinutes; minute < endMinutes; minute += 30) {
+          if (isRoomReservedAtMinute(dayReservations, minute)) {
             isAvailable = false;
             break;
           }
@@ -687,7 +707,7 @@ export default function Reservation() {
                     <option value="">-- Select start time --</option>
                     {availableItemStartTimes.map((time) => (
                       <option key={time} value={time}>
-                        {time}
+                        {formatTimeLabel(time)}
                       </option>
                     ))}
                   </select>
@@ -719,7 +739,7 @@ export default function Reservation() {
                     <option value="">-- Select end time --</option>
                     {availableItemEndTimes.map((time) => (
                       <option key={time} value={time}>
-                        {time}
+                        {formatTimeLabel(time)}
                       </option>
                     ))}
                   </select>
@@ -770,7 +790,7 @@ export default function Reservation() {
                     <option value="">-- Select check-in time --</option>
                     {availableRoomStartTimes.map((time) => (
                       <option key={time} value={time}>
-                        {time}
+                        {formatTimeLabel(time)}
                       </option>
                     ))}
                   </select>
@@ -802,7 +822,7 @@ export default function Reservation() {
                     <option value="">-- Select check-out time --</option>
                     {availableRoomEndTimes.map((time) => (
                       <option key={time} value={time}>
-                        {time}
+                        {formatTimeLabel(time)}
                       </option>
                     ))}
                   </select>

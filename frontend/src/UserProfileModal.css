@@ -477,5 +477,42 @@
   .categoryTabs {
     flex-wrap: wrap;
   }
+
+  .timePeriodTabs {
+    flex-wrap: wrap;
+  }
 }
 
+/* Time Period Tabs */
+.timePeriodTabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+  padding-bottom: 8px;
+  justify-content: center;
+}
+
+.timePeriodBtn {
+  padding: 8px 24px;
+  border: 2px solid rgba(106, 122, 255, 0.3);
+  background: transparent;
+  color: #666;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 20px;
+  transition: all 0.3s ease;
+}
+
+.timePeriodBtn:hover {
+  background: rgba(106, 122, 255, 0.1);
+  border-color: rgba(106, 122, 255, 0.5);
+  color: navy;
+}
+
+.timePeriodBtn.active {
+  color: white;
+  background: linear-gradient(135deg, #a2aafb 0%, #6e7aff 100%);
+  border-color: transparent;
+  box-shadow: 0 2px 8px rgba(106, 122, 255, 0.3);
+}
