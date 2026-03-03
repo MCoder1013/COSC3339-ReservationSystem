@@ -176,9 +176,10 @@ const [formError, setFormError] = useState<string>("");
                 alt="Starlight Pearl Cruises Logo" className="logo" />
                 <h1>{shipName}</h1>
                 <nav className="navLinks">
-                    <Link className="navButton" to="/">Home</Link>
+                  <Link className="navButton" to="/">Home</Link>
+                  <Link className="navButton" to="/reservations">Reservations</Link>
+                  <Link className="navButton" to="/profile">Profile</Link>
                 </nav>
-
             </div>
       </header>
 
@@ -341,7 +342,7 @@ const [formError, setFormError] = useState<string>("");
                       <option value="Gear">Gear</option>
                       <option value="Medical">Medical</option>
                       <option value="Event">Event</option>
-                      <option value="cleaning">Cleaning</option>
+                      <option value="Cleaning">Cleaning</option>
                       <option value="Other">Other</option>
                     </select>
                   </label>
