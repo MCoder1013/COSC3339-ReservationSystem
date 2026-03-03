@@ -1,0 +1,481 @@
+/* Modal Overlay */
+.modalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.modalContent {
+  background: white;
+  width: 100%;
+  max-width: 900px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  animation: slideInCenter 0.3s ease-out;
+  overflow: hidden;
+}
+
+@keyframes slideInCenter {
+  from {
+    transform: scale(0.95);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.modalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24px;
+  border-bottom: 2px solid #e0e0e0;
+  background: linear-gradient(135deg, #a2aafb 0%, #6e7aff 100%);
+}
+
+.modalHeader h2 {
+  margin: 0;
+  color: white;
+  font-size: 28px;
+  font-weight: 600;
+}
+
+.closeBtn {
+  background: none;
+  border: none;
+  font-size: 32px;
+  cursor: pointer;
+  color: white;
+  padding: 0;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+}
+
+.closeBtn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  transform: rotate(90deg);
+}
+
+/* Tab Buttons */
+.tabButtons {
+  display: flex;
+  gap: 0;
+  padding: 0 24px;
+  margin-top: 16px;
+  border-bottom: 2px solid #e0e0e0;
+}
+
+.tabBtn {
+  padding: 14px 24px;
+  border: none;
+  background: transparent;
+  color: #666;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 600;
+  border-bottom: 3px solid transparent;
+  transition: all 0.3s ease;
+  margin-bottom: -2px;
+}
+
+.tabBtn:hover {
+  color: navy;
+}
+
+.tabBtn.active {
+  color: white;
+  background: rgba(106, 122, 255, 0.9);
+  border-bottom-color: white;
+  border-radius: 8px 8px 0 0;
+}
+
+/* Tab Content */
+.tabContent {
+  flex: 1;
+  overflow-y: auto;
+  padding: 28px;
+}
+
+.reservationsTab h3,
+.editInfoTab h3 {
+  color: navy;
+  margin-top: 0;
+  margin-bottom: 20px;
+  font-size: 20px;
+}
+
+/* Reservations List */
+.reservationsList {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.reservationItem {
+  background: linear-gradient(135deg, rgba(162, 170, 251, 0.1) 0%, rgba(110, 122, 255, 0.1) 100%);
+  border: 2px solid rgba(106, 122, 255, 0.3);
+  border-radius: 8px;
+  padding: 16px;
+  transition: all 0.3s ease;
+}
+
+.reservationItem:hover {
+  border-color: rgba(106, 122, 255, 0.6);
+  box-shadow: 0 4px 12px rgba(106, 122, 255, 0.15);
+}
+
+.resDetails {
+  font-size: 14px;
+  line-height: 1.7;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.resDetails p {
+  margin: 0;
+}
+
+.resDetails strong {
+  color: navy;
+}
+
+.status {
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.status.pending {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.status.confirmed {
+  background: #d4edda;
+  color: #155724;
+}
+
+.status.cancelled {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.noDataMessage {
+  text-align: center;
+  color: #666;
+  padding: 40px 20px;
+  font-size: 16px;
+}
+
+.noDataMessage a {
+  color: rgba(106, 122, 255, 0.9);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.noDataMessage a:hover {
+  text-decoration: underline;
+}
+
+/* Edit Form */
+.editForm {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.formGroup label {
+  font-weight: 600;
+  color: navy;
+  font-size: 15px;
+}
+
+.formGroup p {
+  margin: 0;
+  padding: 12px;
+  background: linear-gradient(135deg, rgba(162, 170, 251, 0.1) 0%, rgba(110, 122, 255, 0.1) 100%);
+  border: 1px solid rgba(106, 122, 255, 0.2);
+  border-radius: 6px;
+  font-size: 14px;
+  color: #333;
+}
+
+.bioInput {
+  padding: 12px;
+  border: 2px solid #e0e0e0;
+  border-radius: 6px;
+  font-family: Arial, sans-serif;
+  font-size: 14px;
+  resize: vertical;
+  transition: all 0.3s ease;
+}
+
+.bioInput:focus {
+  outline: none;
+  border-color: rgba(106, 122, 255, 0.8);
+  box-shadow: 0 0 0 3px rgba(106, 122, 255, 0.1);
+}
+
+/* Icon Upload */
+.iconUpload {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-items: center;
+  padding: 20px;
+  background: linear-gradient(135deg, rgba(162, 170, 251, 0.05) 0%, rgba(110, 122, 255, 0.05) 100%);
+  border: 2px dashed rgba(106, 122, 255, 0.3);
+  border-radius: 8px;
+}
+
+.iconPreviewWrapper {
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 4px solid rgba(106, 122, 255, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #a2aafb 0%, #6e7aff 100%);
+  box-shadow: 0 4px 12px rgba(106, 122, 255, 0.3);
+}
+
+.iconPreview {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.fileInput {
+  padding: 10px;
+  border: 2px solid #e0e0e0;
+  border-radius: 6px;
+  font-size: 13px;
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.fileInput:hover {
+  border-color: rgba(106, 122, 255, 0.5);
+}
+
+.fileInput::file-selector-button {
+  background: linear-gradient(135deg, #a2aafb 0%, #6e7aff 100%);
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  margin-right: 10px;
+}
+
+.fileInput::file-selector-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(106, 122, 255, 0.4);
+}
+
+/* Buttons */
+.saveBtn {
+  background: linear-gradient(135deg, #a2aafb 0%, #6e7aff 100%);
+  color: white;
+  border: none;
+  padding: 12px 28px;
+  border-radius: 6px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  align-self: flex-start;
+}
+
+.saveBtn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(106, 122, 255, 0.4);
+}
+
+.successMsg {
+  color: #155724;
+  background: #d4edda;
+  padding: 12px;
+  border-radius: 6px;
+  font-size: 14px;
+  border-left: 4px solid #28a745;
+}
+
+.errorMsg {
+  color: #721c24;
+  background: #f8d7da;
+  padding: 12px;
+  border-radius: 6px;
+  font-size: 14px;
+  border-left: 4px solid #dc3545;
+}
+
+/* Modal Footer */
+.modalFooter {
+  padding: 20px 24px;
+  border-top: 2px solid #e0e0e0;
+  background: linear-gradient(135deg, rgba(162, 170, 251, 0.05) 0%, rgba(110, 122, 255, 0.05) 100%);
+}
+
+.logoutBtn {
+  width: 100%;
+  padding: 12px;
+  background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 15px;
+  transition: all 0.3s ease;
+}
+
+.logoutBtn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(220, 53, 69, 0.4);
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+  .modalContent {
+    max-width: 100%;
+    max-height: 95vh;
+    border-radius: 0;
+  }
+
+  .resDetails {
+    grid-template-columns: 1fr;
+  }
+
+  .modalHeader {
+    padding: 16px;
+  }
+
+  .tabContent {
+    padding: 16px;
+  }
+}
+
+/* Category Tabs within Reservations Tab */
+.categoryTabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+  border-bottom: 2px solid #e0e0e0;
+  padding-bottom: 8px;
+}
+
+.categoryBtn {
+  padding: 10px 20px;
+  border: none;
+  background: transparent;
+  color: #666;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 6px;
+  transition: all 0.3s ease;
+}
+
+.categoryBtn:hover {
+  background: rgba(106, 122, 255, 0.1);
+  color: navy;
+}
+
+.categoryBtn.active {
+  color: white;
+  background: linear-gradient(135deg, #a2aafb 0%, #6e7aff 100%);
+  box-shadow: 0 2px 8px rgba(106, 122, 255, 0.3);
+}
+
+/* Reservations Table */
+.reservationsTable {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.reservationsTable thead {
+  background: linear-gradient(135deg, #a2aafb 0%, #6e7aff 100%);
+  color: white;
+}
+
+.reservationsTable thead th {
+  padding: 14px 12px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.reservationsTable tbody tr {
+  border-bottom: 1px solid #e0e0e0;
+  transition: all 0.3s ease;
+}
+
+.reservationsTable tbody tr:hover {
+  background: linear-gradient(135deg, rgba(162, 170, 251, 0.08) 0%, rgba(110, 122, 255, 0.08) 100%);
+}
+
+.reservationsTable tbody tr:last-child {
+  border-bottom: none;
+}
+
+.reservationsTable tbody td {
+  padding: 14px 12px;
+  font-size: 14px;
+  color: #333;
+}
+
+.reservationsTable tbody td:first-child {
+  font-weight: 600;
+  color: navy;
+}
+
+/* Responsive Table */
+@media (max-width: 768px) {
+  .reservationsTable {
+    display: block;
+    overflow-x: auto;
+  }
+  
+  .categoryTabs {
+    flex-wrap: wrap;
+  }
+}
+

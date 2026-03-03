@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import "./App.css";
 import { Link } from "react-router-dom";
 import { fetchData } from "./api";
+import NavBar from "./NavBar";
 const API_URL = import.meta.env.VITE_API_URL;
 
 export default function ReservationTable() {
@@ -121,24 +122,7 @@ export default function ReservationTable() {
 
   return (
     <div className="page">
-      <header className="navbar">
-        <div className="container headerRow">
-          <img
-            src="images/StarlightPearlLogoWithName.png"
-            alt="Starlight Pearl Cruises Logo"
-            className="logo"
-          />
-          <h1>{shipName}</h1>
-          <nav className="navLinks">
-            <Link className="navButton" to="/">
-              Home
-            </Link>
-            <Link className="navButton" to="/profile">
-              Profile
-            </Link>
-          </nav>
-        </div>
-      </header>
+      <NavBar shipName={shipName} />
 
       <main className="container section inventoryDisplay">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
@@ -149,6 +133,7 @@ export default function ReservationTable() {
                 Make Reservation
               </button>
             </Link>
+            
           )}
         </div>
 

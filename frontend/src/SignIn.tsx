@@ -2,13 +2,14 @@ import { Link, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import "./App.css";
 import { submitData } from "./api";
-import { useAuth } from "./AuthContext";
+import { useAuth } from "./useAuth";
+import NavBar from "./NavBar";
 
 export default function SignIn() {
   const shipName = "Starlight Pearl Cruises";
 
   const navigate = useNavigate();
-  const { setUser } = useAuth();
+  const { login } = useAuth();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -28,12 +29,10 @@ export default function SignIn() {
         return;
       }
 
-      setUser({
-        id: data.userId,
-        firstName: data.firstName,
-        lastName: "",
-        email: email,
-        user_role: data.role,
+      // Store user info in auth state
+      login({
+        userId: data.userId,
+        firstName: data.firstName
       });
 
       setLogInMessage("Successful login!");
@@ -42,11 +41,7 @@ export default function SignIn() {
       setPassword("");
 
       setTimeout(() => {
-        if (data.role === "staff") {
-          navigate("/");
-        } else {
-          navigate("/user-reservations");
-        }
+        navigate("/");
       }, 1000);
 
     } catch {
@@ -57,16 +52,7 @@ export default function SignIn() {
 
   return (
     <div className="page">
-      <header className="navbar">
-        <div className="container headerRow">
-          <img src="images/StarlightPearlLogoWithName.png"
-            alt="Starlight Pearl Cruises Logo" className="logo" />
-          <h1>{shipName}</h1>
-          <nav className="navLinks">
-            <Link className="navButton" to="/">Home</Link>
-          </nav>
-        </div>
-      </header>
+      <NavBar shipName={shipName} />
 
       <main className="container centeredContent">
         <section className="centerCard">

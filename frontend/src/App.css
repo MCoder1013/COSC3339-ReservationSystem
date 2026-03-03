@@ -317,24 +317,30 @@ button:hover, .navButton:hover {
   color: navy !important;
 }
 
-.profileImage {
-  width: 100px;
-  height: 100px;
-  border-radius: 50%;
-  object-fit: cover;
-  display: block;
-  margin: 0 auto 1rem auto;
+/* Welcome section styling */
+.welcomeSection {
+  animation: fadeIn 0.5s ease-in;
 }
 
-.profileImagePlaceholder {
-  width: 100px;
-  height: 100px;
-  border-radius: 50%;
-  background-color: #ccc;
+.welcomeMessage {
+  font-size: 24px;
+  color: navy;
+  margin-bottom: 20px;
+  font-weight: bold;
+}
+
+.userActions {
   display: flex;
-  align-items: center;
+  gap: 16px;
   justify-content: center;
-  margin: 0 auto 1rem auto;
-  font-size: 0.85rem;
-  color: #555;
+  flex-wrap: wrap;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
