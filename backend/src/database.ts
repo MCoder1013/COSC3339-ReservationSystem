@@ -502,3 +502,56 @@ export async function getUserItemReservations(userId: number) {
         throw error;
     }
 }
+
+export async function getUserRoomReservations(userId: number) {
+  try {
+    const rows = await sql`
+      SELECT 
+        r.id,
+        u.first_name,
+        u.last_name,
+        c.cabin_number,
+        r.start_time,
+        r.end_time,
+        r.status
+      FROM reservations r
+      JOIN users u ON r.user_id = u.id
+      JOIN cabins c ON r.cabin_id = c.id
+      WHERE r.user_id = ${userId}
+        AND r.cabin_id IS NOT NULL
+      ORDER BY r.start_time DESC
+    `;
+
+    return rows;
+  } catch (error) {
+    console.error("Error getting user room reservations: ", error);
+    throw error;
+  }
+}
+
+export async function updateReservation(
+  reservationId: number,
+  userId: number,
+  updates: {
+    start_time?: string;
+    end_time?: string;
+    quantity_reserved?: number;
+  }
+) {
+  const result = await sql`
+    UPDATE reservations
+    SET
+      start_time = COALESCE(${updates.start_time ?? null}, start_time),
+      end_time = COALESCE(${updates.end_time ?? null}, end_time),
+      quantity_reserved = COALESCE(${updates.quantity_reserved ?? null}, quantity_reserved)
+    WHERE id = ${reservationId}
+    AND user_id = ${userId}
+    RETURNING *;
+  `;
+
+  if (result.length === 0) {
+    throw new Error("Reservation not found or unauthorized");
+  }
+
+  return result[0];
+}
