@@ -51,6 +51,37 @@ export default function ReservationTable() {
     return `${year}-${month}-${day}T${hours}:${minutes}`;
   };
 
+  const getNowForInput = () => {
+    const now = new Date();
+
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    const day = String(now.getDate()).padStart(2, "0");
+    const hours = String(now.getHours()).padStart(2, "0");
+    const minutes = String(now.getMinutes()).padStart(2, "0");
+
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  };
+
+  const roundTo30Minutes = (value: string) => {
+    const date = new Date(value);
+
+    const minutes = date.getMinutes();
+    const roundedMinutes = Math.round(minutes / 30) * 30;
+
+    date.setMinutes(roundedMinutes);
+    date.setSeconds(0);
+    date.setMilliseconds(0);
+
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    const hours = String(date.getHours()).padStart(2, "0");
+    const mins = String(date.getMinutes()).padStart(2, "0");
+
+    return `${year}-${month}-${day}T${hours}:${mins}`;
+  };
+
   const loadReservations = async () => {
     setLoading(true);
     setFormError("");
@@ -347,22 +378,28 @@ export default function ReservationTable() {
                           >
                             <input
                               type="datetime-local"
+                              min={getNowForInput()}
+                              step={1800}
                               value={editData.start_time}
                               onChange={(e) =>
                                 setEditData({
                                   ...editData,
-                                  start_time: e.target.value,
+                                  start_time: roundTo30Minutes(e.target.value),
                                 })
                               }
                             />
 
                             <input
                               type="datetime-local"
+                              min={
+                                getNowForInput()
+                              }
+                              step={1800}
                               value={editData.end_time}
                               onChange={(e) =>
                                 setEditData({
                                   ...editData,
-                                  end_time: e.target.value,
+                                  end_time: roundTo30Minutes(e.target.value),
                                 })
                               }
                             />
