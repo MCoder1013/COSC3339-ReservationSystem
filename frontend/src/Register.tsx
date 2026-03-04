@@ -2,6 +2,7 @@ import { Link, useNavigate } from "react-router-dom";
 import "./App.css";
 import { submitData } from "./api";
 import { useState } from "react";
+import NavBar from "./NavBar";
 
 export default function Register() {
   const shipName = "Starlight Pearl Cruises";
@@ -37,17 +38,7 @@ export default function Register() {
 
   return (
     <div className="page">
-      <header className="navbar">
-        <div className="container headerRow">
-          <img src="images/StarlightPearlLogoWithName.png" 
-            alt="Starlight Pearl Cruises Logo" className="logo" />
-          <h1>{shipName}</h1>
-          <nav className="navLinks">
-            <Link className="navButton" to="/">Home</Link>
-          </nav>
-
-        </div>
-      </header>
+      <NavBar shipName={shipName} />
 
       <main className="container centeredContent">
         <section className="centerCard">

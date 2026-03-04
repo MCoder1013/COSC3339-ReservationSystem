@@ -160,6 +160,25 @@ router.get('/me', async (req: Request, res: Response) => {
   }
 });
 
+router.get('/users', async (req: Request, res: Response) => {
+  const token = req.cookies?.jwt;
+  if (!token) return res.status(401).json({ error: 'Not authenticated' });
+
+  try {
+    const decoded = jwt.verify(token, jwtSecret) as { id: number };
+    const currentUser = await database.getUserById(decoded.id);
+
+    if (!currentUser || currentUser.user_role !== 'staff') {
+      return res.status(403).json({ error: 'Forbidden: staff only' });
+    }
+
+    const users = await database.getAllUsers();
+    res.json(users);
+  } catch {
+    res.status(401).json({ error: 'Invalid token' });
+  }
+});
+
 const uploadDir = "uploads/profiles";
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 
