@@ -8,8 +8,9 @@ interface UserProfile {
   firstName: string;
   lastName: string;
   email: string;
-  bio: string;
-  iconUrl: string;
+  biography: string | null;
+  profilePicture: string | null;
+  role: string;
 }
 
 interface ItemReservation {
@@ -29,51 +30,7 @@ interface RoomReservation {
   end_time: string;
 }
 
-// Dummy data
-const DUMMY_USER_PROFILE: UserProfile = {
-  id: 1,
-  firstName: "John",
-  lastName: "Smith",
-  email: "john.smith@example.com",
-  bio: "Passionate traveler and adventure enthusiast. Love exploring new destinations and meeting people from around the world!",
-  iconUrl: ""
-};
 
-const DUMMY_ITEMS_RESERVATIONS: ItemReservation[] = [
-  {
-    id: 1,
-    resource_name: "Beach Chairs",
-    quantity_reserved: 2,
-    email: "john.smith@example.com",
-    start_time: "2026-03-10T09:00:00",
-    end_time: "2026-03-10T17:00:00",
-  },
-  {
-    id: 2,
-    resource_name: "Snorkeling Gear",
-    quantity_reserved: 4,
-    email: "john.smith@example.com",
-    start_time: "2026-03-12T10:00:00",
-    end_time: "2026-03-12T15:00:00",
-  },
-];
-
-const DUMMY_ROOMS_RESERVATIONS: RoomReservation[] = [
-  {
-    id: 101,
-    cabin_number: "A-201",
-    email: "john.smith@example.com",
-    start_time: "2026-03-10T14:00:00",
-    end_time: "2026-03-15T11:00:00",
-  },
-  {
-    id: 102,
-    cabin_number: "B-305",
-    email: "john.smith@example.com",
-    start_time: "2026-04-01T14:00:00",
-    end_time: "2026-04-08T11:00:00",
-  },
-];
 
 export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const navigate = useNavigate();
@@ -81,22 +38,58 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
   const [activeTab, setActiveTab] = useState<"reservations" | "editinfo">("reservations");
   const [reservationCategory, setReservationCategory] = useState<"Items" | "Rooms" | "Packages">("Items");
   const [timePeriod, setTimePeriod] = useState<"Past" | "Current" | "Future">("Future");
-  const [userProfile, setUserProfile] = useState<UserProfile>(DUMMY_USER_PROFILE);
-  const [itemsReservations, setItemsReservations] = useState<ItemReservation[]>(DUMMY_ITEMS_RESERVATIONS);
-  const [roomsReservations, setRoomsReservations] = useState<RoomReservation[]>(DUMMY_ROOMS_RESERVATIONS);
-  const [bio, setBio] = useState(DUMMY_USER_PROFILE.bio);
+  const [userProfile, setUserProfile] = useState<UserProfile>();
+  const [itemsReservations, setItemsReservations] = useState<ItemReservation[]>([]);
+  const [roomsReservations, setRoomsReservations] = useState<RoomReservation[]>([]);
+  const [bio, setBio] = useState("");
   const [iconFile, setIconFile] = useState<File | null>(null);
   const [iconPreview, setIconPreview] = useState("");
   const [saveMessage, setSaveMessage] = useState("");
 
   useEffect(() => {
-    if (isOpen) {
-      setUserProfile(DUMMY_USER_PROFILE);
-      setItemsReservations(DUMMY_ITEMS_RESERVATIONS);
-      setRoomsReservations(DUMMY_ROOMS_RESERVATIONS);
-      setBio(DUMMY_USER_PROFILE.bio);
-      setIconPreview(DUMMY_USER_PROFILE.iconUrl);
-    }
+    if (!isOpen) return;
+
+    const fetchData = async () => {
+      try {
+        const token = localStorage.getItem("token");
+
+        const profileRes = await fetch("/api/auth/me", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (!profileRes.ok) throw new Error("Failed to fetch profile");
+
+        const profileData = await profileRes.json();
+        setUserProfile(profileData);
+        setBio(profileData.biography || "");
+        setIconPreview(profileData.profilePicture || "");
+
+        const itemsRes = await fetch("api/reservations/items", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        const itemsData = await itemsRes.json();
+        setItemsReservations(itemsData);
+
+        const roomsRes = await fetch("api/reservations/rooms", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        const roomsData = await roomsRes.json();
+        setRoomsReservations(roomsData);
+
+      } catch (err) {
+        console.error(err);
+      }
+    };
+
+    fetchData();
   }, [isOpen]);
 
   // Function to format date and time
@@ -138,9 +131,36 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
     }
   };
 
-  const handleSaveProfile = () => {
-    // Simulate saving - just show success message
-    setSaveMessage("Profile updated successfully!");
+  const handleSaveProfile = async () => {
+    try {
+      const token = localStorage.getItem("token");
+
+      const formData = new FormData();
+      formData.append("biography", bio);
+
+      if (iconFile) {
+        formData.append("profilePicture", iconFile);
+      }
+
+      const response = await fetch("api/auth/update-profile", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      });
+
+      if (!response.ok) throw new Error("Failed to update profile");
+
+      const updatedUser = await response.json();
+      setUserProfile(updatedUser);
+      setSaveMessage("Profile updated successfully!");
+
+    } catch (err) {
+      console.error(err);
+      setSaveMessage("Error updating profile");
+    }
+
     setTimeout(() => setSaveMessage(""), 3000);
   };
 

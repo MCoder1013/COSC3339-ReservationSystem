@@ -72,6 +72,15 @@ export async function  updateUserProfilePicture(id: number, profilePicture: stri
   await sql`UPDATE users SET profile_picture = ${profilePicture} WHERE id = ${id}`;
 }
 
+export async function getAllUsers() {
+    const result = await sql`
+        SELECT id, first_name, last_name, email, user_role, created_at
+        FROM users
+        ORDER BY id ASC
+    `;
+    return result;
+}
+
 // pulls the resources from the resources table in the SQL 
 // returns only the rows
 // throws error otherwise
@@ -124,6 +133,10 @@ export async function addRoom(r: NewRoom): Promise<number> {
 
         if (r.capacity <= 0) {
             throw new Error("Capacity must be greater than 0");
+        }
+
+        if (r.deck <= 0) {
+            throw new Error("Input a valid deck number");
         }
 
         const existing = await sql`SELECT cabin_number FROM cabins WHERE cabin_number = ${r.cabin_number}`;

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect } from "react";
 import "./App.css";
 import { fetchData } from "./api";
@@ -187,9 +188,7 @@ const [formError, setFormError] = useState<string>("");
             </button>
           ))}
         </div>
-
-          <br />
-
+        
         {/*Add/Delete buttons */}
         <button className="addButton" onClick={() => setShowModal(true)}>
           Add {activeCategory.slice(0, -1)}

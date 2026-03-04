@@ -25,6 +25,7 @@ export default function NavBar({ shipName }: NavBarProps) {
             {!isHomePage && <Link className="navButton" to="/">Home</Link>}
             {user?.role === "staff" && <Link className="navButton" to="/inventory">Inventory</Link>}
             {user?.role === "staff" && <Link className="navButton" to="/reservations">Reservations</Link>}
+            {user?.role === "staff" && <Link className="navButton" to="/view-users">Users</Link>}
             {user ? (
               <button 
                 className="userIconBtn"

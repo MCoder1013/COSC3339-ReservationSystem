@@ -125,6 +125,12 @@ button:hover, .navButton:hover {
   padding: 24px;
 }
 
+.tabButtons {
+  display: flex;
+  justify-content: center; 
+  margin-bottom: 15px;
+}
+
 .inventoryTable {
   width: 100%;
   border-collapse: collapse; /*ensures borders merge properly between cells*/
@@ -208,8 +214,13 @@ button:hover, .navButton:hover {
   font-size: inherit;
 }
 
-.submitButton, .primaryBtn {
+.primaryBtn {
   background: transparent;
+  color: white;
+}
+
+.submitButton {
+  background: navy;
   color: white;
 }
 
