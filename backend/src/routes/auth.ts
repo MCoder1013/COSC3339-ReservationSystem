@@ -2,6 +2,10 @@ import { Router, Request, Response } from 'express';
 import * as argon2 from 'argon2';
 import * as database from '../database.js'
 import jwt from 'jsonwebtoken';
+import multer from "multer";
+import path from "path";
+import fs from "fs";
+
 
 const router = Router();
 
@@ -156,10 +160,6 @@ router.get('/me', async (req: Request, res: Response) => {
   }
 });
 
-import multer from "multer";
-import path from "path";
-import fs from "fs";
-
 const uploadDir = "uploads/profiles";
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 
@@ -187,7 +187,21 @@ router.post('/update-profile', upload.single('profilePicture'), async (req: Requ
   try {
     const decoded = jwt.verify(token, jwtSecret) as { id: number };
     const { biography } = req.body;
-    const profilePicture = req.file ? `/uploads/profiles/${req.file.filename}` : null;
+    let profilePicture: null | string = null
+
+    if (req.file) {
+      const fileName = req.file.filename
+
+      // this is usually unnecessary, but just to be safe we do some extra checks
+      if (fileName.includes('..') || fileName.includes('/')) {
+        throw Error('file name contains disallowed characters')
+      }
+      if (fileName.length === 0 || fileName.length > 100) {
+        throw Error('file name has an invalid length')
+      }
+
+      profilePicture = `/uploads/profiles/${fileName}`
+    }
 
     if (biography !== undefined && profilePicture) {
       await database.updateUserProfile(decoded.id, biography, profilePicture);
