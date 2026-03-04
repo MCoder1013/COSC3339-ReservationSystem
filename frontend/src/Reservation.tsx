@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import "./App.css";
 import { fetchData } from "./api";
+import { Link } from "react-router-dom";
 import DatePicker from "react-date-picker";
 import "react-date-picker/dist/DatePicker.css";
 import "react-calendar/dist/Calendar.css";
@@ -99,7 +100,33 @@ export default function Reservation() {
 
   // Format datetime from date and time string
   const combineDateAndTime = (date: Date, timeStr: string): Date => {
-    const [hours, minutes] = timeStr.split(":").map(Number);
+    let hours: number;
+    let minutes: number;
+    
+    // Handle both 24-hour format (HH:mm) and 12-hour format (H:mm AM/PM)
+    const timeRegex = /^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i;
+    const match = timeStr.match(timeRegex);
+    
+    if (match) {
+      hours = parseInt(match[1]);
+      minutes = parseInt(match[2]);
+      const period = match[3]?.toUpperCase();
+      
+      // Convert 12-hour to 24-hour format if AM/PM is present
+      if (period) {
+        if (period === 'PM' && hours !== 12) {
+          hours += 12;
+        } else if (period === 'AM' && hours === 12) {
+          hours = 0;
+        }
+      }
+    } else {
+      // Fallback to original parsing for backward compatibility
+      const parts = timeStr.split(":").map(Number);
+      hours = parts[0] || 0;
+      minutes = parts[1] || 0;
+    }
+    
     const combined = new Date(date);
     combined.setHours(hours, minutes, 0, 0);
     return combined;
@@ -408,6 +435,8 @@ export default function Reservation() {
       setItemStartTime("");
       setItemEndTime("");
       setAvailableItemEndTimes([]);
+      // Auto-sync end date to start date when start date changes
+      setItemEndDate(itemStartDate);
     }
   }, [itemReservationForm.itemId, itemReservationForm.quantity, itemStartDate, availableItems]);
 
@@ -426,6 +455,8 @@ export default function Reservation() {
       setRoomStartTime("");
       setRoomEndTime("");
       setAvailableRoomEndTimes([]);
+      // Auto-sync end date to start date when start date changes
+      setRoomEndDate(roomStartDate);
     }
   }, [roomReservationForm.cabinId, roomStartDate, availableRooms]);
 
@@ -627,7 +658,12 @@ export default function Reservation() {
       <NavBar shipName={shipName} />
 
       <main className="container section centerCard">
-        <h2>Make a Reservation</h2>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+          <h2>Make a Reservation</h2>
+          <Link to="/user-reservations">
+            <button className="primaryButton">Back to My Reservations</button>
+          </Link>
+        </div>
 
         {/*buttons to switch tabs */}
         <div className="tabButtons">
