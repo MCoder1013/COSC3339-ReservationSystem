@@ -6,10 +6,10 @@ import App from "./App";
 import SignIn from "./SignIn";
 import Register from "./Register";
 import Inventory from "./Inventory";
-import Profile from "./Profile";
 import ReservationTable from "./ReservationViewTable";
 import UserReservationTable from "./UserReservationViewTable";
 import Reservation from "./Reservation";
+import ViewUsers from "./ViewAllUsers"
 import "./index.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
@@ -24,7 +24,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           <Route path="/reservations" element={<ReservationTable />} />
           <Route path="/user-reservations" element={<UserReservationTable />} />
           <Route path="/reservation" element={<Reservation />} />
-          <Route path="/profile" element={<Profile />} />
+          <Route path="/view-users" element={<ViewUsers />} />
         </Routes>
       </AuthProvider>
     </BrowserRouter>

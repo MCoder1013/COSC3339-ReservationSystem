@@ -125,6 +125,12 @@ button:hover, .navButton:hover {
   padding: 24px;
 }
 
+.tabButtons {
+  display: flex;
+  justify-content: center; 
+  margin-bottom: 15px;
+}
+
 .inventoryTable {
   width: 100%;
   border-collapse: collapse; /*ensures borders merge properly between cells*/
@@ -197,13 +203,20 @@ button:hover, .navButton:hover {
   font-size: 14px;
 }
 
-.submitButton, .cancelButton {
-  padding: 10px 20px;
+.submitButton, .cancelButton, .primaryBtn {
+  padding: 10px 18px;
   border-radius: 8px;
-  border: none;
+  border: 1px solid white;
   cursor: pointer;
   font-weight: bold;
   margin-top: 8px;
+  font-family: inherit;
+  font-size: inherit;
+}
+
+.primaryBtn {
+  background: transparent;
+  color: white;
 }
 
 .submitButton {
@@ -211,9 +224,9 @@ button:hover, .navButton:hover {
   color: white;
 }
 
-.submitButton:hover {
-  background: darkblue;
-  color: white;
+.submitButton:hover, .primaryBtn:hover {
+  background: white;
+  color: navy;
 }
 
 .cancelButton {
@@ -317,24 +330,133 @@ button:hover, .navButton:hover {
   color: navy !important;
 }
 
-.profileImage {
-  width: 100px;
-  height: 100px;
-  border-radius: 50%;
-  object-fit: cover;
-  display: block;
-  margin: 0 auto 1rem auto;
+/* Homepage Action Buttons (Unsigned In) */
+.homeActionButtons {
+  display: flex;
+  gap: 24px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-top: 40px;
 }
 
-.profileImagePlaceholder {
-  width: 100px;
-  height: 100px;
-  border-radius: 50%;
-  background-color: #ccc;
+/* Welcome Dashboard (Signed In) */
+.welcomeDashboard {
+  animation: slideInDown 0.5s ease-out;
+  padding-top: 48px;
+  padding-bottom: 48px;
+}
+
+.dashboardContent {
+  text-align: center;
+}
+
+.dashboardContent h2 {
+  font-size: 36px;
+  color: white;
+  margin-bottom: 8px;
+}
+
+.dashboardSubtitle {
+  font-size: 20px;
+  color: white;
+  margin-bottom: 40px;
+  font-style: italic;
+}
+
+.dashboardGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 24px;
+  margin-top: 32px;
+}
+
+.dashboardCard {
+  background: linear-gradient(135deg, rgba(162, 170, 251, 0.6) 0%, rgba(110, 122, 255, 0.9) 100%);
+  border: 2px solid rgba(106, 122, 255, 0.3);
+  border-radius: 12px;
+  padding: 28px;
+  transition: all 0.3s ease;
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.dashboardCard:hover {
+  border-color: rgba(106, 122, 255, 0.6);
+  box-shadow: 0 8px 24px rgba(106, 122, 255, 0.15);
+  transform: translateY(-4px);
+}
+
+.dashboardCard h3 {
+  color: white;
+  font-size: 22px;
+  margin: 0;
+}
+
+.dashboardCard p {
+  color: white;
+  font-size: 15px;
+  margin: 0;
+  flex-grow: 1;
+}
+
+.dashboardCard .primaryBtn {
+  margin-top: 12px;
+  align-self: center;
+}
+
+/* Animations */
+@keyframes slideInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.largeBtn {
+  padding: 16px 40px;
+  font-size: 18px;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  border: none;
+  font-weight: 600;
+  min-width: 200px;
+}
+
+.largeBtn:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 20px rgba(0, 0, 128, 0.25);
+}
+
+/* Welcome section styling */
+.welcomeSection {
+  animation: fadeIn 0.5s ease-in;
+}
+
+.welcomeMessage {
+  font-size: 24px;
+  color: navy;
+  margin-bottom: 20px;
+  font-weight: bold;
+}
+
+.userActions {
+  display: flex;
+  gap: 16px;
   justify-content: center;
-  margin: 0 auto 1rem auto;
-  font-size: 0.85rem;
-  color: #555;
+  flex-wrap: wrap;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }

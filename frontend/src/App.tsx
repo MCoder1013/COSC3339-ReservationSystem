@@ -1,40 +1,68 @@
 import "./App.css";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "./AuthContext";
+import NavBar from "./NavBar";
 
 export default function App() {
   const shipName = "Starlight Pearl Cruises";
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  const isStaff = user?.user_role === "staff";
-  const isNormal = user?.user_role === "normal";
-
   return (
     <div className="page">
-      <header className="navbar">
-        <div className="container headerRow">
-          <img src="images/StarlightPearlLogoWithName.png"
-            alt="Starlight Pearl Cruises Logo" className="logo" />
-          <h1>{shipName}</h1>
-          <nav className="navLinks">
-            {!user && <Link className="navButton" to="/signin">Sign In</Link>}
-            {(user) && <Link className="navButton" to="/">Home</Link>}
-            {isStaff && <Link className="navButton" to="/inventory">Inventory</Link>}
-            {isStaff && <Link className="navButton" to="/reservations">Reservations</Link>}
-            {isStaff && <Link className="navButton" to="/profile">Profile</Link>}
-            {isNormal && <Link className="navButton" to="/user-reservations">My Reservations</Link>}
-            {isNormal && <Link className="navButton" to="/profile">Profile</Link>}
-          </nav>
-        </div>
-      </header>
+      <NavBar shipName={shipName} />
 
       <main className="container">
-        <section className="section">
-          <h2>Sail Where the Stars Lead</h2>
-          <h3>Your ocean journey, guided by starlight.</h3>
-          {!user && <button onClick={() => navigate("/signin")}>Book Your Trip</button>}
-        </section>
+        {!user ? (
+          // Unsigned in: Book option only
+          <section className="section">
+            <h2>Sail Where the Stars Lead</h2>
+            <h3>Your ocean journey, guided by starlight.</h3>
+            <p>Explore our exclusive cruise amenities and book your perfect vacation.</p>
+            
+            <div className="homeActionButtons">
+              <button onClick={() => navigate("/signin")} className="primaryBtn">
+                Book Your Trip
+              </button>
+            </div>
+          </section>
+        ) : (
+          // Signed in: Welcome dashboard
+          <section className="section welcomeDashboard">
+            <div className="dashboardContent">
+              <h2>Welcome back, {user.firstName}!</h2>
+              <p className="dashboardSubtitle">Your voyage awaits</p>
+              
+              <div className="dashboardGrid">
+                <div className="dashboardCard">
+                  <h3>My Reservations</h3>
+                  <p>View and manage your current bookings</p>
+                  <button onClick={() => navigate("/user-reservations")} className="primaryBtn">
+                    View Reservations
+                  </button>
+                </div>
+                
+                <div className="dashboardCard">
+                  <h3>Make a Reservation</h3>
+                  <p>Book rooms, items, or exclusive packages</p>
+                  <button onClick={() => navigate("/reservation")} className="primaryBtn">
+                    New Reservation
+                  </button>
+                </div>
+                
+                {user.role === "staff" && (
+                  <div className="dashboardCard">
+                    <h3>Browse Inventory</h3>
+                    <p>Explore available items and amenities</p>
+                    <button onClick={() => navigate("/inventory")} className="primaryBtn">
+                      Browse
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </section>
+        )}
       </main>
 
       <footer className="footer">

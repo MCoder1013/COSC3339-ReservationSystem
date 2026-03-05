@@ -2,6 +2,10 @@ import { Router, Request, Response } from 'express';
 import * as argon2 from 'argon2';
 import * as database from '../database.js'
 import jwt from 'jsonwebtoken';
+import multer from "multer";
+import path from "path";
+import fs from "fs";
+
 
 const router = Router();
 
@@ -156,9 +160,24 @@ router.get('/me', async (req: Request, res: Response) => {
   }
 });
 
-import multer from "multer";
-import path from "path";
-import fs from "fs";
+router.get('/users', async (req: Request, res: Response) => {
+  const token = req.cookies?.jwt;
+  if (!token) return res.status(401).json({ error: 'Not authenticated' });
+
+  try {
+    const decoded = jwt.verify(token, jwtSecret) as { id: number };
+    const currentUser = await database.getUserById(decoded.id);
+
+    if (!currentUser || currentUser.user_role !== 'staff') {
+      return res.status(403).json({ error: 'Forbidden: staff only' });
+    }
+
+    const users = await database.getAllUsers();
+    res.json(users);
+  } catch {
+    res.status(401).json({ error: 'Invalid token' });
+  }
+});
 
 const uploadDir = "uploads/profiles";
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
@@ -187,7 +206,21 @@ router.post('/update-profile', upload.single('profilePicture'), async (req: Requ
   try {
     const decoded = jwt.verify(token, jwtSecret) as { id: number };
     const { biography } = req.body;
-    const profilePicture = req.file ? `/uploads/profiles/${req.file.filename}` : null;
+    let profilePicture: null | string = null
+
+    if (req.file) {
+      const fileName = req.file.filename
+
+      // this is usually unnecessary, but just to be safe we do some extra checks
+      if (fileName.includes('..') || fileName.includes('/')) {
+        throw Error('file name contains disallowed characters')
+      }
+      if (fileName.length === 0 || fileName.length > 100) {
+        throw Error('file name has an invalid length')
+      }
+
+      profilePicture = `/uploads/profiles/${fileName}`
+    }
 
     if (biography !== undefined && profilePicture) {
       await database.updateUserProfile(decoded.id, biography, profilePicture);

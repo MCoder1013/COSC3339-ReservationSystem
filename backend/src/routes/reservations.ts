@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
-import { getUserItemReservations, addReservation, deleteReservation, pullReservations, getAllReservationsWithDetails, getReservationsByUser } from '../database.js';
+import { getUserItemReservations, addReservation, deleteReservation, pullReservations, getAllReservationsWithDetails, getReservationsByUser, 
+    updateReservation, getUserRoomReservations } from '../database.js';
 import { getAuthenticatedUserId } from './auth.js';
 
 const router = Router();
@@ -35,6 +36,39 @@ router.post("/reservations", async (req: Request, res: Response) => {
         });
     }
 })
+
+router.post("/reservations/:id", async (req: Request, res: Response) => {
+  const reservationId = Number(req.params.id);
+  const user_id = getAuthenticatedUserId(req);
+
+  if (!user_id) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  if (isNaN(reservationId)) {
+    return res.status(400).json({ error: "Invalid reservation ID" });
+  }
+
+  const { start_time, end_time, quantity_reserved } = req.body;
+
+  try {
+    const updated = await updateReservation(reservationId, user_id, {
+      start_time,
+      end_time,
+      quantity_reserved,
+    });
+
+    res.json({
+      message: "Reservation updated successfully",
+      reservation: updated,
+    });
+  } catch (error: any) {
+    console.error("Update error:", error);
+    res.status(400).json({
+      error: error.message || "Failed to update reservation",
+    });
+  }
+});
 
 router.delete('/reservations/:id', async (req: Request, res: Response) => {
     const id = Number(req.params.id);
@@ -94,6 +128,22 @@ router.get('/reservations/items', async (req: Request, res: Response) => {
     } catch (error) {
         console.error('Error fetching user item reservations:', error);
         res.status(500).json({ error: 'Failed to load item reservations' });
+    }
+});
+
+router.get('/reservations/rooms', async (req: Request, res: Response) => {
+    try {
+        const userId = getAuthenticatedUserId(req);
+        
+        if (!userId) {
+            return res.status(401).json({ error: 'Not authenticated' });
+        }
+
+        const rooms = await getUserRoomReservations(userId);
+        res.json(rooms);
+    } catch (error) {
+        console.error('Error fetching user room reservations:', error);
+        res.status(500).json({ error: 'Failed to load room reservations' });
     }
 });
 
