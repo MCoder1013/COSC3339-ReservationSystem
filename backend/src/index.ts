@@ -14,6 +14,7 @@ app.use(cors({
 })); // This tells the browser: "It's okay to accept requests from my frontend"
 app.use(express.json()); // This allows the backend to read JSON sent by your frontend
 app.use(cookieParser())
+app.use('/uploads', express.static('uploads'));
 
 // ROUTES
 app.get('/', (_req, res) => {

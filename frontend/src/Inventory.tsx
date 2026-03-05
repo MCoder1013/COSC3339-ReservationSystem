@@ -1,7 +1,8 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect } from "react";
 import "./App.css";
-import { Link } from "react-router-dom";
 import { fetchData } from "./api";
+import NavBar from "./NavBar";
 const API_URL = import.meta.env.VITE_API_URL;
 
 export default function Inventory() {
@@ -170,17 +171,7 @@ const [formError, setFormError] = useState<string>("");
   return (
     <div className="page">
 
-        <header className="navbar">
-            <div className="container headerRow">
-                <img src="images/StarlightPearlLogoWithName.png" 
-                alt="Starlight Pearl Cruises Logo" className="logo" />
-                <h1>{shipName}</h1>
-                <nav className="navLinks">
-                    <Link className="navButton" to="/">Home</Link>
-                </nav>
-
-            </div>
-      </header>
+      <NavBar shipName={shipName} />
 
         <main className="container section inventoryDisplay">
         <h2>Inventory</h2>
@@ -197,9 +188,7 @@ const [formError, setFormError] = useState<string>("");
             </button>
           ))}
         </div>
-
-          <br />
-
+        
         {/*Add/Delete buttons */}
         <button className="addButton" onClick={() => setShowModal(true)}>
           Add {activeCategory.slice(0, -1)}
@@ -341,7 +330,7 @@ const [formError, setFormError] = useState<string>("");
                       <option value="Gear">Gear</option>
                       <option value="Medical">Medical</option>
                       <option value="Event">Event</option>
-                      <option value="cleaning">Cleaning</option>
+                      <option value="Cleaning">Cleaning</option>
                       <option value="Other">Other</option>
                     </select>
                   </label>

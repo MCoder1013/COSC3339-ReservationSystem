@@ -2,6 +2,10 @@ import { Router, Request, Response } from 'express';
 import * as argon2 from 'argon2';
 import * as database from '../database.js'
 import jwt from 'jsonwebtoken';
+import multer from "multer";
+import path from "path";
+import fs from "fs";
+
 
 const router = Router();
 
@@ -21,6 +25,8 @@ router.post('/register', async (req, res) => {
   let email = req.body.email;
   const password = req.body.password;
   const confirmPassword = req.body.confirmPassword;
+  const employeeCode = req.body.employeeCode;
+  const role = employeeCode === process.env.EMPLOYEE_CODE ? "staff" : "normal";
 
   email = email.toLowerCase();
 
@@ -62,7 +68,7 @@ router.post('/register', async (req, res) => {
   const passwordHash = await argon2.hash(password);
 
   try {
-    await database.tryRegister(firstName, lastName, email, passwordHash);
+    await database.tryRegister(firstName, lastName, email, passwordHash, role);
   } catch (err) {
     if ((err as any).code === 'ER_DUP_ENTRY') {
       return res.status(400).json({
@@ -118,11 +124,116 @@ router.post('/login', async (req: Request, res: Response) => {
       .json({
         message: 'Login successful',
         userId: user.id,
-        firstName: user.first_name
+        firstName: user.first_name,
+        role: user.user_role
       });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Login failed' });
+  }
+});
+
+router.post('/signout', (req: Request, res: Response) => {
+  res.clearCookie('jwt').json({ message: 'Signed out successfully' });
+});
+
+router.get('/me', async (req: Request, res: Response) => {
+  const token = req.cookies?.jwt;
+  if (!token) return res.status(401).json({ error: 'Not authenticated' });
+
+  try {
+    const decoded = jwt.verify(token, jwtSecret) as { id: number };
+    const user = await database.getUserById(decoded.id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    res.json({
+      id: user.id,
+      firstName: user.first_name,
+      lastName: user.last_name,
+      email: user.email,
+      biography: user.biography,
+      profilePicture: user.profile_picture,
+      role: user.user_role,
+    });
+  } catch {
+    res.status(401).json({ error: 'Invalid token' });
+  }
+});
+
+router.get('/users', async (req: Request, res: Response) => {
+  const token = req.cookies?.jwt;
+  if (!token) return res.status(401).json({ error: 'Not authenticated' });
+
+  try {
+    const decoded = jwt.verify(token, jwtSecret) as { id: number };
+    const currentUser = await database.getUserById(decoded.id);
+
+    if (!currentUser || currentUser.user_role !== 'staff') {
+      return res.status(403).json({ error: 'Forbidden: staff only' });
+    }
+
+    const users = await database.getAllUsers();
+    res.json(users);
+  } catch {
+    res.status(401).json({ error: 'Invalid token' });
+  }
+});
+
+const uploadDir = "uploads/profiles";
+if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, uploadDir),
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    cb(null, `${Date.now()}${ext}`);
+  },
+});
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max
+  fileFilter: (req, file, cb) => {
+    const allowed = ["image/jpeg", "image/png", "image/webp"];
+    allowed.includes(file.mimetype) ? cb(null, true) : cb(new Error("Invalid file type"));
+  },
+});
+
+router.post('/update-profile', upload.single('profilePicture'), async (req: Request, res: Response) => {
+  const token = req.cookies?.jwt;
+  if (!token) return res.status(401).json({ error: 'Not authenticated' });
+
+  try {
+    const decoded = jwt.verify(token, jwtSecret) as { id: number };
+    const { biography } = req.body;
+    let profilePicture: null | string = null
+
+    if (req.file) {
+      const fileName = req.file.filename
+
+      // this is usually unnecessary, but just to be safe we do some extra checks
+      if (fileName.includes('..') || fileName.includes('/')) {
+        throw Error('file name contains disallowed characters')
+      }
+      if (fileName.length === 0 || fileName.length > 100) {
+        throw Error('file name has an invalid length')
+      }
+
+      profilePicture = `/uploads/profiles/${fileName}`
+    }
+
+    if (biography !== undefined && profilePicture) {
+      await database.updateUserProfile(decoded.id, biography, profilePicture);
+    } else if (biography !== undefined) {
+      await database.updateUserBiography(decoded.id, biography);
+    } else if (profilePicture) {
+      await database.updateUserProfilePicture(decoded.id, profilePicture);
+    }
+
+    res.json({ message: 'Profile updated successfully', profilePicture });
+  } catch (err) {
+    console.error("Update profile error:", err);
+    res.status(500).json({ error: 'Failed to update profile' });
   }
 });
 

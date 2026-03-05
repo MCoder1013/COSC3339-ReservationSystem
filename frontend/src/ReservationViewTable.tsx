@@ -1,8 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect } from "react";
 import "./App.css";
-import { Link } from "react-router-dom";
 import { fetchData } from "./api";
+import NavBar from "./NavBar";
 const API_URL = import.meta.env.VITE_API_URL;
 
 export default function ReservationTable() {
@@ -38,15 +38,12 @@ export default function ReservationTable() {
     setLoading(true);
     try {
       const allReservations = await fetchData("/api/reservations");
-      
-      const now = new Date();
 
       const itemReservations = allReservations
         .filter(
           (res: any) => 
             res.resource_id !== null && 
-            res.cabin_id === null &&
-            new Date(res.end_time) >= now
+            res.cabin_id === null
         )
         .sort((a: any, b: any) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
 
@@ -54,8 +51,7 @@ export default function ReservationTable() {
         .filter(
           (res: any) => 
             res.cabin_id !== null && 
-            res.resource_id === null &&
-            new Date(res.end_time) >= now
+            res.resource_id === null
         )
         .sort((a: any, b: any) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
 
@@ -119,24 +115,7 @@ export default function ReservationTable() {
 
   return (
     <div className="page">
-      <header className="navbar">
-        <div className="container headerRow">
-          <img
-            src="images/StarlightPearlLogoWithName.png"
-            alt="Starlight Pearl Cruises Logo"
-            className="logo"
-          />
-          <h1>{shipName}</h1>
-          <nav className="navLinks">
-            <Link className="navButton" to="/">
-              Home
-            </Link>
-            <Link className="navButton" to="/user-reservations">
-              User Reservations
-            </Link>
-          </nav>
-        </div>
-      </header>
+      <NavBar shipName={shipName} />
 
       <main className="container section inventoryDisplay">
         <h2>Reservations</h2>
