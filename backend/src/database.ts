@@ -555,3 +555,43 @@ export async function updateReservation(
 
   return result[0];
 }
+
+// status updates
+
+export async function updateAvailabilityStatus(
+    
+) {
+
+}
+
+// get total count remaining in the current time
+export async function countRemaining(
+    r: NewReservation, 
+    sql: TransactionSql<{}>, 
+    ): Promise<number> {
+
+    const resourceRows = await sql`
+        SELECT quantity FROM resources WHERE id = ${r.resource_id}
+    `;
+
+    if (resourceRows.length === 0) {
+        throw new Error("Resource not found");
+    }
+
+    const itemQuantity = resourceRows[0].quantity;
+
+
+    const overlapRows = await sql`
+    SELECT COALESCE(SUM(quantity_reserved), 0) AS total_reserved
+    FROM reservations
+    WHERE resource_id = ${r.resource_id}
+    AND start_time < ${r.end_time}
+    AND end_time > ${r.start_time}
+`; 
+
+    const totalReserved = overlapRows[0].total_reserved;
+
+    const availableQuantity = itemQuantity - totalReserved; 
+
+    return availableQuantity; 
+}
