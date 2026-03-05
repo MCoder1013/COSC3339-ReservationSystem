@@ -566,8 +566,11 @@ export async function updateAvailabilityStatus(
 
 // get total count remaining in the current time
 export async function countRemaining(
-    r: NewReservation, 
-    sql: TransactionSql<{}>, 
+    r: {
+        resource_id: number, 
+        start_time: string, 
+        end_time: string
+    }
     ): Promise<number> {
 
     const resourceRows = await sql`
