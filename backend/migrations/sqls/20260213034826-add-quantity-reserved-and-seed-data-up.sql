@@ -1,6 +1,6 @@
 -- Add quantity_reserved column
 ALTER TABLE reservations
-  ADD COLUMN quantity_reserved INT;
+ADD COLUMN quantity_reserved INT NOT NULL DEFAULT 1;
 
 -- Add constraints from sprint2_migration.sql
 ALTER TABLE reservations
