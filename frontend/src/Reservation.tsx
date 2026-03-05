@@ -17,8 +17,10 @@ type Value = ValuePiece | [ValuePiece, ValuePiece];
 export default function Reservation() {
   const shipName = "Starlight Pearl Cruises";
 
-  const [formError, setFormError] = useState<string>("");
 
+
+  const [formError, setFormError] = useState<string>("");
+  const [currentAvailability, setCurrentAvailability] = useState<number | null>(null);
   const categories = ["Items", "Rooms", "Packages"] as const;
 
   //current selected tab/category
@@ -50,6 +52,13 @@ export default function Reservation() {
   const [availableItemStartTimes, setAvailableItemStartTimes] = useState<string[]>([]);
   const [availableItemEndTimes, setAvailableItemEndTimes] = useState<string[]>([]);
 
+
+  const timeSelected =
+  itemStartDate &&
+  itemStartTime &&
+  itemEndDate &&
+  itemEndTime;
+
   //date and time picker state for Rooms
   const [roomStartDate, setRoomStartDate] = useState<ValuePiece>(new Date());
   const [roomStartTime, setRoomStartTime] = useState("");
@@ -69,6 +78,66 @@ export default function Reservation() {
     }
     return slots;
   };
+  
+
+  // 
+  const fetchCurrentAvailability = async (
+  resourceId: string,
+  startDate: Date,
+  startTime: string,
+  endDate: Date,
+  endTime: string
+) => {
+  if (!resourceId || !startDate || !startTime || !endDate || !endTime) {
+    setCurrentAvailability(null);
+    return;
+  }
+
+  try {
+    const start = combineDateAndTime(startDate, startTime);
+    const end = combineDateAndTime(endDate, endTime);
+
+    const formatForAPI = (date: Date) =>
+      formatInTimeZone(date, "UTC", "yyyy-MM-dd HH:mm:ss");
+
+    const response = await fetch(
+      `${API_URL}/api/resources/availability?resource_id=${resourceId}&start_time=${formatForAPI(start)}&end_time=${formatForAPI(end)}`
+    );
+
+    const data = await response.json();
+
+    setCurrentAvailability(data.remaining);
+  } catch (error) {
+    console.error("Error fetching availability:", error);
+    setCurrentAvailability(null);
+  }
+};
+
+useEffect(() => {
+  if (
+    activeCategory === "Items" &&
+    itemReservationForm.itemId &&
+    itemStartDate &&
+    itemStartTime &&
+    itemEndDate &&
+    itemEndTime
+  ) {
+    fetchCurrentAvailability(
+      itemReservationForm.itemId,
+      itemStartDate,
+      itemStartTime,
+      itemEndDate,
+      itemEndTime
+    );
+  }
+}, [
+  itemReservationForm.itemId,
+  itemStartDate,
+  itemStartTime,
+  itemEndDate,
+  itemEndTime,
+]);
+
 
   // Convert time string (HH:mm) to minutes for comparison
   const timeToMinutes = (timeStr: string): number => {
@@ -696,9 +765,14 @@ export default function Reservation() {
                     <option value="">-- Choose an item --</option>
                     {availableItems.map((item) => (
                       <option key={item.id} value={item.id}>
-                        {item.name} ({item.category}) - Available: {item.quantity}
+                      {item.name} ({item.category}) - Available:{" "}
+                      {item.id === Number(itemReservationForm.itemId) &&
+                      timeSelected &&
+                        currentAvailability !== null
+                        ? currentAvailability
+                        : item.quantity}
                       </option>
-                    ))}
+                      ))}
                   </select>
                 </label>
 
