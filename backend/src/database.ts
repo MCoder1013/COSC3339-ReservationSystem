@@ -16,23 +16,39 @@ type Shift = 'Morning' | 'Day' | 'Night';
 
 type ReservationStatus = 'Pending' | 'Confirmed' | 'Cancelled';
 
+const isRunningTests = process.env.RUNNING_TESTS === '1'
+
 const pgOptions = {
-    databaseDir: './data/db',
+    databaseDir: process.env.DB_DATA_PATH || './data/db',
     user: process.env.DB_USER,
     // Password is required, so just set a placeholder if it's not set.
     password: process.env.DB_PASSWORD || 'pass',
-    port: 5432,
-    persistent: true
+    port: parseInt(process.env.DB_POSTGRES_PORT ?? '') || 5432,
+    persistent: !isRunningTests
 }
-const pg = new EmbeddedPostgres(pgOptions);
-await pg.start();
-const sql = postgres({
-    user: pgOptions.user,
-    password: pgOptions.password,
-    port: pgOptions.port,
-    host: 'localhost',
-    database: 'cruise_reservation'
-});
+// The tests create the embedded database somewhere else, so only make it when
+// running normally.
+if (!isRunningTests) {
+    const pg = new EmbeddedPostgres(pgOptions);
+    await pg.start();
+}
+let sql: postgres.Sql<{}>
+// These two functions exist and are exported so the tests can forcibly disconnect us.
+export async function disconnectFromDatabase() {
+    if (sql) {
+        await sql.end()
+    }
+}
+export function connectToDatabase() {
+    sql = postgres({
+        user: pgOptions.user,
+        password: pgOptions.password,
+        port: pgOptions.port,
+        host: 'localhost',
+        database: 'cruise_reservation'
+    });
+}
+connectToDatabase()
 // ensures that dates are always handled as utc
 process.env.TZ = 'UTC'
 
@@ -52,12 +68,12 @@ export async function getUserByEmail(email: string) {
 }
 
 export async function getUserById(id: number) {
-  const result = await sql`SELECT * FROM users WHERE id = ${id}`;
-  return result[0] ?? null;
+    const result = await sql`SELECT * FROM users WHERE id = ${id}`;
+    return result[0] ?? null;
 }
 
 export async function updateUserProfile(id: number, biography: string, profilePicture: string) {
-  await sql`
+    await sql`
     UPDATE users
     SET biography = ${biography}, profile_picture = ${profilePicture}
     WHERE id = ${id}
@@ -65,11 +81,11 @@ export async function updateUserProfile(id: number, biography: string, profilePi
 }
 
 export async function updateUserBiography(id: number, biography: string) {
-  await sql`UPDATE users SET biography = ${biography} WHERE id = ${id}`;
+    await sql`UPDATE users SET biography = ${biography} WHERE id = ${id}`;
 }
 
-export async function  updateUserProfilePicture(id: number, profilePicture: string) {
-  await sql`UPDATE users SET profile_picture = ${profilePicture} WHERE id = ${id}`;
+export async function updateUserProfilePicture(id: number, profilePicture: string) {
+    await sql`UPDATE users SET profile_picture = ${profilePicture} WHERE id = ${id}`;
 }
 
 export async function getAllUsers() {
@@ -474,7 +490,7 @@ export async function deleteReservation(id: number): Promise<void> {
         // Delete the reservation
         await sql`DELETE FROM reservations WHERE id = ${id}`;
 
-    
+
     })
 }
 // Get all item reservations for a specific user
@@ -504,8 +520,8 @@ export async function getUserItemReservations(userId: number) {
 }
 
 export async function getUserRoomReservations(userId: number) {
-  try {
-    const rows = await sql`
+    try {
+        const rows = await sql`
       SELECT 
         r.id,
         u.first_name,
@@ -522,23 +538,23 @@ export async function getUserRoomReservations(userId: number) {
       ORDER BY r.start_time DESC
     `;
 
-    return rows;
-  } catch (error) {
-    console.error("Error getting user room reservations: ", error);
-    throw error;
-  }
+        return rows;
+    } catch (error) {
+        console.error("Error getting user room reservations: ", error);
+        throw error;
+    }
 }
 
 export async function updateReservation(
-  reservationId: number,
-  userId: number,
-  updates: {
-    start_time?: string;
-    end_time?: string;
-    quantity_reserved?: number;
-  }
+    reservationId: number,
+    userId: number,
+    updates: {
+        start_time?: string;
+        end_time?: string;
+        quantity_reserved?: number;
+    }
 ) {
-  const result = await sql`
+    const result = await sql`
     UPDATE reservations
     SET
       start_time = COALESCE(${updates.start_time ?? null}, start_time),
@@ -549,9 +565,9 @@ export async function updateReservation(
     RETURNING *;
   `;
 
-  if (result.length === 0) {
-    throw new Error("Reservation not found or unauthorized");
-  }
+    if (result.length === 0) {
+        throw new Error("Reservation not found or unauthorized");
+    }
 
-  return result[0];
+    return result[0];
 }

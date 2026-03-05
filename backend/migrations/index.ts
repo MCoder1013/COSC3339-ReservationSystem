@@ -1,18 +1,26 @@
 import dotenv from 'dotenv'
 import fs from 'fs/promises'
 import EmbeddedPostgres from 'embedded-postgres';
-import postgres from 'postgres';
+import postgres, { PostgresError } from 'postgres';
 
 dotenv.config()
 
-const pgOptions = {
-  databaseDir: './data/db',
+let shouldLog = true
+export function disablePostgresLogging() {
+  shouldLog = false
+}
+
+const pgOptions: ConstructorParameters<typeof EmbeddedPostgres>[0] = {
+  databaseDir: process.env.DB_DATA_PATH || './data/db',
   user: process.env.DB_USER,
   // Password is required, so just set a placeholder if it's not set.
   password: process.env.DB_PASSWORD || 'pass',
-  port: 5432,
-  persistent: true,
-  initdbFlags: ['--encoding=utf8', '--locale=en_US.UTF-8']
+  port: parseInt(process.env.DB_POSTGRES_PORT ?? '') || 5432,
+  persistent: process.env.RUNNING_TESTS !== '1',
+  initdbFlags: ['--encoding=utf8', '--locale=en_US.UTF-8'],
+  onLog: (msg: string) => {
+    if (shouldLog) console.log(msg)
+  }
 }
 const pg = new EmbeddedPostgres(pgOptions);
 try {
@@ -23,11 +31,11 @@ try {
 }
 await pg.start();
 
-function connectPg(database) {
+function connectPg(database: string) {
   return postgres({
-    user: pgOptions.user,
-    password: pgOptions.password,
-    port: pgOptions.port,
+    user: pgOptions!.user,
+    password: pgOptions!.password,
+    port: pgOptions!.port,
     host: 'localhost',
     database
   });
@@ -43,7 +51,7 @@ try {
   LC_COLLATE = 'en_US.UTF-8'
   LC_CTYPE = 'en_US.UTF-8';
 `;
-} catch (err) {
+} catch (err: any) {
   // if it's a duplicate database error, that's fine and can be ignored
   if (err.code !== '42P04')
     throw err
@@ -124,7 +132,7 @@ async function up() {
  * 
  * @param {string} fileName 
  */
-async function runMigration(fileName) {
+async function runMigration(fileName: string) {
   const migrationSql = await fs.readFile(`migrations/sqls/${fileName}`, 'utf8')
   console.log('Running migration at', fileName)
 
@@ -145,7 +153,7 @@ async function runMigration(fileName) {
  * 
  * @param {string} name Create a new migration with the given name.
  */
-async function newMigration(name) {
+async function newMigration(name: string) {
   const nameRegex = /^[a-z-0-9]+$/
   if (!nameRegex.test(name)) {
     console.error(`Invalid new migration name '${name}', should be lowercase and separated by hyphens, for example \`migration-name-here\`.`)
@@ -192,5 +200,9 @@ if (args.length === 0) {
   }
 }
 
+disablePostgresLogging()
 
-process.exit(0)
+await sql.end()
+if (process.env.RUNNING_TESTS !== '1') {
+  process.exit(0)
+}

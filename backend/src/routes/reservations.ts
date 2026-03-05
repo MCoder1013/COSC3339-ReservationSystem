@@ -1,7 +1,9 @@
 import { Router, Request, Response } from 'express';
-import { getUserItemReservations, addReservation, deleteReservation, pullReservations, getAllReservationsWithDetails, getReservationsByUser, 
-    updateReservation, getUserRoomReservations } from '../database.js';
-import { getAuthenticatedUserId } from './auth.js';
+import {
+    getUserItemReservations, addReservation, deleteReservation, getAllReservationsWithDetails,
+    getReservationsByUser, updateReservation, getUserRoomReservations
+} from '../database.ts';
+import { getAuthenticatedUserId } from './auth.ts';
 
 const router = Router();
 
@@ -17,7 +19,7 @@ router.post("/reservations", async (req: Request, res: Response) => {
     try {
         const reservationId = await addReservation({
             user_id,
-            cabin_id: cabin_id ??  null,
+            cabin_id: cabin_id ?? null,
             resource_id: resource_id ?? null,
             staff_id: staff_id ?? null,
             start_time,
@@ -38,36 +40,36 @@ router.post("/reservations", async (req: Request, res: Response) => {
 })
 
 router.post("/reservations/:id", async (req: Request, res: Response) => {
-  const reservationId = Number(req.params.id);
-  const user_id = getAuthenticatedUserId(req);
+    const reservationId = Number(req.params.id);
+    const user_id = getAuthenticatedUserId(req);
 
-  if (!user_id) {
-    return res.status(401).json({ error: "Unauthorized" });
-  }
+    if (!user_id) {
+        return res.status(401).json({ error: "Unauthorized" });
+    }
 
-  if (isNaN(reservationId)) {
-    return res.status(400).json({ error: "Invalid reservation ID" });
-  }
+    if (isNaN(reservationId)) {
+        return res.status(400).json({ error: "Invalid reservation ID" });
+    }
 
-  const { start_time, end_time, quantity_reserved } = req.body;
+    const { start_time, end_time, quantity_reserved } = req.body;
 
-  try {
-    const updated = await updateReservation(reservationId, user_id, {
-      start_time,
-      end_time,
-      quantity_reserved,
-    });
+    try {
+        const updated = await updateReservation(reservationId, user_id, {
+            start_time,
+            end_time,
+            quantity_reserved,
+        });
 
-    res.json({
-      message: "Reservation updated successfully",
-      reservation: updated,
-    });
-  } catch (error: any) {
-    console.error("Update error:", error);
-    res.status(400).json({
-      error: error.message || "Failed to update reservation",
-    });
-  }
+        res.json({
+            message: "Reservation updated successfully",
+            reservation: updated,
+        });
+    } catch (error: any) {
+        console.error("Update error:", error);
+        res.status(400).json({
+            error: error.message || "Failed to update reservation",
+        });
+    }
 });
 
 router.delete('/reservations/:id', async (req: Request, res: Response) => {
@@ -98,19 +100,19 @@ router.get("/reservations", async (req: Request, res: Response) => {
 });
 
 router.get("/my-reservations", async (req: Request, res: Response) => {
-  const user_id = getAuthenticatedUserId(req);
+    const user_id = getAuthenticatedUserId(req);
 
-  if (!user_id) {
-    return res.status(401).json({ error: "Not authenticated" });
-  }
+    if (!user_id) {
+        return res.status(401).json({ error: "Not authenticated" });
+    }
 
-  try {
-    const reservations = await getReservationsByUser(user_id);
-    res.json(reservations);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Failed to fetch reservations" });
-  }
+    try {
+        const reservations = await getReservationsByUser(user_id);
+        res.json(reservations);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to fetch reservations" });
+    }
 });
 
 
@@ -118,7 +120,7 @@ router.get("/my-reservations", async (req: Request, res: Response) => {
 router.get('/reservations/items', async (req: Request, res: Response) => {
     try {
         const userId = getAuthenticatedUserId(req);
-        
+
         if (!userId) {
             return res.status(401).json({ error: 'Not authenticated' });
         }
@@ -134,7 +136,7 @@ router.get('/reservations/items', async (req: Request, res: Response) => {
 router.get('/reservations/rooms', async (req: Request, res: Response) => {
     try {
         const userId = getAuthenticatedUserId(req);
-        
+
         if (!userId) {
             return res.status(401).json({ error: 'Not authenticated' });
         }

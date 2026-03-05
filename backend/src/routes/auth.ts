@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import * as argon2 from 'argon2';
-import * as database from '../database.js'
+import * as database from '../database.ts'
 import jwt from 'jsonwebtoken';
 import multer from "multer";
 import path from "path";
@@ -26,7 +26,7 @@ router.post('/register', async (req, res) => {
   const password = req.body.password;
   const confirmPassword = req.body.confirmPassword;
   const employeeCode = req.body.employeeCode;
-  const role = employeeCode === process.env.EMPLOYEE_CODE ? "staff" : "normal";
+  const role = (process.env.EMPLOYEE_CODE && employeeCode === process.env.EMPLOYEE_CODE) ? "staff" : "normal";
 
   email = email.toLowerCase();
 

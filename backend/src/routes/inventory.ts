@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { pullResources, pullRooms, addRoom, addResources, deleteRoom, deleteResource, addStaff, pullStaff, deleteStaff } from '../database.js';
+import { pullResources, pullRooms, addRoom, addResources, deleteRoom, deleteResource, addStaff, pullStaff, deleteStaff } from '../database.ts';
 
 const router = Router();
 

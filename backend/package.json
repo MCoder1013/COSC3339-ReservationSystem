@@ -4,11 +4,12 @@
   "description": "",
   "main": "dist/index.js",
   "scripts": {
-    "migrate": "node migrations",
+    "migrate": "npx migrations",
     "install-all": "npm install && npm run migrate",
     "dev": "npm run install-all && tsx watch src/index.ts",
     "build": "npm run install-all && tsc",
-    "start": "node dist/index.js"
+    "start": "npm run install-all && tsx src/index.ts",
+    "test": "node --import=tsx --test --test-reporter node-test-reporter test/test.ts"
   },
   "keywords": [],
   "author": "",
@@ -19,6 +20,7 @@
     "@types/express": "^5.0.6",
     "@types/multer": "^2.0.0",
     "@types/node": "^25.0.10",
+    "node-test-reporter": "^1.2.0",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"
   },

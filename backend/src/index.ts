@@ -1,11 +1,11 @@
 import express from 'express';
 import cors from 'cors'; // Required for Frontend-to-Backend communication
-import inventoryRoutes from "./routes/inventory.js";
-import authRoutes from "./routes/auth.js";
-import reservationRoutes from "./routes/reservations.js";
+import inventoryRoutes from "./routes/inventory.ts";
+import authRoutes from "./routes/auth.ts";
+import reservationRoutes from "./routes/reservations.ts";
 import cookieParser from 'cookie-parser';
 
-const app = express();
+export const app = express();
 
 // MIDDLEWARE
 app.use(cors({
@@ -35,7 +35,8 @@ app.use("/api", inventoryRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api", reservationRoutes);
 
-const PORT = 3000;
+
+const PORT = parseInt(process.env.APP_PORT ?? '') || 3000;
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Backend is actually listening on http://localhost:${PORT}`);

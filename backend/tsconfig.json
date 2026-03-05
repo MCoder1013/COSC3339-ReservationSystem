@@ -1,23 +1,25 @@
 {
   "compilerOptions": {
-    /* Language and Optimization */
-    "target": "ES2022",
+    // Language and optimization
+    // "target": "ES2022",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "outDir": "./dist",
-    "rootDir": "./src",
     "strict": true,
     "noImplicitAny": true,
     "skipLibCheck": true,
-    /* Interop and Backend Features */
+    // Interop and backend features
     "esModuleInterop": true,
     "resolveJsonModule": true,
     "sourceMap": true,
     "removeComments": true,
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
+    "allowImportingTsExtensions": true,
+    "noEmit": true
   },
   "include": [
-    "src/**/*"
+    "src/**/*",
+    "test/**/*"
   ],
   "exclude": [
     "node_modules"
