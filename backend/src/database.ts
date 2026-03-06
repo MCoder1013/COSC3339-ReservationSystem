@@ -471,14 +471,12 @@ export async function deleteStaff(id: number): Promise<number | undefined> {
 
 export async function deleteReservation(r: {
     reservationId: number,
-    userId: number
+    userId?: number
 }): Promise<void> {
     try {
-        const rows = await sql`
-            DELETE FROM reservations
-            WHERE id = ${r.reservationId} AND user_id = ${r.userId}
-            RETURNING id
-        `;
+        const rows = r.userId
+            ? await sql`DELETE FROM reservations WHERE id = ${r.reservationId} AND user_id = ${r.userId} RETURNING id`
+            : await sql`DELETE FROM reservations WHERE id = ${r.reservationId} RETURNING id`;
         if (rows.length === 0) {
             throw new Error("Reservation not found or does not belong to user");
         }

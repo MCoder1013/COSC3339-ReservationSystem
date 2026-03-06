@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { getUserItemReservations, addReservation, deleteReservation, pullReservations, getAllReservationsWithDetails, getReservationsByUser, 
-    updateReservation, getUserRoomReservations } from '../database.js';
+    updateReservation, getUserRoomReservations, getUserById } from '../database.js';
 import { getAuthenticatedUserId } from './auth.js';
 
 const router = Router();
@@ -150,6 +150,28 @@ router.get('/reservations/rooms', async (req: Request, res: Response) => {
         console.error('Error fetching user room reservations:', error);
         res.status(500).json({ error: 'Failed to load room reservations' });
     }
+});
+
+router.delete('/admin/reservations/:id', async (req: Request, res: Response) => {
+  const reservationId = Number(req.params.id);
+  const userId = getAuthenticatedUserId(req);
+
+  if(!userId) return res.status(401).json({error: "Unauthorized" });
+  if (isNaN(reservationId)) return res.status(400).json({error: "Invalid ID format"});
+
+  try {
+    const user = await getUserById(userId); 
+
+    if(!user || user.user_role !== 'staff') {
+      return res.status(403).json({ error: "Forbidden: staff only" }); 
+
+    }
+    await deleteReservation({ reservationId: reservationId }); 
+    res.json({ message: "reservation deleted successfully "}); 
+
+  } catch (error) {
+    res.status(500).json({ error: "failed to delete reservation"});
+  }
 });
 
 export default router;
