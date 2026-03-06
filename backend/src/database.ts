@@ -366,6 +366,37 @@ export async function addReservationWithTransaction(sql: postgres.TransactionSql
     return newId
 }
 
+// Validate guest emails and return their user IDs
+export async function validateGuestEmails(emails: string[]): Promise<{ valid: boolean; userIds: number[]; invalidEmails: string[] }> {
+    const userIds: number[] = [];
+    const invalidEmails: string[] = [];
+
+    for (const email of emails) {
+        const user = await getUserByEmail(email.trim());
+        if (user) {
+            userIds.push(user.id);
+        } else {
+            invalidEmails.push(email);
+        }
+    }
+
+    return {
+        valid: invalidEmails.length === 0,
+        userIds,
+        invalidEmails
+    };
+}
+
+// Add additional guests to a reservation
+export async function addGuestsToReservation(reservationId: number, guestUserIds: number[]): Promise<void> {
+    for (const userId of guestUserIds) {
+        await sql`
+            INSERT INTO reservation_groups (user_id, reservation_id)
+            VALUES (${userId}, ${reservationId})
+        `;
+    }
+}
+
 interface Reservation {
     id: number
     user_id: number

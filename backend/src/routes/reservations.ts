@@ -1,13 +1,13 @@
 import { Router, Request, Response } from 'express';
 import { getUserItemReservations, addReservation, deleteReservation, pullReservations, getAllReservationsWithDetails, getReservationsByUser, 
-    updateReservation, getUserRoomReservations } from '../database.js';
+    updateReservation, getUserRoomReservations, validateGuestEmails, addGuestsToReservation } from '../database.js';
 import { getAuthenticatedUserId } from './auth.js';
 
 const router = Router();
 
 router.post("/reservations", async (req: Request, res: Response) => {
     // Need a safe way to get the user id and add it in since we are not getting that from the frontend
-    const { cabin_id, resource_id, staff_id, start_time, end_time, quantity_reserved } = req.body;
+    const { cabin_id, resource_id, staff_id, start_time, end_time, quantity_reserved, additional_guest_emails } = req.body;
     const user_id = getAuthenticatedUserId(req);
 
     if (!user_id) {
@@ -15,6 +15,40 @@ router.post("/reservations", async (req: Request, res: Response) => {
     }
 
     try {
+        // Validate additional guest emails if provided
+        if (additional_guest_emails && Array.isArray(additional_guest_emails) && additional_guest_emails.length > 0) {
+            const validation = await validateGuestEmails(additional_guest_emails);
+            
+            if (!validation.valid) {
+                return res.status(400).json({
+                    error: `The following email(s) do not exist in the system: ${validation.invalidEmails.join(', ')}. All guests must have registered accounts.`
+                });
+            }
+
+            // Create the reservation
+            const reservationId = await addReservation({
+                user_id,
+                cabin_id: cabin_id ??  null,
+                resource_id: resource_id ?? null,
+                staff_id: staff_id ?? null,
+                start_time,
+                end_time,
+                quantity_reserved
+            });
+
+            // Add primary user to reservation_groups table
+            await addGuestsToReservation(reservationId, [user_id]);
+            
+            // Add additional guests to reservation_groups table
+            await addGuestsToReservation(reservationId, validation.userIds);
+
+            return res.status(201).json({
+                message: "Reservation added successfully with additional guests",
+                reservationId
+            });
+        }
+
+        // No additional guests - proceed with regular reservation
         const reservationId = await addReservation({
             user_id,
             cabin_id: cabin_id ??  null,

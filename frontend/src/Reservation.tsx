@@ -67,6 +67,48 @@ export default function Reservation() {
   const [availableRoomStartTimes, setAvailableRoomStartTimes] = useState<string[]>([]);
   const [availableRoomEndTimes, setAvailableRoomEndTimes] = useState<string[]>([]);
 
+  //additional guest emails for room reservations
+  const [additionalGuestEmails, setAdditionalGuestEmails] = useState<string[]>([]);
+  const [guestEmailError, setGuestEmailError] = useState<string>("");
+
+  // Handler functions for managing additional guest emails
+  const handleAddGuestEmail = () => {
+    setGuestEmailError("");
+    
+    if (!roomReservationForm.cabinId) {
+      setGuestEmailError("Please select a room first.");
+      return;
+    }
+
+    const selectedRoom = availableRooms.find((room) => String(room.id) === String(roomReservationForm.cabinId));
+    if (!selectedRoom) {
+      setGuestEmailError("Selected room not found.");
+      return;
+    }
+
+    const roomCapacity = selectedRoom.capacity;
+    const currentGuestCount = additionalGuestEmails.length + 1; // +1 for the primary user
+
+    if (currentGuestCount >= roomCapacity) {
+      setGuestEmailError(`Cannot add more guests. Room capacity is ${roomCapacity}.`);
+      return;
+    }
+
+    setAdditionalGuestEmails([...additionalGuestEmails, ""]);
+  };
+
+  const handleRemoveGuestEmail = (index: number) => {
+    setGuestEmailError("");
+    const updatedEmails = additionalGuestEmails.filter((_, i) => i !== index);
+    setAdditionalGuestEmails(updatedEmails);
+  };
+
+  const handleUpdateGuestEmail = (index: number, value: string) => {
+    const updatedEmails = [...additionalGuestEmails];
+    updatedEmails[index] = value;
+    setAdditionalGuestEmails(updatedEmails);
+  };
+
   // Generate all 30-minute time slots for a day
   const generateTimeSlots = (): string[] => {
     const slots = [];
@@ -552,6 +594,9 @@ useEffect(() => {
       setAvailableRoomEndTimes([]);
       // Auto-sync end date to start date when start date changes
       setRoomEndDate(roomStartDate);
+      // Reset guest emails when room changes
+      setAdditionalGuestEmails([]);
+      setGuestEmailError("");
     }
   }, [roomReservationForm.cabinId, roomStartDate, availableRooms]);
 
@@ -701,6 +746,18 @@ useEffect(() => {
         return;
       }
 
+      //validate guest emails if any are provided
+      for (let i = 0; i < additionalGuestEmails.length; i++) {
+        const email = additionalGuestEmails[i].trim();
+        if (email && !email.includes('@')) {
+          setFormError(`Guest ${i + 1} email is invalid. Please enter a valid email address.`);
+          return;
+        }
+      }
+
+      //filter out empty email entries
+      const validGuestEmails = additionalGuestEmails.filter(email => email.trim() !== "");
+
       try {
         const formatForMySQL = (date: Date) => {
           return formatInTimeZone(date, 'UTC', 'yyyy-MM-dd HH:mm:ss');
@@ -711,6 +768,7 @@ useEffect(() => {
           start_time: formatForMySQL(startDateTime),
           end_time: formatForMySQL(endDateTime),
           quantity_reserved: 1,
+          additional_guest_emails: validGuestEmails,
         };
 
         console.log(reservationData);
@@ -734,6 +792,8 @@ useEffect(() => {
         setRoomStartTime("");
         setRoomEndDate(new Date());
         setRoomEndTime("");
+        setAdditionalGuestEmails([]);
+        setGuestEmailError("");
         
         // Refresh available rooms to show updated availability
         await loadAvailableRooms();
@@ -963,6 +1023,54 @@ useEffect(() => {
                     ))}
                   </select>
                 </label>
+
+                <br />
+
+                {/* Additional Guests Section */}
+                <div className="additionalGuestsSection">
+                  <h4>Additional Guests</h4>
+                  <p className="additionalGuestsInfo">
+                    {roomReservationForm.cabinId && availableRooms.find(r => String(r.id) === String(roomReservationForm.cabinId))
+                      ? `Room capacity: ${availableRooms.find(r => String(r.id) === String(roomReservationForm.cabinId)).capacity} (You can add ${availableRooms.find(r => String(r.id) === String(roomReservationForm.cabinId)).capacity - 1} more guest${availableRooms.find(r => String(r.id) === String(roomReservationForm.cabinId)).capacity - 1 !== 1 ? 's' : ''})`
+                      : "Select a room to add additional guests"}
+                  </p>
+                  
+                  {additionalGuestEmails.map((email, index) => (
+                    <div key={index} className="guestEmailRow">
+                      <label>
+                        Guest {index + 1} Email:
+                        <input
+                          type="email"
+                          className="quantityInput"
+                          placeholder="Enter guest email"
+                          value={email}
+                          onChange={(e) => handleUpdateGuestEmail(index, e.target.value)}
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveGuestEmail(index)}
+                        className="removeGuestButton"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                  
+                  <button
+                    type="button"
+                    onClick={handleAddGuestEmail}
+                    className="addGuestButton"
+                  >
+                    + Add Guest Email
+                  </button>
+                  
+                  {guestEmailError && (
+                    <div className="guestEmailError">
+                      {guestEmailError}
+                    </div>
+                  )}
+                </div>
               </>
             ) : (
               // Packages tab - placeholder
