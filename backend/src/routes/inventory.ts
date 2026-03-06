@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { pullResources, pullRooms, addRoom, addResources, deleteRoom, deleteResource, addStaff, pullStaff, deleteStaff } from '../database.js';
+import { pullResources, pullRooms, addRoom, addResources, deleteRoom, deleteResource, addStaff, pullStaff, deleteStaff, countRemaining } from '../database.js';
 
 const router = Router();
 
@@ -128,5 +128,23 @@ router.delete('/staff/:id', async (req: Request, res: Response) => {
     }
 });
 
+router.get('/resources/availability', async(req: Request, res: Response) => {
+    try {
+        const { resource_id, start_time, end_time } = req.query;
+
+        const remaining = await countRemaining(
+      {
+        resource_id: Number(resource_id),
+        start_time: String(start_time),
+        end_time: String(end_time)
+      }
+    );
+
+    res.json({ remaining });
+
+    } catch (err) {
+    res.status(400).json({ error: "failed to get availabiltiy"});
+  }
+});
 
 export default router; 
