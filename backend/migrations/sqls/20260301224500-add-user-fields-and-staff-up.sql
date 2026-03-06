@@ -26,17 +26,17 @@ CREATE TABLE IF NOT EXISTS staff (
         ON DELETE RESTRICT
 );
 
-CREATE TABLE IF NOT EXISTS reservation_groups (
-    user_id INT NOT NULL,
-    reservation_id INT NOT NULL,
+-- CREATE TABLE IF NOT EXISTS reservation_groups (
+--     user_id INT NOT NULL,
+--     reservation_id INT NOT NULL,
 
-    CONSTRAINT fk_res_group_user
-        FOREIGN KEY (user_id) REFERENCES users(id)
-        ON UPDATE CASCADE
-        ON DELETE RESTRICT,
+--     CONSTRAINT fk_res_group_user
+--         FOREIGN KEY (user_id) REFERENCES users(id)
+--         ON UPDATE CASCADE
+--         ON DELETE RESTRICT,
 
-    CONSTRAINT fk_res_group_info
-        FOREIGN KEY (reservation_id) REFERENCES reservations(id)
-        ON UPDATE CASCADE
-        ON DELETE RESTRICT
-);
+--     CONSTRAINT fk_res_group_info
+--         FOREIGN KEY (reservation_id) REFERENCES reservations(id)
+--         ON UPDATE CASCADE
+--         ON DELETE RESTRICT
+-- );
