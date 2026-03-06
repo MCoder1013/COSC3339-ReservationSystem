@@ -469,13 +469,23 @@ export async function deleteStaff(id: number): Promise<number | undefined> {
     }
 }
 
-export async function deleteReservation(id: number): Promise<void> {
-    return await sql.begin(async sql => {
-        // Delete the reservation
-        await sql`DELETE FROM reservations WHERE id = ${id}`;
-
-    
-    })
+export async function deleteReservation(r: {
+    reservationId: number,
+    userId: number
+}): Promise<void> {
+    try {
+        const rows = await sql`
+            DELETE FROM reservations
+            WHERE id = ${r.reservationId} AND user_id = ${r.userId}
+            RETURNING id
+        `;
+        if (rows.length === 0) {
+            throw new Error("Reservation not found or does not belong to user");
+        }
+    } catch (error) {
+        console.error("Error deleting reservation: ", error);
+        throw error;
+    }
 }
 // Get all item reservations for a specific user
 export async function getUserItemReservations(userId: number) {

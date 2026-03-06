@@ -72,12 +72,17 @@ router.post("/reservations/:id", async (req: Request, res: Response) => {
 
 router.delete('/reservations/:id', async (req: Request, res: Response) => {
     const id = Number(req.params.id);
+    const userId = getAuthenticatedUserId(req);
+
+    if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+    }
 
     if (isNaN(id)) {
         return res.status(400).json({ message: "Invalid ID format" });
     }
     try {
-        await deleteReservation(id);
+        await deleteReservation({ reservationId: id, userId });
 
         res.json({ message: "reservation deleted successfully" });
     } catch (error) {
