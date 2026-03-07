@@ -85,6 +85,35 @@ router.post("/reservations/:id", async (req: Request, res: Response) => {
 
   const { start_time, end_time, quantity_reserved } = req.body;
 
+  if (start_time !== undefined) {
+    const start = new Date(start_time);
+    if (isNaN(start.getTime())) {
+      return res.status(400).json({ error: "Invalid start_time" });
+    }
+    if (start <= new Date()) {
+      return res.status(400).json({ error: "start_time must be in the future" });
+    }
+  }
+
+  if (end_time !== undefined) {
+    const end = new Date(end_time);
+    if (isNaN(end.getTime())) {
+      return res.status(400).json({ error: "Invalid end_time" });
+    }
+  }
+
+  if (start_time !== undefined && end_time !== undefined) {
+    if (new Date(end_time) <= new Date(start_time)) {
+      return res.status(400).json({ error: "end_time must be after start_time" });
+    }
+  }
+
+  if (quantity_reserved !== undefined) {
+    if (!Number.isInteger(quantity_reserved) || quantity_reserved < 1) {
+      return res.status(400).json({ error: "quantity_reserved must be a positive integer" });
+    }
+  }
+
   try {
     const updated = await updateReservation(reservationId, user_id, {
       start_time,
