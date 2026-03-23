@@ -52,12 +52,12 @@ export async function getUserByEmail(email: string) {
 }
 
 export async function getUserById(id: number) {
-  const result = await sql`SELECT * FROM users WHERE id = ${id}`;
-  return result[0] ?? null;
+    const result = await sql`SELECT * FROM users WHERE id = ${id}`;
+    return result[0] ?? null;
 }
 
 export async function updateUserProfile(id: number, biography: string, profilePicture: string) {
-  await sql`
+    await sql`
     UPDATE users
     SET biography = ${biography}, profile_picture = ${profilePicture}
     WHERE id = ${id}
@@ -65,11 +65,11 @@ export async function updateUserProfile(id: number, biography: string, profilePi
 }
 
 export async function updateUserBiography(id: number, biography: string) {
-  await sql`UPDATE users SET biography = ${biography} WHERE id = ${id}`;
+    await sql`UPDATE users SET biography = ${biography} WHERE id = ${id}`;
 }
 
-export async function  updateUserProfilePicture(id: number, profilePicture: string) {
-  await sql`UPDATE users SET profile_picture = ${profilePicture} WHERE id = ${id}`;
+export async function updateUserProfilePicture(id: number, profilePicture: string) {
+    await sql`UPDATE users SET profile_picture = ${profilePicture} WHERE id = ${id}`;
 }
 
 export async function getAllUsers() {
@@ -224,12 +224,18 @@ export async function addStaff(s: NewStaff): Promise<number> {
     }
 }
 
+interface ReservationCheck {
+    id: number
+    start_time: string
+    end_time: string
+}
+
 // chekcs for reservations to make sure the timeslots are not currently already being used for: staff members, resources, and cabins
-async function checkResourceTime(r: NewReservation, sql: TransactionSql<{}>) {
+async function checkResourceTime(r: ReservationCheck, sql: TransactionSql<{}>) {
     const rows = await sql`
         SELECT id FROM reservations
         WHERE
-            resource_id = ${r.resource_id}
+            resource_id = ${r.id}
             AND start_time < ${r.end_time}
             AND end_time > ${r.start_time}
     `;
@@ -239,11 +245,11 @@ async function checkResourceTime(r: NewReservation, sql: TransactionSql<{}>) {
     }
 }
 
-async function checkCabinTime(r: NewReservation, sql: TransactionSql<{}>) {
+async function checkCabinTime(r: ReservationCheck, sql: TransactionSql<{}>) {
     const rows = await sql`
         SELECT id FROM reservations
         WHERE
-            cabin_id = ${r.cabin_id}
+            cabin_id = ${r.id}
             AND start_time < ${r.end_time}
             AND end_time > ${r.start_time}
     `;
@@ -253,11 +259,11 @@ async function checkCabinTime(r: NewReservation, sql: TransactionSql<{}>) {
     }
 }
 
-async function checkStaffTime(r: NewReservation, sql: TransactionSql<{}>) {
+async function checkStaffTime(r: ReservationCheck, sql: TransactionSql<{}>) {
     const rows = await sql`
         SELECT id FROM reservations
         WHERE
-            staff_id = ${r.staff_id}
+            staff_id = ${r.id}
             AND start_time < ${r.end_time}
             AND end_time > ${r.start_time}
     `;
@@ -267,8 +273,14 @@ async function checkStaffTime(r: NewReservation, sql: TransactionSql<{}>) {
     }
 }
 
+interface ResourceCountCheck {
+    resource_id: number
+    quantity_reserved: number
+    start_time: string
+    end_time: string
+}
 async function checkResourceCount(
-    r: NewReservation,
+    r: ResourceCountCheck,
     sql: TransactionSql<{}>
 ) {
     const resourceRows = await sql`
@@ -316,33 +328,75 @@ interface NewReservation {
 }
 export async function addReservation(r: NewReservation): Promise<number> {
     return await sql.begin(async sql => {
-        if (r.staff_id != null) {
-            await checkStaffTime(r, sql);
-        }
-
-        if (r.cabin_id != null) {
-            await checkCabinTime(r, sql);
-        }
-
-        if (r.resource_id != null) {
-            await checkResourceCount(r, sql);
-        }
-
-        const result = await sql`
-            INSERT INTO reservations
-                (user_id, cabin_id, resource_id, staff_id,
-                start_time, end_time, quantity_reserved)
-            VALUES
-                (${r.user_id}, ${r.cabin_id}, ${r.resource_id}, ${r.staff_id},
-                ${r.start_time}, ${r.end_time}, ${r.quantity_reserved})
-            RETURNING id
-        `;
-        const newId = result[0].id
-
-
-        return newId
+        return await addReservationWithTransaction(sql, r)
     });
 }
+export async function addReservationWithTransaction(sql: postgres.TransactionSql<{}>, r: NewReservation): Promise<number> {
+    if (r.staff_id != null) {
+        await checkStaffTime({
+            start_time: r.start_time,
+            end_time: r.end_time,
+            id: r.staff_id
+        }, sql);
+    }
+
+    if (r.cabin_id != null) {
+        await checkCabinTime({
+            start_time: r.start_time,
+            end_time: r.end_time,
+            id: r.cabin_id
+        }, sql);
+    }
+
+    if (r.resource_id != null) {
+        await checkResourceCount(r, sql);
+    }
+
+    const result = await sql`
+        INSERT INTO reservations
+            (user_id, cabin_id, resource_id, staff_id,
+            start_time, end_time, quantity_reserved)
+        VALUES
+            (${r.user_id}, ${r.cabin_id}, ${r.resource_id}, ${r.staff_id},
+            ${r.start_time}, ${r.end_time}, ${r.quantity_reserved})
+        RETURNING id
+    `;
+    const newId = result[0].id
+
+    return newId
+}
+
+// Validate guest emails and return their user IDs
+export async function validateGuestEmails(emails: string[]): Promise<{ valid: boolean; userIds: number[]; invalidEmails: string[] }> {
+    const userIds: number[] = [];
+    const invalidEmails: string[] = [];
+
+    for (const email of emails) {
+        const user = await getUserByEmail(email.trim());
+        if (user) {
+            userIds.push(user.id);
+        } else {
+            invalidEmails.push(email);
+        }
+    }
+
+    return {
+        valid: invalidEmails.length === 0,
+        userIds,
+        invalidEmails
+    };
+}
+
+// Add additional guests to a reservation
+export async function addGuestsToReservation(reservationId: number, guestUserIds: number[]): Promise<void> {
+    for (const userId of guestUserIds) {
+        await sql`
+            INSERT INTO reservation_groups (user_id, reservation_id)
+            VALUES (${userId}, ${reservationId})
+        `;
+    }
+}
+
 interface Reservation {
     id: number
     user_id: number
@@ -474,7 +528,7 @@ export async function deleteReservation(id: number): Promise<void> {
         // Delete the reservation
         await sql`DELETE FROM reservations WHERE id = ${id}`;
 
-    
+
     })
 }
 // Get all item reservations for a specific user
@@ -504,8 +558,8 @@ export async function getUserItemReservations(userId: number) {
 }
 
 export async function getUserRoomReservations(userId: number) {
-  try {
-    const rows = await sql`
+    try {
+        const rows = await sql`
       SELECT 
         r.id,
         u.first_name,
@@ -522,36 +576,83 @@ export async function getUserRoomReservations(userId: number) {
       ORDER BY r.start_time DESC
     `;
 
-    return rows;
-  } catch (error) {
-    console.error("Error getting user room reservations: ", error);
-    throw error;
-  }
+        return rows;
+    } catch (error) {
+        console.error("Error getting user room reservations: ", error);
+        throw error;
+    }
 }
 
 export async function updateReservation(
-  reservationId: number,
-  userId: number,
-  updates: {
-    start_time?: string;
-    end_time?: string;
-    quantity_reserved?: number;
-  }
+    reservationId: number,
+    userId: number,
+    updates: {
+        start_time?: string;
+        end_time?: string;
+        quantity_reserved?: number;
+    }
 ) {
-  const result = await sql`
-    UPDATE reservations
-    SET
-      start_time = COALESCE(${updates.start_time ?? null}, start_time),
-      end_time = COALESCE(${updates.end_time ?? null}, end_time),
-      quantity_reserved = COALESCE(${updates.quantity_reserved ?? null}, quantity_reserved)
-    WHERE id = ${reservationId}
-    AND user_id = ${userId}
-    RETURNING *;
-  `;
+    return await sql.begin(async sql => {
+        const reservationRows = await sql`SELECT * FROM reservations WHERE id = ${reservationId}`;
+        const reservationData = reservationRows[0] as NewReservation
 
-  if (result.length === 0) {
-    throw new Error("Reservation not found or unauthorized");
-  }
+        // Delete the reservation so it's ignored when we're checking for
+        // conflicts. Since we're in a transaction, this'll get rolled back if
+        // something errors.
+        await sql`DELETE FROM reservations WHERE id = ${reservationId}`
 
-  return result[0];
+        reservationData.start_time = updates.start_time ?? reservationData.start_time
+        reservationData.end_time = updates.end_time ?? reservationData.end_time
+        reservationData.quantity_reserved = updates.quantity_reserved ?? reservationData.quantity_reserved
+
+        await addReservationWithTransaction(sql, reservationData)
+
+        const newReservationRows = await sql`
+            SELECT * FROM reservations WHERE id = ${reservationId}`;
+        const newReservationData = newReservationRows[0] as NewReservation
+        return newReservationData
+    })
+}
+
+// status updates
+
+export async function updateAvailabilityStatus(
+
+) {
+
+}
+
+// get total count remaining in the current time
+export async function countRemaining(
+    r: {
+        resource_id: number,
+        start_time: string,
+        end_time: string
+    }
+): Promise<number> {
+
+    const resourceRows = await sql`
+        SELECT quantity FROM resources WHERE id = ${r.resource_id}
+    `;
+
+    if (resourceRows.length === 0) {
+        throw new Error("Resource not found");
+    }
+
+    const itemQuantity = resourceRows[0].quantity;
+
+
+    const overlapRows = await sql`
+    SELECT COALESCE(SUM(quantity_reserved), 0) AS total_reserved
+    FROM reservations
+    WHERE resource_id = ${r.resource_id}
+    AND start_time < ${r.end_time}
+    AND end_time > ${r.start_time}
+`;
+
+    const totalReserved = overlapRows[0].total_reserved;
+
+    const availableQuantity = itemQuantity - totalReserved;
+
+    return availableQuantity;
 }

@@ -17,8 +17,10 @@ type Value = ValuePiece | [ValuePiece, ValuePiece];
 export default function Reservation() {
   const shipName = "Starlight Pearl Cruises";
 
-  const [formError, setFormError] = useState<string>("");
 
+
+  const [formError, setFormError] = useState<string>("");
+  const [currentAvailability, setCurrentAvailability] = useState<number | null>(null);
   const categories = ["Items", "Rooms", "Packages"] as const;
 
   //current selected tab/category
@@ -50,6 +52,13 @@ export default function Reservation() {
   const [availableItemStartTimes, setAvailableItemStartTimes] = useState<string[]>([]);
   const [availableItemEndTimes, setAvailableItemEndTimes] = useState<string[]>([]);
 
+
+  const timeSelected =
+  itemStartDate &&
+  itemStartTime &&
+  itemEndDate &&
+  itemEndTime;
+
   //date and time picker state for Rooms
   const [roomStartDate, setRoomStartDate] = useState<ValuePiece>(new Date());
   const [roomStartTime, setRoomStartTime] = useState("");
@@ -57,6 +66,48 @@ export default function Reservation() {
   const [roomEndTime, setRoomEndTime] = useState("");
   const [availableRoomStartTimes, setAvailableRoomStartTimes] = useState<string[]>([]);
   const [availableRoomEndTimes, setAvailableRoomEndTimes] = useState<string[]>([]);
+
+  //additional guest emails for room reservations
+  const [additionalGuestEmails, setAdditionalGuestEmails] = useState<string[]>([]);
+  const [guestEmailError, setGuestEmailError] = useState<string>("");
+
+  // Handler functions for managing additional guest emails
+  const handleAddGuestEmail = () => {
+    setGuestEmailError("");
+    
+    if (!roomReservationForm.cabinId) {
+      setGuestEmailError("Please select a room first.");
+      return;
+    }
+
+    const selectedRoom = availableRooms.find((room) => String(room.id) === String(roomReservationForm.cabinId));
+    if (!selectedRoom) {
+      setGuestEmailError("Selected room not found.");
+      return;
+    }
+
+    const roomCapacity = selectedRoom.capacity;
+    const currentGuestCount = additionalGuestEmails.length + 1; // +1 for the primary user
+
+    if (currentGuestCount >= roomCapacity) {
+      setGuestEmailError(`Cannot add more guests. Room capacity is ${roomCapacity}.`);
+      return;
+    }
+
+    setAdditionalGuestEmails([...additionalGuestEmails, ""]);
+  };
+
+  const handleRemoveGuestEmail = (index: number) => {
+    setGuestEmailError("");
+    const updatedEmails = additionalGuestEmails.filter((_, i) => i !== index);
+    setAdditionalGuestEmails(updatedEmails);
+  };
+
+  const handleUpdateGuestEmail = (index: number, value: string) => {
+    const updatedEmails = [...additionalGuestEmails];
+    updatedEmails[index] = value;
+    setAdditionalGuestEmails(updatedEmails);
+  };
 
   // Generate all 30-minute time slots for a day
   const generateTimeSlots = (): string[] => {
@@ -69,6 +120,66 @@ export default function Reservation() {
     }
     return slots;
   };
+  
+
+  // 
+  const fetchCurrentAvailability = async (
+  resourceId: string,
+  startDate: Date,
+  startTime: string,
+  endDate: Date,
+  endTime: string
+) => {
+  if (!resourceId || !startDate || !startTime || !endDate || !endTime) {
+    setCurrentAvailability(null);
+    return;
+  }
+
+  try {
+    const start = combineDateAndTime(startDate, startTime);
+    const end = combineDateAndTime(endDate, endTime);
+
+    const formatForAPI = (date: Date) =>
+      formatInTimeZone(date, "UTC", "yyyy-MM-dd HH:mm:ss");
+
+    const response = await fetch(
+      `${API_URL}/api/resources/availability?resource_id=${resourceId}&start_time=${formatForAPI(start)}&end_time=${formatForAPI(end)}`
+    );
+
+    const data = await response.json();
+
+    setCurrentAvailability(data.remaining);
+  } catch (error) {
+    console.error("Error fetching availability:", error);
+    setCurrentAvailability(null);
+  }
+};
+
+useEffect(() => {
+  if (
+    activeCategory === "Items" &&
+    itemReservationForm.itemId &&
+    itemStartDate &&
+    itemStartTime &&
+    itemEndDate &&
+    itemEndTime
+  ) {
+    fetchCurrentAvailability(
+      itemReservationForm.itemId,
+      itemStartDate,
+      itemStartTime,
+      itemEndDate,
+      itemEndTime
+    );
+  }
+}, [
+  itemReservationForm.itemId,
+  itemStartDate,
+  itemStartTime,
+  itemEndDate,
+  itemEndTime,
+]);
+
 
   // Convert time string (HH:mm) to minutes for comparison
   const timeToMinutes = (timeStr: string): number => {
@@ -146,38 +257,59 @@ export default function Reservation() {
     return dateTime.getHours() * 60 + dateTime.getMinutes();
   };
 
-  const getItemReservationsForDay = async (itemId: string, date: Date) => {
-    const { dayStart, dayEnd } = getDayBounds(date);
+  const getItemReservations = async (itemId: string) => {
     const allReservations = await fetchData(`/api/reservations?resource_id=${itemId}`);
 
     return allReservations
+      .filter((res: any) => res.resource_id === Number(itemId))
+      .map((res: any) => ({
+        start: new Date(res.start_time),
+        end: new Date(res.end_time),
+        quantityReserved: Number(res.quantity_reserved) || 0,
+      }));
+  };
+
+  const getRoomReservations = async (cabinId: string) => {
+    const allReservations = await fetchData(`/api/reservations?cabin_id=${cabinId}`);
+
+    return allReservations
+      .filter((res: any) => res.cabin_id === Number(cabinId))
+      .map((res: any) => ({
+        start: new Date(res.start_time),
+        end: new Date(res.end_time),
+      }));
+  };
+
+  const intervalsOverlap = (startA: Date, endA: Date, startB: Date, endB: Date) => {
+    return startA < endB && endA > startB;
+  };
+
+  const getItemReservationsForDay = async (itemId: string, date: Date) => {
+    const { dayStart, dayEnd } = getDayBounds(date);
+    const allReservations = await getItemReservations(itemId);
+
+    return allReservations
       .filter((res: any) => {
-        if (res.resource_id !== Number(itemId)) return false;
-        const start = new Date(res.start_time);
-        const end = new Date(res.end_time);
-        return start <= dayEnd && end >= dayStart;
+        return intervalsOverlap(dayStart, dayEnd, res.start, res.end);
       })
       .map((res: any) => ({
-        startMinutes: getMinutesOfDay(new Date(res.start_time)),
-        endMinutes: getMinutesOfDay(new Date(res.end_time)),
-        quantityReserved: Number(res.quantity_reserved) || 0,
+        startMinutes: getMinutesOfDay(res.start > dayStart ? res.start : dayStart),
+        endMinutes: getMinutesOfDay(res.end < dayEnd ? res.end : dayEnd),
+        quantityReserved: res.quantityReserved,
       }));
   };
 
   const getRoomReservationsForDay = async (cabinId: string, date: Date) => {
     const { dayStart, dayEnd } = getDayBounds(date);
-    const allReservations = await fetchData(`/api/reservations?cabin_id=${cabinId}`);
+    const allReservations = await getRoomReservations(cabinId);
 
     return allReservations
       .filter((res: any) => {
-        if (res.cabin_id !== Number(cabinId)) return false;
-        const start = new Date(res.start_time);
-        const end = new Date(res.end_time);
-        return start <= dayEnd && end >= dayStart;
+        return intervalsOverlap(dayStart, dayEnd, res.start, res.end);
       })
       .map((res: any) => ({
-        startMinutes: getMinutesOfDay(new Date(res.start_time)),
-        endMinutes: getMinutesOfDay(new Date(res.end_time)),
+        startMinutes: getMinutesOfDay(res.start > dayStart ? res.start : dayStart),
+        endMinutes: getMinutesOfDay(res.end < dayEnd ? res.end : dayEnd),
       }));
   };
 
@@ -195,6 +327,42 @@ export default function Reservation() {
     minute: number
   ) => {
     return reservations.some((res) => minute >= res.startMinutes && minute <= res.endMinutes);
+  };
+
+  const isItemIntervalAvailable = (
+    reservations: { start: Date; end: Date; quantityReserved: number }[],
+    requestedQuantity: number,
+    totalQuantity: number,
+    startDateTime: Date,
+    endDateTime: Date
+  ) => {
+    for (let slotStart = new Date(startDateTime); slotStart < endDateTime; slotStart = new Date(slotStart.getTime() + 30 * 60 * 1000)) {
+      const slotEnd = new Date(slotStart.getTime() + 30 * 60 * 1000);
+      const reservedQty = reservations
+        .filter((res) => intervalsOverlap(slotStart, slotEnd, res.start, res.end))
+        .reduce((sum, res) => sum + res.quantityReserved, 0);
+
+      if (reservedQty + requestedQuantity > totalQuantity) {
+        return false;
+      }
+    }
+
+    return true;
+  };
+
+  const isRoomIntervalAvailable = (
+    reservations: { start: Date; end: Date }[],
+    startDateTime: Date,
+    endDateTime: Date
+  ) => {
+    for (let slotStart = new Date(startDateTime); slotStart < endDateTime; slotStart = new Date(slotStart.getTime() + 30 * 60 * 1000)) {
+      const slotEnd = new Date(slotStart.getTime() + 30 * 60 * 1000);
+      if (reservations.some((res) => intervalsOverlap(slotStart, slotEnd, res.start, res.end))) {
+        return false;
+      }
+    }
+
+    return true;
   };
 
   // Fetch existing reservations for an item on a specific date and calculate available start times
@@ -242,8 +410,8 @@ export default function Reservation() {
   };
 
   // Calculate available end times based on start time
-  const getAvailableItemEndTimes = async (itemId: string, quantity: string, date: Date, startTime: string) => {
-    if (!itemId || !quantity || !date || !startTime) {
+  const getAvailableItemEndTimes = async (itemId: string, quantity: string, startDate: Date, endDate: Date, startTime: string) => {
+    if (!itemId || !quantity || !startDate || !endDate || !startTime) {
       setAvailableItemEndTimes([]);
       return;
     }
@@ -255,38 +423,22 @@ export default function Reservation() {
         return;
       }
 
-      const dayReservations = await getItemReservationsForDay(itemId, date);
+      const reservations = await getItemReservations(itemId);
 
       const selectedItem = availableItems.find((item) => String(item.id) === itemId);
       const totalQuantity = selectedItem ? selectedItem.quantity : 0;
 
       const allSlots = generateTimeSlots();
-      const startTimeMinutes = timeToMinutes(startTime);
       const availableSlots: string[] = [];
       const now = new Date();
-      const minAllowedMinutes = isSameCalendarDay(date, now) ? getNextHalfHourMinutes(now) : 0;
+      const startDateTime = combineDateAndTime(startDate, startTime);
 
-      if (startTimeMinutes < minAllowedMinutes) {
-        setAvailableItemEndTimes([]);
-        return;
-      }
-
-      // End time must be after start time and must keep full interval capacity-valid
+      // End time must be after start time and full interval must keep capacity-valid
       for (const timeSlot of allSlots) {
-        const endMinutes = timeToMinutes(timeSlot);
-        if (endMinutes <= startTimeMinutes || endMinutes < minAllowedMinutes) continue;
+        const endDateTime = combineDateAndTime(endDate, timeSlot);
+        if (endDateTime <= startDateTime || endDateTime <= now) continue;
 
-        let isAvailable = true;
-
-        for (let minute = startTimeMinutes; minute < endMinutes; minute += 30) {
-          const reservedQtyAtMinute = getReservedItemQuantityAtMinute(dayReservations, minute);
-          if (reservedQtyAtMinute + quantity_num > totalQuantity) {
-            isAvailable = false;
-            break;
-          }
-        }
-
-        if (isAvailable) {
+        if (isItemIntervalAvailable(reservations, quantity_num, totalQuantity, startDateTime, endDateTime)) {
           availableSlots.push(timeSlot);
         }
       }
@@ -331,41 +483,26 @@ export default function Reservation() {
   };
 
   // Calculate available end times for rooms based on start time
-  const getAvailableRoomEndTimes = async (cabinId: string, date: Date, startTime: string) => {
-    if (!cabinId || !date || !startTime) {
+  const getAvailableRoomEndTimes = async (cabinId: string, startDate: Date, endDate: Date, startTime: string) => {
+    if (!cabinId || !startDate || !endDate || !startTime) {
       setAvailableRoomEndTimes([]);
       return;
     }
 
     try {
-      const dayReservations = await getRoomReservationsForDay(cabinId, date);
+      const reservations = await getRoomReservations(cabinId);
 
       const allSlots = generateTimeSlots();
-      const startTimeMinutes = timeToMinutes(startTime);
       const availableSlots: string[] = [];
       const now = new Date();
-      const minAllowedMinutes = isSameCalendarDay(date, now) ? getNextHalfHourMinutes(now) : 0;
-
-      if (startTimeMinutes < minAllowedMinutes) {
-        setAvailableRoomEndTimes([]);
-        return;
-      }
+      const startDateTime = combineDateAndTime(startDate, startTime);
 
       // End time must be after start time and no overlap in the full interval
       for (const timeSlot of allSlots) {
-        const endMinutes = timeToMinutes(timeSlot);
-        if (endMinutes <= startTimeMinutes || endMinutes < minAllowedMinutes) continue;
+        const endDateTime = combineDateAndTime(endDate, timeSlot);
+        if (endDateTime <= startDateTime || endDateTime <= now) continue;
 
-        let isAvailable = true;
-
-        for (let minute = startTimeMinutes; minute < endMinutes; minute += 30) {
-          if (isRoomReservedAtMinute(dayReservations, minute)) {
-            isAvailable = false;
-            break;
-          }
-        }
-
-        if (isAvailable) {
+        if (isRoomIntervalAvailable(reservations, startDateTime, endDateTime)) {
           availableSlots.push(timeSlot);
         }
       }
@@ -442,11 +579,11 @@ export default function Reservation() {
 
   // Update available end times for items when start time changes
   useEffect(() => {
-    if (activeCategory === "Items" && itemReservationForm.itemId && itemReservationForm.quantity && itemStartDate && itemStartTime) {
-      getAvailableItemEndTimes(itemReservationForm.itemId, itemReservationForm.quantity, itemStartDate, itemStartTime);
+    if (activeCategory === "Items" && itemReservationForm.itemId && itemReservationForm.quantity && itemStartDate && itemEndDate && itemStartTime) {
+      getAvailableItemEndTimes(itemReservationForm.itemId, itemReservationForm.quantity, itemStartDate, itemEndDate, itemStartTime);
       setItemEndTime("");
     }
-  }, [itemStartTime, itemReservationForm.itemId, itemReservationForm.quantity, itemStartDate, availableItems]);
+  }, [itemStartTime, itemEndDate, itemReservationForm.itemId, itemReservationForm.quantity, itemStartDate, availableItems]);
 
   // Update available start times for rooms when date or room changes
   useEffect(() => {
@@ -457,16 +594,19 @@ export default function Reservation() {
       setAvailableRoomEndTimes([]);
       // Auto-sync end date to start date when start date changes
       setRoomEndDate(roomStartDate);
+      // Reset guest emails when room changes
+      setAdditionalGuestEmails([]);
+      setGuestEmailError("");
     }
   }, [roomReservationForm.cabinId, roomStartDate, availableRooms]);
 
   // Update available end times for rooms when start time changes
   useEffect(() => {
-    if (activeCategory === "Rooms" && roomReservationForm.cabinId && roomStartDate && roomStartTime) {
-      getAvailableRoomEndTimes(roomReservationForm.cabinId, roomStartDate, roomStartTime);
+    if (activeCategory === "Rooms" && roomReservationForm.cabinId && roomStartDate && roomEndDate && roomStartTime) {
+      getAvailableRoomEndTimes(roomReservationForm.cabinId, roomStartDate, roomEndDate, roomStartTime);
       setRoomEndTime("");
     }
-  }, [roomStartTime, roomReservationForm.cabinId, roomStartDate, availableRooms]);
+  }, [roomStartTime, roomEndDate, roomReservationForm.cabinId, roomStartDate, availableRooms]);
 
   //reservation submission
   const handleReservationSubmit = async (e: React.FormEvent) => {
@@ -606,6 +746,18 @@ export default function Reservation() {
         return;
       }
 
+      //validate guest emails if any are provided
+      for (let i = 0; i < additionalGuestEmails.length; i++) {
+        const email = additionalGuestEmails[i].trim();
+        if (email && !email.includes('@')) {
+          setFormError(`Guest ${i + 1} email is invalid. Please enter a valid email address.`);
+          return;
+        }
+      }
+
+      //filter out empty email entries
+      const validGuestEmails = additionalGuestEmails.filter(email => email.trim() !== "");
+
       try {
         const formatForMySQL = (date: Date) => {
           return formatInTimeZone(date, 'UTC', 'yyyy-MM-dd HH:mm:ss');
@@ -616,6 +768,7 @@ export default function Reservation() {
           start_time: formatForMySQL(startDateTime),
           end_time: formatForMySQL(endDateTime),
           quantity_reserved: 1,
+          additional_guest_emails: validGuestEmails,
         };
 
         console.log(reservationData);
@@ -639,6 +792,8 @@ export default function Reservation() {
         setRoomStartTime("");
         setRoomEndDate(new Date());
         setRoomEndTime("");
+        setAdditionalGuestEmails([]);
+        setGuestEmailError("");
         
         // Refresh available rooms to show updated availability
         await loadAvailableRooms();
@@ -696,9 +851,14 @@ export default function Reservation() {
                     <option value="">-- Choose an item --</option>
                     {availableItems.map((item) => (
                       <option key={item.id} value={item.id}>
-                        {item.name} ({item.category}) - Available: {item.quantity}
+                      {item.name} ({item.category}) - Available:{" "}
+                      {item.id === Number(itemReservationForm.itemId) &&
+                      timeSelected &&
+                        currentAvailability !== null
+                        ? currentAvailability
+                        : item.quantity}
                       </option>
-                    ))}
+                      ))}
                   </select>
                 </label>
 
@@ -863,6 +1023,54 @@ export default function Reservation() {
                     ))}
                   </select>
                 </label>
+
+                <br />
+
+                {/* Additional Guests Section */}
+                <div className="additionalGuestsSection">
+                  <h4>Additional Guests</h4>
+                  <p className="additionalGuestsInfo">
+                    {roomReservationForm.cabinId && availableRooms.find(r => String(r.id) === String(roomReservationForm.cabinId))
+                      ? `Room capacity: ${availableRooms.find(r => String(r.id) === String(roomReservationForm.cabinId)).capacity} (You can add ${availableRooms.find(r => String(r.id) === String(roomReservationForm.cabinId)).capacity - 1} more guest${availableRooms.find(r => String(r.id) === String(roomReservationForm.cabinId)).capacity - 1 !== 1 ? 's' : ''})`
+                      : "Select a room to add additional guests"}
+                  </p>
+                  
+                  {additionalGuestEmails.map((email, index) => (
+                    <div key={index} className="guestEmailRow">
+                      <label>
+                        Guest {index + 1} Email:
+                        <input
+                          type="email"
+                          className="quantityInput"
+                          placeholder="Enter guest email"
+                          value={email}
+                          onChange={(e) => handleUpdateGuestEmail(index, e.target.value)}
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveGuestEmail(index)}
+                        className="removeGuestButton"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                  
+                  <button
+                    type="button"
+                    onClick={handleAddGuestEmail}
+                    className="addGuestButton"
+                  >
+                    + Add Guest Email
+                  </button>
+                  
+                  {guestEmailError && (
+                    <div className="guestEmailError">
+                      {guestEmailError}
+                    </div>
+                  )}
+                </div>
               </>
             ) : (
               // Packages tab - placeholder

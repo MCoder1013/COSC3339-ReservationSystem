@@ -20,15 +20,8 @@ CHECK (quantity_reserved > 0);
 
 -- cabin validation
 ALTER TABLE cabins
-DROP CONSTRAINT IF EXISTS chk_cabin_capacity_positive;
-
-ALTER TABLE cabins
-ADD CONSTRAINT chk_cabin_capacity_positive
-CHECK (capacity > 0);
-
--- resource name validation
-ALTER TABLE resources
-DROP CONSTRAINT IF EXISTS chk_resource_name_not_blank;
+  ADD CONSTRAINT chk_cabin_capacity_positive
+  CHECK (capacity > 0);
 
 ALTER TABLE resources
 ADD CONSTRAINT chk_resource_name_not_blank
