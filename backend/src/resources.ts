@@ -1,28 +1,17 @@
-import dotenv from 'dotenv';
-import EmbeddedPostgres from 'embedded-postgres';
-import postgres, { Row, RowList, TransactionSql } from 'postgres';
-import {sql} from '../src/database.js';
-
-dotenv.config();
-
-// ENUMS FOR DATABASE
-type RoomStatus = 'Available' | 'Unavailable' | 'Maintenance';
-type RoomType = 'Economy' | 'Oceanview' | 'Balcony' | "Suite";
+import { sql } from './database.js';
+import { TransactionSql } from 'postgres';
 
 type Categories = 'Gear' | 'Medical' | 'Event' | 'Cleaning' | 'Other';
 type ResourceStatus = 'Available' | 'Out' | 'Maintenance';
 
-type Role = 'Nurse' | 'Tour Guide' | 'Security' | 'Housekeeping' | 'Other';
-type Shift = 'Morning' | 'Day' | 'Night';
+interface ResourceCountCheck {
+    resource_id: number
+    quantity_reserved: number
+    start_time: string
+    end_time: string
+}
 
-type ReservationStatus = 'Pending' | 'Confirmed' | 'Cancelled';
-
-
-// ensures that dates are always handled as utc
-process.env.TZ = 'UTC'
-
-
-// pulls the resources from the resources table in the SQL 
+// pulls the resources from the resources table in the SQL
 // returns only the rows
 // throws error otherwise
 export async function pullResources() {
@@ -67,15 +56,7 @@ export async function addResources(name: string, category: Categories, quantity:
     }
 }
 
-
-interface ResourceCountCheck {
-    resource_id: number
-    quantity_reserved: number
-    start_time: string
-    end_time: string
-}
-
-async function checkResourceCount(
+export async function checkResourceCount(
     r: ResourceCountCheck,
     sql: TransactionSql<{}>
 ) {
@@ -94,7 +75,7 @@ async function checkResourceCount(
     }
 
     const sameTimeReservations = await sql`
-        SELECT quantity_reserved 
+        SELECT quantity_reserved
         FROM reservations
         WHERE resource_id = ${r.resource_id}
             AND start_time < ${r.end_time}
@@ -112,7 +93,6 @@ async function checkResourceCount(
         throw new Error("Not enough quantity available");
     }
 }
-
 
 // Delete resource by name instead of id since users won't know id
 export async function deleteResource(name: string): Promise<number> {
@@ -144,17 +124,15 @@ export async function countRemaining(
 
     const itemQuantity = resourceRows[0].quantity;
 
-
     const overlapRows = await sql`
-    SELECT COALESCE(SUM(quantity_reserved), 0) AS total_reserved
-    FROM reservations
-    WHERE resource_id = ${r.resource_id}
-    AND start_time < ${r.end_time}
-    AND end_time > ${r.start_time}
-`;
+        SELECT COALESCE(SUM(quantity_reserved), 0) AS total_reserved
+        FROM reservations
+        WHERE resource_id = ${r.resource_id}
+        AND start_time < ${r.end_time}
+        AND end_time > ${r.start_time}
+    `;
 
     const totalReserved = overlapRows[0].total_reserved;
-
     const availableQuantity = itemQuantity - totalReserved;
 
     return availableQuantity;

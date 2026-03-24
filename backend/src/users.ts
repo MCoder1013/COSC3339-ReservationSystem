@@ -1,14 +1,4 @@
-import dotenv from 'dotenv';
-import EmbeddedPostgres from 'embedded-postgres';
-import postgres, { Row, RowList, TransactionSql } from 'postgres';
-import {sql} from '../src/database.js';
-
-
-dotenv.config();
-
-
-// ensures that dates are always handled as utc
-process.env.TZ = 'UTC'
+import { sql } from './database.js';
 
 export async function tryRegister(firstName: string, lastName: string, email: string, passwordHash: string, role: string) {
     const result = await sql`
@@ -21,7 +11,6 @@ export async function tryRegister(firstName: string, lastName: string, email: st
 
 export async function getUserByEmail(email: string) {
     const result = await sql`SELECT * FROM users WHERE email = ${email}`;
-
     return result[0]; // first user or undefined
 }
 
@@ -55,4 +44,23 @@ export async function getAllUsers() {
     return result;
 }
 
+// Validate guest emails and return their user IDs
+export async function validateGuestEmails(emails: string[]): Promise<{ valid: boolean; userIds: number[]; invalidEmails: string[] }> {
+    const userIds: number[] = [];
+    const invalidEmails: string[] = [];
 
+    for (const email of emails) {
+        const user = await getUserByEmail(email.trim());
+        if (user) {
+            userIds.push(user.id);
+        } else {
+            invalidEmails.push(email);
+        }
+    }
+
+    return {
+        valid: invalidEmails.length === 0,
+        userIds,
+        invalidEmails
+    };
+}

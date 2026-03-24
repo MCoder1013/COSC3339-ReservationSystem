@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
-import { getUserItemReservations, addReservation, deleteReservation, pullReservations, getAllReservationsWithDetails, getReservationsByUser, 
-    updateReservation, getUserRoomReservations, validateGuestEmails, addGuestsToReservation } from '../database.js';
+import { addReservation, deleteReservation, getAllReservationsWithDetails, getReservationsByUser,
+    updateReservation, getUserRoomReservations, getUserItemReservations, addGuestsToReservation } from '../reservations.js';
+import { validateGuestEmails } from '../users.js';
 import { getAuthenticatedUserId } from './auth.js';
 
 const router = Router();
