@@ -26,13 +26,15 @@ const pgOptions = {
 }
 const pg = new EmbeddedPostgres(pgOptions);
 await pg.start();
-const sql = postgres({
+export const sql = postgres({
     user: pgOptions.user,
     password: pgOptions.password,
     port: pgOptions.port,
     host: 'localhost',
     database: 'cruise_reservation'
 });
+
+
 // ensures that dates are always handled as utc
 process.env.TZ = 'UTC'
 
