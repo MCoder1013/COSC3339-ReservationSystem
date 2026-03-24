@@ -119,7 +119,9 @@ router.post('/login', async (req: Request, res: Response) => {
     res
       .cookie('jwt', token, {
         httpOnly: true,
-        sameSite: 'lax'
+        sameSite: 'lax',
+        // cookie lasts for a year
+        maxAge: 1000 * 60 * 60 * 24 * 365
       })
       .json({
         message: 'Login successful',
