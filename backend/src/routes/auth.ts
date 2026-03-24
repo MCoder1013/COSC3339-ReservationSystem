@@ -116,6 +116,11 @@ router.post('/login', async (req: Request, res: Response) => {
     // If email exists and password matches, login is successful
 
     const token = jwt.sign({ id: user.id }, jwtSecret);
+    const resolvedRole =
+      user.user_role === 'staff' && await database.isAdminUser(user.id)
+        ? 'admin'
+        : user.user_role;
+
     res
       .cookie('jwt', token, {
         httpOnly: true,
@@ -125,7 +130,7 @@ router.post('/login', async (req: Request, res: Response) => {
         message: 'Login successful',
         userId: user.id,
         firstName: user.first_name,
-        role: user.user_role
+        role: resolvedRole
       });
   } catch (err) {
     console.error(err);
@@ -146,6 +151,11 @@ router.get('/me', async (req: Request, res: Response) => {
     const user = await database.getUserById(decoded.id);
     if (!user) return res.status(404).json({ error: 'User not found' });
 
+    const resolvedRole =
+      user.user_role === 'staff' && await database.isAdminUser(user.id)
+        ? 'admin'
+        : user.user_role;
+
     res.json({
       id: user.id,
       firstName: user.first_name,
@@ -153,7 +163,7 @@ router.get('/me', async (req: Request, res: Response) => {
       email: user.email,
       biography: user.biography,
       profilePicture: user.profile_picture,
-      role: user.user_role,
+      role: resolvedRole,
     });
   } catch {
     res.status(401).json({ error: 'Invalid token' });
@@ -173,7 +183,54 @@ router.get('/users', async (req: Request, res: Response) => {
     }
 
     const users = await database.getAllUsers();
-    res.json(users);
+    const usersWithAdmin = await Promise.all(
+      users.map(async (user: any) => ({
+        ...user,
+        is_admin: user.user_role === 'staff' ? await database.isAdminUser(user.id) : false,
+      }))
+    );
+    res.json(usersWithAdmin);
+  } catch {
+    res.status(401).json({ error: 'Invalid token' });
+  }
+});
+
+router.patch('/users/:id/admin', async (req: Request, res: Response) => {
+  const token = req.cookies?.jwt;
+  if (!token) return res.status(401).json({ error: 'Not authenticated' });
+
+  const targetUserId = Number(req.params.id);
+  if (isNaN(targetUserId)) {
+    return res.status(400).json({ error: 'Invalid user id' });
+  }
+
+  const { isAdmin } = req.body;
+  if (typeof isAdmin !== 'boolean') {
+    return res.status(400).json({ error: 'isAdmin must be a boolean' });
+  }
+
+  try {
+    const decoded = jwt.verify(token, jwtSecret) as { id: number };
+    const callerIsAdmin = await database.isAdminUser(decoded.id);
+
+    if (!callerIsAdmin) {
+      return res.status(403).json({ error: 'Forbidden: admin only' });
+    }
+
+    const targetUser = await database.getUserById(targetUserId);
+    if (!targetUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    if (targetUser.user_role !== 'staff') {
+      return res.status(400).json({ error: 'Only staff users can be promoted/demoted as admin' });
+    }
+
+    await database.setStaffAdminStatus(targetUserId, isAdmin);
+
+    res.json({
+      message: isAdmin ? 'User promoted to admin' : 'User demoted to staff',
+    });
   } catch {
     res.status(401).json({ error: 'Invalid token' });
   }
