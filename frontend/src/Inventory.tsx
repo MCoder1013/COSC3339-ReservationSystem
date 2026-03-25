@@ -3,14 +3,10 @@ import { useState, useEffect } from "react";
 import "./App.css";
 import { fetchData } from "./api";
 import NavBar from "./NavBar";
-import { useAuth } from "./AuthContext";
 const API_URL = import.meta.env.VITE_API_URL;
 
 export default function Inventory() {
 const shipName = "Starlight Pearl Cruises";
-const { user } = useAuth();
-const isAdmin = user?.role === "admin";
-const canViewInventory = user?.role === "staff" || user?.role === "admin";
 
 const [formError, setFormError] = useState<string>("");
 
@@ -89,7 +85,6 @@ const [formError, setFormError] = useState<string>("");
       const response = await fetch(`${API_URL}${endpoint}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
         body: JSON.stringify(body),
       });
 
@@ -154,7 +149,6 @@ const [formError, setFormError] = useState<string>("");
 
       await fetch(`${API_URL}${endpoint}`, {
         method: "DELETE",
-        credentials: "include",
       });
 
       //refresh inventory
@@ -179,13 +173,6 @@ const [formError, setFormError] = useState<string>("");
 
       <NavBar shipName={shipName} />
 
-      {!canViewInventory ? (
-        <main className="container section centerCard">
-          <h2>Inventory</h2>
-          <p>Access denied. Staff or Admin role required.</p>
-        </main>
-      ) : (
-
         <main className="container section inventoryDisplay">
         <h2>Inventory</h2>
 
@@ -203,14 +190,10 @@ const [formError, setFormError] = useState<string>("");
         </div>
         
         {/*Add/Delete buttons */}
-        {isAdmin && (
-          <>
-            <button className="addButton" onClick={() => setShowModal(true)}>
-              Add {activeCategory.slice(0, -1)}
-            </button>
-            <button className="deleteButton" onClick={() => setShowDeleteModal(true)}>Delete {activeCategory.slice(0, -1)}</button>
-          </>
-        )}
+        <button className="addButton" onClick={() => setShowModal(true)}>
+          Add {activeCategory.slice(0, -1)}
+        </button>
+        <button className="deleteButton" onClick={() => setShowDeleteModal(true)}>Delete {activeCategory.slice(0, -1)}</button>
 
         {/*changes table dynamically */}
         <table className="inventoryTable">
@@ -252,13 +235,12 @@ const [formError, setFormError] = useState<string>("");
         </table>
 
       </main>
-      )}
       <footer className="footer">
         <div className="container">© 2026 {shipName}</div>
       </footer>
 
       {/*modal for adding rooms/items */}
-      {canViewInventory && showModal && (
+      {showModal && (
         <div className="modal" onClick={() => setShowModal(false)}>
           <div className="modalContent" onClick={(e) => e.stopPropagation()}>
             <h3>Add {activeCategory.slice(0, -1)}</h3>
@@ -392,7 +374,7 @@ const [formError, setFormError] = useState<string>("");
       )}
 
       {/*modal for deleting rooms/items */}
-      {canViewInventory && showDeleteModal && (
+      {showDeleteModal && (
         <div className="modal" onClick={() => setShowDeleteModal(false)}>
           <div className="modalContent" onClick={(e) => e.stopPropagation()}>
             <h3>Delete {activeCategory.slice(0, -1)}</h3>
