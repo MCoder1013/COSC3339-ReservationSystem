@@ -183,7 +183,6 @@ router.get("/my-reservations", async (req: Request, res: Response) => {
 });
 
 
-
 // RES-GET-ITEMS - gets items for authenticated user
 router.get('/reservations/items', async (req: Request, res: Response) => {
     try {
