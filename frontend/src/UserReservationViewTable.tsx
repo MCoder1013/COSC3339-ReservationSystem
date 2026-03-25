@@ -168,6 +168,31 @@ export default function ReservationTable() {
   const handleUpdateReservation = async () => {
     if (!selectedReservationId) return;
 
+    const start = editData.start_time ? new Date(editData.start_time) : null;
+    const end = editData.end_time ? new Date(editData.end_time) : null;
+    const qty = editData.quantity_reserved;
+
+    if (!start || isNaN(start.getTime())) {
+      setFormError("Please enter a valid start date and time.");
+      return;
+    }
+    if (!end || isNaN(end.getTime())) {
+      setFormError("Please enter a valid end date and time.");
+      return;
+    }
+    if (start <= new Date()) {
+      setFormError("Start time must be in the future.");
+      return;
+    }
+    if (end <= start) {
+      setFormError("End time must be after start time.");
+      return;
+    }
+    if (activeCategory === "Items" && (qty === undefined || !Number.isInteger(qty) || qty < 1)) {
+      setFormError("Quantity must be a whole number of at least 1.");
+      return;
+    }
+
     try {
       const response = await fetch(
         `${API_URL}/api/reservations/${selectedReservationId}`,

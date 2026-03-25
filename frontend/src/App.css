@@ -3,14 +3,16 @@
 }
 
 .page {
-  min-height: 100vh; /*makes sure page fills full screen height */
+  min-height: 100vh;
+  /*makes sure page fills full screen height */
   display: flex;
   flex-direction: column;
-  font-family: Arial, sans-serif;
+  font-family: "Roboto", sans-serif;
 }
 
 main {
-  flex: 1;   /*pushes footer to bottom always*/
+  flex: 1;
+  /*pushes footer to bottom always*/
 }
 
 .centeredContent {
@@ -21,13 +23,15 @@ main {
 }
 
 .container {
-  width: min(1000px, 92vw); /* never wider than 1000px, but shrinks on phones */
-  margin: 0 auto;          /* centers the container */
+  width: min(1000px, 92vw);
+  /* never wider than 1000px, but shrinks on phones */
+  margin: 0 auto;
+  /* centers the container */
 }
 
 /* Hero full-width background, content centered inside */
 .navbar {
-  background: navy;
+  background: #00008080;
   color: white;
   text-align: center;
 }
@@ -40,15 +44,36 @@ main {
 
 /* Footer full width background, centered content */
 .footer {
-  background: lightgray;
+  background: #000a;
   padding: 16px 0;
   text-align: center;
 }
 
 .headerRow {
   display: flex;
-  justify-content: space-between; /* pushes button to right */
-  align-items: center;            /* keeps them vertically aligned */
+  justify-content: space-between;
+  /* pushes button to right */
+  align-items: center;
+  /* keeps them vertically aligned */
+  align-content: center;
+}
+
+h1 {
+  font-size: 2.5rem;
+  margin: 0;
+  padding: 0;
+  font-weight: 500;
+  font-family: 'Roboto Slab';
+  letter-spacing: 0.5px;
+
+  background: linear-gradient(to top, #aaa, #fff);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+h2 {
+  margin-top: 0;
 }
 
 .logo {
@@ -66,9 +91,12 @@ main {
 .navLinks {
   display: flex;
   align-items: center;
+  gap: 0.5em;
 }
 
-button, .navButton, button.navButton {
+button,
+.navButton,
+button.navButton {
   font-size: inherit;
   font-family: inherit;
   padding: 10px 18px;
@@ -77,20 +105,23 @@ button, .navButton, button.navButton {
   background: transparent;
   color: white;
   cursor: pointer;
-  text-decoration: none;  /* removes underline */ 
+  text-decoration: none;
+  /* removes underline */
+  display: inline-block;
 }
 
-button:hover, .navButton:hover {
+button:hover,
+.navButton:hover {
   background: white;
   color: navy;
 }
 
 .centerCard {
   max-width: 400px;
-  margin: 0 auto;
+  margin: 0.5em auto;
   background: rgba(162, 170, 252, 0.9);
   color: navy;
-  padding: 24px;
+  padding: 20px;
   border-radius: 12px;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
@@ -98,7 +129,12 @@ button:hover, .navButton:hover {
 .form {
   display: flex;
   flex-direction: column;
-  gap: 12px; /* spacing between inputs */
+  gap: 12px;
+  /* spacing between inputs */
+}
+
+.form input {
+  margin-left: 0.3em
 }
 
 .errorMessage {
@@ -113,13 +149,15 @@ button:hover, .navButton:hover {
 .inventoryDisplay {
   background: rgba(110, 122, 255, 0.95);
   width: min(900px, 92vw);
-  margin: 24px auto 40px; /*bottom space before footer */
+  margin: 24px auto 40px;
+  /*bottom space before footer */
 
   /*this controls how far down table background goes */
   min-height: calc(100vh - 260px);
   max-height: calc(100vh - 180px);
 
-  overflow-y: auto; /*if content is too long, it scrolls inside the box */
+  overflow-y: auto;
+  /*if content is too long, it scrolls inside the box */
   background: rgba(110, 122, 255, 0.95);
   border-radius: 12px;
   padding: 24px;
@@ -127,13 +165,14 @@ button:hover, .navButton:hover {
 
 .tabButtons {
   display: flex;
-  justify-content: center; 
+  justify-content: center;
   margin-bottom: 15px;
 }
 
 .inventoryTable {
   width: 100%;
-  border-collapse: collapse; /*ensures borders merge properly between cells*/
+  border-collapse: collapse;
+  /*ensures borders merge properly between cells*/
   margin-top: 16px;
 }
 
@@ -145,7 +184,8 @@ button:hover, .navButton:hover {
 }
 
 .inventoryTable thead {
-  background: rgba(0, 0, 128, 0.1); /* light navy background */
+  background: rgba(0, 0, 128, 0.1);
+  /* light navy background */
   font-weight: bold;
 }
 
@@ -194,16 +234,21 @@ button:hover, .navButton:hover {
   color: navy;
 }
 
+input {
+  border-radius: 4px;
+  border: 1px solid #ccc;
+}
+
 .modalContent input,
 .modalContent select {
   margin-top: 4px;
   padding: 8px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
   font-size: 14px;
 }
 
-.submitButton, .cancelButton, .primaryBtn {
+.submitButton,
+.cancelButton,
+.primaryBtn {
   padding: 10px 18px;
   border-radius: 8px;
   border: 1px solid white;
@@ -224,7 +269,8 @@ button:hover, .navButton:hover {
   color: white;
 }
 
-.submitButton:hover, .primaryBtn:hover {
+.submitButton:hover,
+.primaryBtn:hover {
   background: white;
   color: navy;
 }
@@ -411,6 +457,7 @@ button:hover, .navButton:hover {
     opacity: 0;
     transform: translateY(-20px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -456,7 +503,109 @@ button:hover, .navButton:hover {
   from {
     opacity: 0;
   }
+
   to {
     opacity: 1;
   }
+}
+
+/* Time input styling */
+.timeInput {
+  width: 100%;
+  padding: 10px 12px;
+  margin-top: 6px;
+  border: 2px solid #ccc;
+  border-radius: 8px;
+  font-size: 15px;
+  background: white;
+  color: black;
+}
+
+.timeInput:disabled {
+  background: #e9ecef;
+  color: #6c757d;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* Additional Guests Section */
+.additionalGuestsSection {
+  margin-top: 20px;
+  padding: 20px;
+  border: 2px solid rgba(0, 0, 128, 0.2);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.95);
+}
+
+.additionalGuestsSection h4 {
+  margin-top: 0;
+  color: navy;
+  font-size: 18px;
+}
+
+.additionalGuestsInfo {
+  font-size: 14px;
+  color: #666;
+  margin-bottom: 16px;
+}
+
+.guestEmailRow {
+  margin-bottom: 12px;
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.guestEmailRow label {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+.guestEmailRow input {
+  width: 100%;
+  margin-top: 6px;
+}
+
+.removeGuestButton {
+  padding: 10px 16px;
+  background: #dc3545;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: bold;
+  font-family: inherit;
+  font-size: inherit;
+  transition: background 0.3s ease;
+  white-space: nowrap;
+}
+
+.removeGuestButton:hover {
+  background: #c82333;
+}
+
+.addGuestButton {
+  padding: 12px 20px;
+  background: navy;
+  color: white;
+  border: 1px solid navy;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: bold;
+  font-family: inherit;
+  font-size: inherit;
+  margin-top: 12px;
+  transition: all 0.3s ease;
+}
+
+.addGuestButton:hover {
+  background: white;
+  color: navy;
+}
+
+.guestEmailError {
+  color: #dc3545;
+  margin-top: 12px;
+  font-size: 14px;
+  font-weight: bold;
 }
