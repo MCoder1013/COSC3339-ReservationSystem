@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import * as argon2 from 'argon2';
-import * as database from '../database.js'
+import * as database from '../users.js'
 import jwt from 'jsonwebtoken';
 import multer from "multer";
 import path from "path";
@@ -119,9 +119,7 @@ router.post('/login', async (req: Request, res: Response) => {
     res
       .cookie('jwt', token, {
         httpOnly: true,
-        sameSite: 'lax',
-        // cookie lasts for a year
-        maxAge: 1000 * 60 * 60 * 24 * 365
+        sameSite: 'lax'
       })
       .json({
         message: 'Login successful',
