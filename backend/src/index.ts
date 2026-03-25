@@ -11,8 +11,8 @@ const app = express();
 app.use(cors({
   origin: true, // Allow requests from frontend
   credentials: true // Allow cookies to be sent
-})); // This tells the browser: "It's okay to accept requests from my frontend"
-app.use(express.json()); // This allows the backend to read JSON sent by your frontend
+})); 
+app.use(express.json()); // allows the backend to read JSON sent byfrontend
 app.use(cookieParser())
 app.use('/uploads', express.static('uploads'));
 
@@ -21,18 +21,21 @@ app.get('/', (_req, res) => {
   res.send('Welcome to the reservation system API!');
 });
 
-// The "Health Check" route your frontend button calls
-app.get('/api/health', (req, res) => {
-  res.json({
-    status: 'Alive',
-    message: 'Backend is talking to Frontend!',
-    timestamp: new Date().toISOString()
-  });
-});
+// app.get('/api/health', (req, res) => {
+//   res.json({
+//     status: 'Alive',
+//     message: 'Backend is talking to Frontend!',
+//     timestamp: new Date().toISOString()
+//   });
+// });
 
 // INVENTORY ROUTES
 app.use("/api", inventoryRoutes);
+
+//AUTHENTICATION 
 app.use("/api/auth", authRoutes);
+
+// RESERVATIONS
 app.use("/api", reservationRoutes);
 
 const PORT = 3000;
