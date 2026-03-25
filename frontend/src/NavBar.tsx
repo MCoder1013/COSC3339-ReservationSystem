@@ -13,6 +13,8 @@ export default function NavBar({ shipName }: NavBarProps) {
   const location = useLocation();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const isHomePage = location.pathname === "/";
+  const isStaffOrAdmin = user?.role === "staff" || user?.role === "admin";
+  const isAdmin = user?.role === "admin";
 
   return (
     <>
@@ -25,9 +27,10 @@ export default function NavBar({ shipName }: NavBarProps) {
           <h1>{shipName}</h1>
           <nav className="navLinks">
             {!isHomePage && <Link className="navButton" to="/">Home</Link>}
-            {user?.role === "staff" && <Link className="navButton" to="/inventory">Inventory</Link>}
-            {user?.role === "staff" && <Link className="navButton" to="/reservations">Reservations</Link>}
-            {user?.role === "staff" && <Link className="navButton" to="/view-users">Users</Link>}
+            {isStaffOrAdmin && <Link className="navButton" to="/inventory">Inventory</Link>}
+            {isStaffOrAdmin && <Link className="navButton" to="/reservations">Reservations</Link>}
+            {isStaffOrAdmin && <Link className="navButton" to="/view-users">Users</Link>}
+            {isAdmin && <Link className="navButton" to="/analytics">Analytics</Link>}
             {user ? (
               <button
                 className="userIconBtn"
