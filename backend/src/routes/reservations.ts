@@ -1,12 +1,10 @@
 import { Router, Request, Response } from 'express';
-import { addReservation, deleteReservation, getAllReservationsWithDetails, getReservationsByUser,
-    updateReservation, getUserRoomReservations, getUserItemReservations, addGuestsToReservation } from '../reservations.js';
-import { validateGuestEmails } from '../users.js';
+import { getUserItemReservations, addReservation, deleteReservation, pullReservations, getAllReservationsWithDetails, getReservationsByUser, 
+    updateReservation, getUserRoomReservations, validateGuestEmails, addGuestsToReservation } from '../database.js';
 import { getAuthenticatedUserId } from './auth.js';
 
 const router = Router();
 
-// RES-POST
 router.post("/reservations", async (req: Request, res: Response) => {
     // Need a safe way to get the user id and add it in since we are not getting that from the frontend
     const { cabin_id, resource_id, staff_id, start_time, end_time, quantity_reserved, additional_guest_emails } = req.body;
@@ -73,7 +71,6 @@ router.post("/reservations", async (req: Request, res: Response) => {
     }
 })
 
-// RES-POST
 router.post("/reservations/:id", async (req: Request, res: Response) => {
   const reservationId = Number(req.params.id);
   const user_id = getAuthenticatedUserId(req);
@@ -136,15 +133,19 @@ router.post("/reservations/:id", async (req: Request, res: Response) => {
   }
 });
 
-// RES-DELETE - deletes reservation by ID
 router.delete('/reservations/:id', async (req: Request, res: Response) => {
     const id = Number(req.params.id);
+    const userId = getAuthenticatedUserId(req);
+
+    if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+    }
 
     if (isNaN(id)) {
         return res.status(400).json({ message: "Invalid ID format" });
     }
     try {
-        await deleteReservation(id);
+        await deleteReservation({ reservationId: id, userId });
 
         res.json({ message: "reservation deleted successfully" });
     } catch (error) {
@@ -153,7 +154,6 @@ router.delete('/reservations/:id', async (req: Request, res: Response) => {
 });
 
 // Get all reservations with full details (includes joined room and resource data)
-// RES-GET - gets all reservations for everyone full information  
 router.get("/reservations", async (req: Request, res: Response) => {
     try {
         const result = await getAllReservationsWithDetails();
@@ -165,7 +165,6 @@ router.get("/reservations", async (req: Request, res: Response) => {
     }
 });
 
-// RES-GET-reservations - gets reservations for authenticated user 
 router.get("/my-reservations", async (req: Request, res: Response) => {
   const user_id = getAuthenticatedUserId(req);
 
@@ -200,7 +199,6 @@ router.get('/reservations/items', async (req: Request, res: Response) => {
     }
 });
 
-// RES-GET-ROOMS - gets current rooms reservation for authenticated user
 router.get('/reservations/rooms', async (req: Request, res: Response) => {
     try {
         const userId = getAuthenticatedUserId(req);
@@ -215,6 +213,28 @@ router.get('/reservations/rooms', async (req: Request, res: Response) => {
         console.error('Error fetching user room reservations:', error);
         res.status(500).json({ error: 'Failed to load room reservations' });
     }
+});
+
+router.delete('/admin/reservations/:id', async (req: Request, res: Response) => {
+  const reservationId = Number(req.params.id);
+  const userId = getAuthenticatedUserId(req);
+
+  if(!userId) return res.status(401).json({error: "Unauthorized" });
+  if (isNaN(reservationId)) return res.status(400).json({error: "Invalid ID format"});
+
+  try {
+    const user = await getUserById(userId); 
+
+    if(!user || user.user_role !== 'staff') {
+      return res.status(403).json({ error: "Forbidden: staff only" }); 
+
+    }
+    await deleteReservation({ reservationId: reservationId }); 
+    res.json({ message: "reservation deleted successfully "}); 
+
+  } catch (error) {
+    res.status(500).json({ error: "failed to delete reservation"});
+  }
 });
 
 export default router;
