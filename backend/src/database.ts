@@ -56,21 +56,6 @@ export async function getUserById(id: number) {
     return result[0] ?? null;
 }
 
-export async function isAdminUser(userId: number): Promise<boolean> {
-    const result = await sql`
-        SELECT role
-        FROM staff
-        WHERE staff_id = ${userId}
-        LIMIT 1
-    `;
-
-    if (result.length === 0) {
-        return false;
-    }
-
-    return String(result[0].role).toLowerCase() === 'admin';
-}
-
 export async function updateUserProfile(id: number, biography: string, profilePicture: string) {
     await sql`
     UPDATE users
@@ -96,24 +81,6 @@ export async function getAllUsers() {
     return result;
 }
 
-export async function setStaffAdminStatus(userId: number, shouldBeAdmin: boolean): Promise<void> {
-    if (shouldBeAdmin) {
-        await sql`
-            INSERT INTO staff (staff_id, role, shift)
-            VALUES (${userId}, 'Admin', 'Day')
-            ON CONFLICT (staff_id)
-            DO UPDATE SET role = 'Admin'
-        `;
-        return;
-    }
-
-    await sql`
-        UPDATE staff
-        SET role = 'Other'
-        WHERE staff_id = ${userId}
-    `;
-}
-
 // pulls the resources from the resources table in the SQL 
 // returns only the rows
 // throws error otherwise
@@ -134,20 +101,6 @@ export async function pullRooms() {
         return result;
     } catch (error) {
         console.error("Error getting cabins: ", error);
-        throw error;
-    }
-}
-
-export async function pullCruises() {
-    try {
-        const result = await sql`
-            SELECT *
-            FROM cruises
-            ORDER BY departure_date ASC
-        `;
-        return result;
-    } catch (error) {
-        console.error("Error getting cruises: ", error);
         throw error;
     }
 }
@@ -273,7 +226,6 @@ export async function addStaff(s: NewStaff): Promise<number> {
 
 interface ReservationCheck {
     id: number
-    cruise_id: number | null
     start_time: string
     end_time: string
 }
@@ -284,7 +236,6 @@ async function checkResourceTime(r: ReservationCheck, sql: TransactionSql<{}>) {
         SELECT id FROM reservations
         WHERE
             resource_id = ${r.id}
-            AND cruise_id = ${r.cruise_id}
             AND start_time < ${r.end_time}
             AND end_time > ${r.start_time}
     `;
@@ -299,7 +250,6 @@ async function checkCabinTime(r: ReservationCheck, sql: TransactionSql<{}>) {
         SELECT id FROM reservations
         WHERE
             cabin_id = ${r.id}
-            AND cruise_id = ${r.cruise_id}
             AND start_time < ${r.end_time}
             AND end_time > ${r.start_time}
     `;
@@ -325,7 +275,6 @@ async function checkStaffTime(r: ReservationCheck, sql: TransactionSql<{}>) {
 
 interface ResourceCountCheck {
     resource_id: number
-    cruise_id: number | null
     quantity_reserved: number
     start_time: string
     end_time: string
@@ -352,7 +301,6 @@ async function checkResourceCount(
         SELECT quantity_reserved 
         FROM reservations
         WHERE resource_id = ${r.resource_id}
-            AND cruise_id = ${r.cruise_id}
             AND start_time < ${r.end_time}
             AND end_time > ${r.start_time}
     `;
@@ -371,10 +319,9 @@ async function checkResourceCount(
 
 interface NewReservation {
     user_id: number
-    cruise_id: number | null
-    cabin_id: number | null
-    resource_id: number | null
-    staff_id: number | null
+    cabin_id: number
+    resource_id: number
+    staff_id: number
     start_time: string
     end_time: string
     quantity_reserved: number
@@ -389,8 +336,7 @@ export async function addReservationWithTransaction(sql: postgres.TransactionSql
         await checkStaffTime({
             start_time: r.start_time,
             end_time: r.end_time,
-            id: r.staff_id,
-            cruise_id: null
+            id: r.staff_id
         }, sql);
     }
 
@@ -398,27 +344,20 @@ export async function addReservationWithTransaction(sql: postgres.TransactionSql
         await checkCabinTime({
             start_time: r.start_time,
             end_time: r.end_time,
-            id: r.cabin_id,
-            cruise_id: r.cruise_id
+            id: r.cabin_id
         }, sql);
     }
 
     if (r.resource_id != null) {
-        await checkResourceCount({
-            resource_id: r.resource_id,
-            cruise_id: r.cruise_id,
-            quantity_reserved: r.quantity_reserved,
-            start_time: r.start_time,
-            end_time: r.end_time
-        }, sql);
+        await checkResourceCount(r, sql);
     }
 
     const result = await sql`
         INSERT INTO reservations
-            (user_id, cruise_id, cabin_id, resource_id, staff_id,
+            (user_id, cabin_id, resource_id, staff_id,
             start_time, end_time, quantity_reserved)
         VALUES
-            (${r.user_id}, ${r.cruise_id}, ${r.cabin_id}, ${r.resource_id}, ${r.staff_id},
+            (${r.user_id}, ${r.cabin_id}, ${r.resource_id}, ${r.staff_id},
             ${r.start_time}, ${r.end_time}, ${r.quantity_reserved})
         RETURNING id
     `;
@@ -495,7 +434,6 @@ export async function getAllReservationsWithDetails() {
             SELECT 
                 r.id,
                 r.user_id,
-                r.cruise_id,
                 r.cabin_id,
                 r.resource_id,
                 r.staff_id,
@@ -510,15 +448,11 @@ export async function getAllReservationsWithDetails() {
                 c.type,
                 c.deck,
                 c.capacity,
-                cr.cruise_name,
-                cr.departure_date,
-                cr.return_date,
                 res.name AS resource_name,
                 res.category
             FROM reservations r
             LEFT JOIN users u ON r.user_id = u.id
             LEFT JOIN cabins c ON r.cabin_id = c.id
-            LEFT JOIN cruises cr ON r.cruise_id = cr.id
             LEFT JOIN resources res ON r.resource_id = res.id
             ORDER BY r.start_time DESC
         `;
@@ -535,17 +469,14 @@ export async function getReservationsByUser(userId: number): Promise<RowList<Row
             r.id,
             r.start_time,
             r.end_time,
-            r.cruise_id,
             r.resource_id,
             r.cabin_id,
             r.quantity_reserved,
             u.email,
-            cr.cruise_name,
             res.name AS resource_name,
             c.cabin_number
         FROM reservations r
         JOIN users u ON r.user_id = u.id
-        LEFT JOIN cruises cr ON r.cruise_id = cr.id
         LEFT JOIN resources res ON r.resource_id = res.id
         LEFT JOIN cabins c ON r.cabin_id = c.id
         WHERE r.user_id = ${userId}
@@ -634,14 +565,12 @@ export async function getUserRoomReservations(userId: number) {
         u.first_name,
         u.last_name,
         c.cabin_number,
-                cr.cruise_name,
         r.start_time,
         r.end_time,
         r.status
       FROM reservations r
       JOIN users u ON r.user_id = u.id
       JOIN cabins c ON r.cabin_id = c.id
-            LEFT JOIN cruises cr ON r.cruise_id = cr.id
       WHERE r.user_id = ${userId}
         AND r.cabin_id IS NOT NULL
       ORDER BY r.start_time DESC
@@ -697,7 +626,6 @@ export async function updateAvailabilityStatus(
 export async function countRemaining(
     r: {
         resource_id: number,
-        cruise_id?: number,
         start_time: string,
         end_time: string
     }
@@ -714,22 +642,13 @@ export async function countRemaining(
     const itemQuantity = resourceRows[0].quantity;
 
 
-    const overlapRows = r.cruise_id
-        ? await sql`
-            SELECT COALESCE(SUM(quantity_reserved), 0) AS total_reserved
-            FROM reservations
-            WHERE resource_id = ${r.resource_id}
-            AND cruise_id = ${r.cruise_id}
-            AND start_time < ${r.end_time}
-            AND end_time > ${r.start_time}
-        `
-        : await sql`
-            SELECT COALESCE(SUM(quantity_reserved), 0) AS total_reserved
-            FROM reservations
-            WHERE resource_id = ${r.resource_id}
-            AND start_time < ${r.end_time}
-            AND end_time > ${r.start_time}
-        `;
+    const overlapRows = await sql`
+    SELECT COALESCE(SUM(quantity_reserved), 0) AS total_reserved
+    FROM reservations
+    WHERE resource_id = ${r.resource_id}
+    AND start_time < ${r.end_time}
+    AND end_time > ${r.start_time}
+`;
 
     const totalReserved = overlapRows[0].total_reserved;
 
