@@ -7,7 +7,7 @@ const router = Router();
 
 router.post("/reservations", async (req: Request, res: Response) => {
     // Need a safe way to get the user id and add it in since we are not getting that from the frontend
-  const { cruise_id, cabin_id, resource_id, staff_id, start_time, end_time, quantity_reserved, additional_guest_emails } = req.body;
+    const { cabin_id, resource_id, staff_id, start_time, end_time, quantity_reserved, additional_guest_emails } = req.body;
     const user_id = getAuthenticatedUserId(req);
 
     if (!user_id) {
@@ -15,10 +15,6 @@ router.post("/reservations", async (req: Request, res: Response) => {
     }
 
     try {
-      if (cabin_id && !cruise_id) {
-        return res.status(400).json({ error: "cruise_id is required for room reservations" });
-      }
-
         // Validate additional guest emails if provided
         if (additional_guest_emails && Array.isArray(additional_guest_emails) && additional_guest_emails.length > 0) {
             const validation = await validateGuestEmails(additional_guest_emails);
@@ -32,7 +28,6 @@ router.post("/reservations", async (req: Request, res: Response) => {
             // Create the reservation
             const reservationId = await addReservation({
                 user_id,
-              cruise_id: cruise_id ?? null,
                 cabin_id: cabin_id ??  null,
                 resource_id: resource_id ?? null,
                 staff_id: staff_id ?? null,
@@ -56,7 +51,6 @@ router.post("/reservations", async (req: Request, res: Response) => {
         // No additional guests - proceed with regular reservation
         const reservationId = await addReservation({
             user_id,
-          cruise_id: cruise_id ?? null,
             cabin_id: cabin_id ??  null,
             resource_id: resource_id ?? null,
             staff_id: staff_id ?? null,
@@ -162,20 +156,9 @@ router.delete('/reservations/:id', async (req: Request, res: Response) => {
 // Get all reservations with full details (includes joined room and resource data)
 router.get("/reservations", async (req: Request, res: Response) => {
     try {
-    const result = await getAllReservationsWithDetails();
+        const result = await getAllReservationsWithDetails();
 
-    const cabinId = req.query.cabin_id ? Number(req.query.cabin_id) : undefined;
-    const resourceId = req.query.resource_id ? Number(req.query.resource_id) : undefined;
-    const cruiseId = req.query.cruise_id ? Number(req.query.cruise_id) : undefined;
-
-    const filtered = result.filter((reservation: any) => {
-      const cabinMatches = cabinId === undefined || reservation.cabin_id === cabinId;
-      const resourceMatches = resourceId === undefined || reservation.resource_id === resourceId;
-      const cruiseMatches = cruiseId === undefined || reservation.cruise_id === cruiseId;
-      return cabinMatches && resourceMatches && cruiseMatches;
-    });
-
-    res.status(200).json(filtered);
+        res.status(200).json(result);
     } catch (error) {
         console.error("Error fetching all reservations:", error);
         res.status(500).json({ error: "Failed to fetch reservations" });
