@@ -14,6 +14,13 @@ const API_URL = import.meta.env.VITE_API_URL;
 type ValuePiece = Date | null;
 type Value = ValuePiece | [ValuePiece, ValuePiece];
 
+type Cruise = {
+  id: number;
+  cruise_name: string;
+  departure_date: string;
+  return_date: string;
+};
+
 export default function Reservation() {
   const shipName = "Starlight Pearl Cruises";
 
@@ -32,6 +39,11 @@ export default function Reservation() {
   
   //available rooms from database
   const [availableRooms, setAvailableRooms] = useState<any[]>([]);
+
+  //available cruises from database
+  const [availableCruises, setAvailableCruises] = useState<Cruise[]>([]);
+  const [selectedCruiseId, setSelectedCruiseId] = useState("");
+  const hasSelectedCruise = selectedCruiseId !== "";
 
   //reservation form state for Items tab
   const [itemReservationForm, setItemReservationForm] = useState({
@@ -269,11 +281,11 @@ useEffect(() => {
       }));
   };
 
-  const getRoomReservations = async (cabinId: string) => {
-    const allReservations = await fetchData(`/api/reservations?cabin_id=${cabinId}`);
+  const getRoomReservations = async (cabinId: string, cruiseId: string) => {
+    const allReservations = await fetchData(`/api/reservations?cabin_id=${cabinId}&cruise_id=${cruiseId}`);
 
     return allReservations
-      .filter((res: any) => res.cabin_id === Number(cabinId))
+      .filter((res: any) => res.cabin_id === Number(cabinId) && res.cruise_id === Number(cruiseId))
       .map((res: any) => ({
         start: new Date(res.start_time),
         end: new Date(res.end_time),
@@ -299,9 +311,9 @@ useEffect(() => {
       }));
   };
 
-  const getRoomReservationsForDay = async (cabinId: string, date: Date) => {
+  const getRoomReservationsForDay = async (cabinId: string, cruiseId: string, date: Date) => {
     const { dayStart, dayEnd } = getDayBounds(date);
-    const allReservations = await getRoomReservations(cabinId);
+    const allReservations = await getRoomReservations(cabinId, cruiseId);
 
     return allReservations
       .filter((res: any) => {
@@ -451,14 +463,14 @@ useEffect(() => {
   };
 
   // Fetch existing reservations for a room on a specific date and calculate available start times
-  const getAvailableRoomStartTimes = async (cabinId: string, date: Date) => {
-    if (!cabinId || !date) {
+  const getAvailableRoomStartTimes = async (cabinId: string, cruiseId: string, date: Date) => {
+    if (!cabinId || !cruiseId || !date) {
       setAvailableRoomStartTimes([]);
       return;
     }
 
     try {
-      const dayReservations = await getRoomReservationsForDay(cabinId, date);
+      const dayReservations = await getRoomReservationsForDay(cabinId, cruiseId, date);
 
       const allSlots = generateTimeSlots();
       const availableSlots: string[] = [];
@@ -483,14 +495,14 @@ useEffect(() => {
   };
 
   // Calculate available end times for rooms based on start time
-  const getAvailableRoomEndTimes = async (cabinId: string, startDate: Date, endDate: Date, startTime: string) => {
-    if (!cabinId || !startDate || !endDate || !startTime) {
+  const getAvailableRoomEndTimes = async (cabinId: string, cruiseId: string, startDate: Date, endDate: Date, startTime: string) => {
+    if (!cabinId || !cruiseId || !startDate || !endDate || !startTime) {
       setAvailableRoomEndTimes([]);
       return;
     }
 
     try {
-      const reservations = await getRoomReservations(cabinId);
+      const reservations = await getRoomReservations(cabinId, cruiseId);
 
       const allSlots = generateTimeSlots();
       const availableSlots: string[] = [];
@@ -548,6 +560,19 @@ useEffect(() => {
     loadAvailableRooms();
   }, []);
 
+  const loadAvailableCruises = async () => {
+    try {
+      const cruisesData = await fetchData("/api/cruises");
+      setAvailableCruises(cruisesData);
+    } catch (error) {
+      console.error("Error fetching cruises:", error);
+    }
+  };
+
+  useEffect(() => {
+    loadAvailableCruises();
+  }, []);
+
   // Real-time validation: check if quantity entered exceeds available amount for selected item
   useEffect(() => {
     let errorMessage = "";
@@ -587,8 +612,8 @@ useEffect(() => {
 
   // Update available start times for rooms when date or room changes
   useEffect(() => {
-    if (activeCategory === "Rooms" && roomReservationForm.cabinId && roomStartDate) {
-      getAvailableRoomStartTimes(roomReservationForm.cabinId, roomStartDate);
+    if (activeCategory === "Rooms" && selectedCruiseId && roomReservationForm.cabinId && roomStartDate) {
+      getAvailableRoomStartTimes(roomReservationForm.cabinId, selectedCruiseId, roomStartDate);
       setRoomStartTime("");
       setRoomEndTime("");
       setAvailableRoomEndTimes([]);
@@ -598,15 +623,15 @@ useEffect(() => {
       setAdditionalGuestEmails([]);
       setGuestEmailError("");
     }
-  }, [roomReservationForm.cabinId, roomStartDate, availableRooms]);
+  }, [selectedCruiseId, roomReservationForm.cabinId, roomStartDate, availableRooms]);
 
   // Update available end times for rooms when start time changes
   useEffect(() => {
-    if (activeCategory === "Rooms" && roomReservationForm.cabinId && roomStartDate && roomEndDate && roomStartTime) {
-      getAvailableRoomEndTimes(roomReservationForm.cabinId, roomStartDate, roomEndDate, roomStartTime);
+    if (activeCategory === "Rooms" && selectedCruiseId && roomReservationForm.cabinId && roomStartDate && roomEndDate && roomStartTime) {
+      getAvailableRoomEndTimes(roomReservationForm.cabinId, selectedCruiseId, roomStartDate, roomEndDate, roomStartTime);
       setRoomEndTime("");
     }
-  }, [roomStartTime, roomEndDate, roomReservationForm.cabinId, roomStartDate, availableRooms]);
+  }, [selectedCruiseId, roomStartTime, roomEndDate, roomReservationForm.cabinId, roomStartDate, availableRooms]);
 
   //reservation submission
   const handleReservationSubmit = async (e: React.FormEvent) => {
@@ -708,6 +733,11 @@ useEffect(() => {
         setFormError("An error occurred. Please try again.");
       }
     } else if (activeCategory === "Rooms") {
+      if (!selectedCruiseId) {
+        setFormError("Please select a cruise first.");
+        return;
+      }
+
       //validate room selection
       if (!roomReservationForm.cabinId) {
         setFormError("Please select a room to reserve.");
@@ -764,6 +794,7 @@ useEffect(() => {
         };
 
         const reservationData = {
+          cruise_id: Number(selectedCruiseId),
           cabin_id: Number(roomReservationForm.cabinId),
           start_time: formatForMySQL(startDateTime),
           end_time: formatForMySQL(endDateTime),
@@ -944,6 +975,45 @@ useEffect(() => {
             ) : activeCategory === "Rooms" ? (
               <>
                 <label>
+                  Select Cruise:
+                  <select
+                    className="itemInput"
+                    value={selectedCruiseId}
+                    onChange={(e) => {
+                      setSelectedCruiseId(e.target.value);
+                      setRoomReservationForm({ cabinId: "" });
+                      setRoomStartDate(new Date());
+                      setRoomStartTime("");
+                      setRoomEndDate(new Date());
+                      setRoomEndTime("");
+                      setAvailableRoomStartTimes([]);
+                      setAvailableRoomEndTimes([]);
+                      setAdditionalGuestEmails([]);
+                      setGuestEmailError("");
+                    }}
+                    required
+                  >
+                    <option value="">-- Choose a cruise --</option>
+                    {availableCruises.map((cruise) => (
+                      <option key={cruise.id} value={cruise.id}>
+                        {cruise.cruise_name} ({cruise.departure_date} to {cruise.return_date})
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <br />
+
+                {!hasSelectedCruise && (
+                  <p>Please select a cruise to unlock room reservation inputs.</p>
+                )}
+
+                {availableCruises.length === 0 && (
+                  <p>No cruises are available yet. Please add cruises first.</p>
+                )}
+
+                <fieldset disabled={!hasSelectedCruise} style={{ border: "none", padding: 0, margin: 0 }}>
+                <label>
                   Select Room:
                   <select
                     className="itemInput"
@@ -1071,6 +1141,7 @@ useEffect(() => {
                     </div>
                   )}
                 </div>
+                </fieldset>
               </>
             ) : (
               // Packages tab - placeholder
@@ -1086,7 +1157,7 @@ useEffect(() => {
             )}
 
             {(activeCategory === "Items" || activeCategory === "Rooms") && (
-              <button type="submit" className="submitButton">
+              <button type="submit" className="submitButton" disabled={activeCategory === "Rooms" && !hasSelectedCruise}>
                 Submit Reservation
               </button>
             )}

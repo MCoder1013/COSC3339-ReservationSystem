@@ -21,6 +21,10 @@ router.get('/rooms', async (req: Request, res: Response) => {
 
 // ROOMS-POST 
 router.post("/rooms", async (req: Request, res: Response) => {
+    if (!(await ensureAdmin(req, res))) {
+        return;
+    }
+
     const { cabin_number, deck, type, capacity, status } = req.body;
 
     try {
@@ -39,6 +43,10 @@ router.post("/rooms", async (req: Request, res: Response) => {
 
 // ROOMS-DELETE - deletes room by cabin number
 router.delete('/rooms/:cabin_number', async (req: Request, res: Response) => {
+    if (!(await ensureAdmin(req, res))) {
+        return;
+    }
+
     const cabinNumber = req.params.cabin_number as string;
 
     try {
@@ -105,11 +113,12 @@ router.get('/staff', async (req: Request, res: Response) => {
 // RES-GETAVAILABLE - gets avaialbel at current time  
 router.get('/resources/availability', async(req: Request, res: Response) => {
     try {
-        const { resource_id, start_time, end_time } = req.query;
+                const { resource_id, cruise_id, start_time, end_time } = req.query;
 
         const remaining = await countRemaining(
       {
         resource_id: Number(resource_id),
+                cruise_id: cruise_id ? Number(cruise_id) : undefined,
         start_time: String(start_time),
         end_time: String(end_time)
       }

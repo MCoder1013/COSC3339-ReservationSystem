@@ -13,21 +13,26 @@ export default function NavBar({ shipName }: NavBarProps) {
   const location = useLocation();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const isHomePage = location.pathname === "/";
+  const isStaffOrAdmin = user?.role === "staff" || user?.role === "admin";
+  const isAdmin = user?.role === "admin";
 
   return (
     <>
       <header className="navbar">
         <div className="container headerRow">
-          <img src="images/StarlightPearlLogoWithName.png" 
-          alt="Starlight Pearl Cruises Logo" className="logo" />
+          <a href="/">
+            <img src="images/StarlightPearlLogoWithName.png"
+              alt="Starlight Pearl Cruises Logo" className="logo" />
+          </a>
           <h1>{shipName}</h1>
           <nav className="navLinks">
             {!isHomePage && <Link className="navButton" to="/">Home</Link>}
-            {user?.role === "staff" && <Link className="navButton" to="/inventory">Inventory</Link>}
-            {user?.role === "staff" && <Link className="navButton" to="/reservations">Reservations</Link>}
-            {user?.role === "staff" && <Link className="navButton" to="/view-users">Users</Link>}
+            {isStaffOrAdmin && <Link className="navButton" to="/inventory">Inventory</Link>}
+            {isStaffOrAdmin && <Link className="navButton" to="/reservations">Reservations</Link>}
+            {isStaffOrAdmin && <Link className="navButton" to="/view-users">Users</Link>}
+            {isAdmin && <Link className="navButton" to="/analytics">Analytics</Link>}
             {user ? (
-              <button 
+              <button
                 className="userIconBtn"
                 onClick={() => setIsProfileOpen(true)}
                 title={user.firstName}
@@ -43,8 +48,8 @@ export default function NavBar({ shipName }: NavBarProps) {
         </div>
       </header>
 
-      <UserProfileModal 
-        isOpen={isProfileOpen} 
+      <UserProfileModal
+        isOpen={isProfileOpen}
         onClose={() => setIsProfileOpen(false)}
       />
     </>
