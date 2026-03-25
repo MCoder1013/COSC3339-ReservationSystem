@@ -1,14 +1,37 @@
 import { Router, Request, Response } from 'express';
-import { pullRooms, addRoom, deleteRoom } from '../rooms.js';
-import { pullResources, addResources, deleteResource, countRemaining } from '../resources.js';
-import { pullStaff, addStaff, deleteStaff } from '../staff.js';
+import { pullResources, pullRooms, pullCruises, addRoom, addResources, deleteRoom, deleteResource, addStaff, pullStaff, deleteStaff, countRemaining, isAdminUser } from '../database.js';
+import { getAuthenticatedUserId } from './auth.js';
 
 const router = Router();
 
+async function ensureAdmin(req: Request, res: Response): Promise<boolean> {
+    const userId = getAuthenticatedUserId(req);
 
-// ROOMS 
+    if (!userId) {
+        res.status(401).json({ error: 'Unauthorized' });
+        return false;
+    }
 
-// ROOMS-GET - gets all rooms 
+    const isAdmin = await isAdminUser(userId);
+    if (!isAdmin) {
+        res.status(403).json({ error: 'Forbidden: admin only' });
+        return false;
+    }
+
+    return true;
+}
+
+// pull items form database
+// get all items from the resources table
+router.get('/resources', async (req: Request, res: Response) => {
+    try {
+        const items = await pullResources();
+        res.json(items);
+    } catch (error) {
+        res.status(500).json({ error: "Failed to load inventory" });
+    }
+});
+
 router.get('/rooms', async (req: Request, res: Response) => {
     try {
         const rooms = await pullRooms();
@@ -18,8 +41,25 @@ router.get('/rooms', async (req: Request, res: Response) => {
     }
 });
 
+router.get('/cruises', async (_req: Request, res: Response) => {
+    try {
+        const cruises = await pullCruises();
+        res.json(cruises);
+    } catch (error) {
+        res.status(500).json({ error: "Failed to load cruises" })
+    }
+});
 
-// ROOMS-POST 
+router.get('/staff', async (req: Request, res: Response) => {
+    try {
+        const staff = await pullStaff();
+        res.json(staff);
+    } catch (error) {
+        res.status(500).json({ error: "Failed to load staff members" })
+    }
+});
+
+// add to inventory features 
 router.post("/rooms", async (req: Request, res: Response) => {
     if (!(await ensureAdmin(req, res))) {
         return;
@@ -39,9 +79,41 @@ router.post("/rooms", async (req: Request, res: Response) => {
     }
 });
 
+router.post("/resources", async (req: Request, res: Response) => {
+    if (!(await ensureAdmin(req, res))) {
+        return;
+    }
 
+    const { name, category, quantity, status } = req.body;
 
-// ROOMS-DELETE - deletes room by cabin number
+    try {
+        const resourceId = await addResources(name, category, quantity, status);
+        res.status(201).json({
+            message: "Resource added",
+            resourceId
+        });
+    } catch (error: any) {
+        console.error(error);
+        res.status(400).json({ error: "Error when adding a resource" });
+    }
+});
+
+router.post("/staff", async (req: Request, res: Response) => {
+    const { name, role, email, shift } = req.body;
+
+    try {
+        const staffId = await addStaff({ name, role, email, shift });
+        res.status(201).json({
+            message: "Staff member added",
+            staffId
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Error adding staff member" })
+    }
+});
+
+// delete from inventory features
 router.delete('/rooms/:cabin_number', async (req: Request, res: Response) => {
     if (!(await ensureAdmin(req, res))) {
         return;
@@ -61,9 +133,26 @@ router.delete('/rooms/:cabin_number', async (req: Request, res: Response) => {
     }
 });
 
-// STAFF 
 
-// STAFF-DELETE - deletes staff by id 
+router.delete('/resources/:name', async (req: Request, res: Response) => {
+    if (!(await ensureAdmin(req, res))) {
+        return;
+    }
+
+    const name = req.params.name as string;
+
+    try {
+        const resourceId = await deleteResource(name);
+        if (resourceId !== undefined) {
+            return res.status(404).json({ message: "Resource not found" })
+        }
+
+        res.json({ message: "resource deleted successfully" });
+    } catch (error) {
+        res.status(500).json({ error: "failed to delete resource" });
+    }
+});
+
 router.delete('/staff/:id', async (req: Request, res: Response) => {
     const id = Number(req.params.id);
     if (isNaN(id)) {
@@ -82,35 +171,6 @@ router.delete('/staff/:id', async (req: Request, res: Response) => {
     }
 });
 
-// STAFF-POST
-router.post("/staff", async (req: Request, res: Response) => {
-    const { name, role, email, shift } = req.body;
-
-    try {
-        const staffId = await addStaff({ name, role, email, shift });
-        res.status(201).json({
-            message: "Staff member added",
-            staffId
-        });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: "Error adding staff member" })
-    }
-});
-
-// STAFF-GET - gets all staff 
-router.get('/staff', async (req: Request, res: Response) => {
-    try {
-        const staff = await pullStaff();
-        res.json(staff);
-    } catch (error) {
-        res.status(500).json({ error: "Failed to load staff members" })
-    }
-});
-
-// RESOURCES -- RES
-
-// RES-GETAVAILABLE - gets avaialbel at current time  
 router.get('/resources/availability', async(req: Request, res: Response) => {
     try {
                 const { resource_id, cruise_id, start_time, end_time } = req.query;
@@ -130,49 +190,5 @@ router.get('/resources/availability', async(req: Request, res: Response) => {
     res.status(400).json({ error: "failed to get availabiltiy"});
   }
 });
-
-// RES-DELETE
-router.delete('/resources/:name', async (req: Request, res: Response) => {
-    const name = req.params.name as string;
-
-    try {
-        const resourceId = await deleteResource(name);
-        if (resourceId !== undefined) {
-            return res.status(404).json({ message: "Resource not found" })
-        }
-
-        res.json({ message: "resource deleted successfully" });
-    } catch (error) {
-        res.status(500).json({ error: "failed to delete resource" });
-    }
-});
-
-// RES-POST
-router.post("/resources", async (req: Request, res: Response) => {
-    const { name, category, quantity, status } = req.body;
-
-    try {
-        const resourceId = await addResources(name, category, quantity, status);
-        res.status(201).json({
-            message: "Resource added",
-            resourceId
-        });
-    } catch (error: any) {
-        console.error(error);
-        res.status(400).json({ error: "Error when adding a resource" });
-    }
-});
-
-
-// RES-GETALL - gets all resources in inventory with total count 
-router.get('/resources', async (req: Request, res: Response) => {
-    try {
-        const items = await pullResources();
-        res.json(items);
-    } catch (error) {
-        res.status(500).json({ error: "Failed to load inventory" });
-    }
-});
-
 
 export default router; 
