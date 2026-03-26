@@ -4,6 +4,8 @@ import inventoryRoutes from "./routes/inventory.js";
 import authRoutes from "./routes/auth.js";
 import reservationRoutes from "./routes/reservations.js";
 import cookieParser from 'cookie-parser';
+import './notifications.js';
+
 
 const app = express();
 
