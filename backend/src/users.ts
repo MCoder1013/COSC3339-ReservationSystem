@@ -44,6 +44,30 @@ export async function getAllUsers() {
     return result;
 }
 
+export async function getStaffRoleByUserId(userId: number): Promise<string | null> {
+    const result = await sql`
+        SELECT role
+        FROM staff
+        WHERE staff_id = ${userId}
+        LIMIT 1
+    `;
+
+    return (result[0]?.role as string | undefined) ?? null;
+}
+
+export async function isUserStaffAdmin(userId: number): Promise<boolean> {
+    const staffRole = await getStaffRoleByUserId(userId);
+    return staffRole?.trim().toLowerCase() === 'admin';
+}
+
+export async function updateUserRole(userId: number, newRole: string): Promise<void> {
+    await sql`
+        UPDATE users
+        SET user_role = ${newRole}
+        WHERE id = ${userId}
+    `;
+}
+
 // Validate guest emails and return their user IDs
 export async function validateGuestEmails(emails: string[]): Promise<{ valid: boolean; userIds: number[]; invalidEmails: string[] }> {
     const userIds: number[] = [];

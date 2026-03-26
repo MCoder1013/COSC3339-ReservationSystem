@@ -115,6 +115,11 @@ router.post('/login', async (req: Request, res: Response) => {
     }
     // If email exists and password matches, login is successful
 
+    const staffRole = user.user_role === 'staff'
+      ? await database.getStaffRoleByUserId(user.id)
+      : null;
+    const isStaffAdmin = user.user_role === 'staff' && staffRole?.trim().toLowerCase() === 'admin';
+
     const token = jwt.sign({ id: user.id }, jwtSecret);
     res
       .cookie('jwt', token, {
@@ -125,7 +130,9 @@ router.post('/login', async (req: Request, res: Response) => {
         message: 'Login successful',
         userId: user.id,
         firstName: user.first_name,
-        role: user.user_role
+        role: user.user_role,
+        staffRole,
+        isStaffAdmin
       });
   } catch (err) {
     console.error(err);
@@ -146,6 +153,11 @@ router.get('/me', async (req: Request, res: Response) => {
     const user = await database.getUserById(decoded.id);
     if (!user) return res.status(404).json({ error: 'User not found' });
 
+    const staffRole = user.user_role === 'staff'
+      ? await database.getStaffRoleByUserId(user.id)
+      : null;
+    const isStaffAdmin = user.user_role === 'staff' && staffRole?.trim().toLowerCase() === 'admin';
+
     res.json({
       id: user.id,
       firstName: user.first_name,
@@ -154,6 +166,8 @@ router.get('/me', async (req: Request, res: Response) => {
       biography: user.biography,
       profilePicture: user.profile_picture,
       role: user.user_role,
+      staffRole,
+      isStaffAdmin
     });
   } catch {
     res.status(401).json({ error: 'Invalid token' });
@@ -243,5 +257,71 @@ export function getAuthenticatedUserId(req: Request): number | undefined {
   const decoded = jwt.verify(cookie, jwtSecret) as { id: number } | undefined;
   return decoded?.id
 }
+
+router.post('/update-user-role', async (req: Request, res: Response) => {
+  const token = req.cookies?.jwt;
+  if (!token) return res.status(401).json({ error: 'Not authenticated' });
+
+  try {
+    const decoded = jwt.verify(token, jwtSecret) as { id: number };
+    const currentUser = await database.getUserById(decoded.id);
+
+    if (!currentUser || currentUser.user_role !== 'staff') {
+      return res.status(403).json({ error: 'Forbidden: staff only' });
+    }
+
+    const isAdmin = await database.isUserStaffAdmin(decoded.id);
+    if (!isAdmin) {
+      return res.status(403).json({ error: 'Forbidden: admin only' });
+    }
+
+    const { userId, newRole } = req.body;
+
+    if (!userId || !newRole) {
+      return res.status(400).json({ error: 'Missing userId or newRole' });
+    }
+
+    if (!['normal', 'staff', 'admin'].includes(newRole)) {
+      return res.status(400).json({ error: 'Invalid role' });
+    }
+
+    const targetUser = await database.getUserById(userId);
+    if (!targetUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Update user role
+    if (newRole === 'admin') {
+      // Promote to admin: set user_role to 'staff' and add to staff table with role 'Admin'
+      await database.updateUserRole(userId, 'staff');
+      // Insert or update in staff table
+      await (database as any).sql`
+        INSERT INTO staff (staff_id, role, shift)
+        VALUES (${userId}, 'Admin', 'Day')
+        ON CONFLICT (staff_id)
+        DO UPDATE SET role = 'Admin'
+      `;
+    } else if (newRole === 'staff') {
+      // Demote to staff: set user_role to 'staff' and remove from staff table
+      await database.updateUserRole(userId, 'staff');
+      // Delete from staff table if exists
+      await (database as any).sql`
+        DELETE FROM staff WHERE staff_id = ${userId}
+      `;
+    } else {
+      // Downgrade to normal: set user_role to 'normal' and remove from staff table
+      await database.updateUserRole(userId, 'normal');
+      // Delete from staff table if exists
+      await (database as any).sql`
+        DELETE FROM staff WHERE staff_id = ${userId}
+      `;
+    }
+
+    res.json({ message: 'User role updated successfully' });
+  } catch (err) {
+    console.error('Update role error:', err);
+    res.status(500).json({ error: 'Failed to update user role' });
+  }
+});
 
 export default router; 
