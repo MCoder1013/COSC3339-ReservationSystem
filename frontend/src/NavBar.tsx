@@ -18,8 +18,10 @@ export default function NavBar({ shipName }: NavBarProps) {
     <>
       <header className="navbar">
         <div className="container headerRow">
-          <img src="images/StarlightPearlLogoWithName.png" 
-          alt="Starlight Pearl Cruises Logo" className="logo" />
+          <a href="/">
+            <img src="images/StarlightPearlLogoWithName.png"
+              alt="Starlight Pearl Cruises Logo" className="logo" />
+          </a>
           <h1>{shipName}</h1>
           <nav className="navLinks">
             {!isHomePage && <Link className="navButton" to="/">Home</Link>}
@@ -27,7 +29,7 @@ export default function NavBar({ shipName }: NavBarProps) {
             {user?.role === "staff" && <Link className="navButton" to="/reservations">Reservations</Link>}
             {user?.role === "staff" && <Link className="navButton" to="/view-users">Users</Link>}
             {user ? (
-              <button 
+              <button
                 className="userIconBtn"
                 onClick={() => setIsProfileOpen(true)}
                 title={user.firstName}
@@ -43,8 +45,8 @@ export default function NavBar({ shipName }: NavBarProps) {
         </div>
       </header>
 
-      <UserProfileModal 
-        isOpen={isProfileOpen} 
+      <UserProfileModal
+        isOpen={isProfileOpen}
         onClose={() => setIsProfileOpen(false)}
       />
     </>

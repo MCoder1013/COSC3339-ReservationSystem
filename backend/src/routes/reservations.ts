@@ -1,10 +1,12 @@
 import { Router, Request, Response } from 'express';
-import { getUserItemReservations, addReservation, deleteReservation, pullReservations, getAllReservationsWithDetails, getReservationsByUser, 
-    updateReservation, getUserRoomReservations, validateGuestEmails, addGuestsToReservation } from '../database.js';
+import { addReservation, deleteReservation, getAllReservationsWithDetails, getReservationsByUser,
+    updateReservation, getUserRoomReservations, getUserItemReservations, addGuestsToReservation } from '../reservations.js';
+import { validateGuestEmails } from '../users.js';
 import { getAuthenticatedUserId } from './auth.js';
 
 const router = Router();
 
+// RES-POST
 router.post("/reservations", async (req: Request, res: Response) => {
     // Need a safe way to get the user id and add it in since we are not getting that from the frontend
     const { cabin_id, resource_id, staff_id, start_time, end_time, quantity_reserved, additional_guest_emails } = req.body;
@@ -71,6 +73,7 @@ router.post("/reservations", async (req: Request, res: Response) => {
     }
 })
 
+// RES-POST
 router.post("/reservations/:id", async (req: Request, res: Response) => {
   const reservationId = Number(req.params.id);
   const user_id = getAuthenticatedUserId(req);
@@ -133,6 +136,7 @@ router.post("/reservations/:id", async (req: Request, res: Response) => {
   }
 });
 
+// RES-DELETE - deletes reservation by ID
 router.delete('/reservations/:id', async (req: Request, res: Response) => {
     const id = Number(req.params.id);
 
@@ -149,6 +153,7 @@ router.delete('/reservations/:id', async (req: Request, res: Response) => {
 });
 
 // Get all reservations with full details (includes joined room and resource data)
+// RES-GET - gets all reservations for everyone full information  
 router.get("/reservations", async (req: Request, res: Response) => {
     try {
         const result = await getAllReservationsWithDetails();
@@ -160,6 +165,7 @@ router.get("/reservations", async (req: Request, res: Response) => {
     }
 });
 
+// RES-GET-reservations - gets reservations for authenticated user 
 router.get("/my-reservations", async (req: Request, res: Response) => {
   const user_id = getAuthenticatedUserId(req);
 
@@ -177,7 +183,8 @@ router.get("/my-reservations", async (req: Request, res: Response) => {
 });
 
 
-// Get all item reservations for the authenticated user
+
+// RES-GET-ITEMS - gets items for authenticated user
 router.get('/reservations/items', async (req: Request, res: Response) => {
     try {
         const userId = getAuthenticatedUserId(req);
@@ -194,6 +201,7 @@ router.get('/reservations/items', async (req: Request, res: Response) => {
     }
 });
 
+// RES-GET-ROOMS - gets current rooms reservation for authenticated user
 router.get('/reservations/rooms', async (req: Request, res: Response) => {
     try {
         const userId = getAuthenticatedUserId(req);

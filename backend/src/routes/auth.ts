@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import * as argon2 from 'argon2';
-import * as database from '../database.js'
+import * as database from '../users.js'
 import jwt from 'jsonwebtoken';
 import multer from "multer";
 import path from "path";
