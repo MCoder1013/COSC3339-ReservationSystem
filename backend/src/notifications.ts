@@ -1,5 +1,9 @@
 import dotenv from 'dotenv';
 import { getItemFromID } from './resources.js';
+import cron from 'node-cron';
+import { sql } from './database.js';
+
+
 
 const nodemailer = require("nodemailer");
 dotenv.config();
@@ -24,15 +28,40 @@ interface NewReservation {
 
 
 
-async function sendEmailNotificationToUser(userEmail: string, reservation: NewReservation) {
+async function sendEmailNotificationToUserForResource(userEmail: string, reservation: NewReservation) {
     await transporter.sendMail({
         from: process.env.EMAIL, 
         to: userEmail, 
         subject: "Reservation happening soon", 
          html: `
-        <h2>Your table is almost ready!</h2>
+        <h2>Upcoming Reservation</h2>
         <p>Your reservation for <strong>${await getItemFromID(reservation.user_id)}</strong> 
          is coming up at ${reservation.start_time}.</p>
     `
     });
+}
+
+
+// check for upcoming reservations every min 
+cron.schedule('0 * * * * *', async () => {
+    const upcoming = await checkUpcomingReservations(10);
+
+    for(const reservation of upcoming) {
+        await sendEmailNotificationToUserForResource(reservation.email, reservation);
+    }
+});
+
+
+// Query to check for upcoming reservations
+async function checkUpcomingReservations(minsAhead: number): Promise<(NewReservation & { email: string })[]>  {
+
+ const rows = await sql`                                                                                                                                                                                         
+          SELECT r.*, u.email                                                                                                                                                                                         
+          FROM reservations r                                                                                                                                                                                       
+          JOIN users u ON r.user_id = u.id
+          WHERE r.start_time > NOW() + (${minsAhead - 1} || ' minutes')::interval                                                                                                                                     
+            AND r.start_time <= NOW() + (${minsAhead} || ' minutes')::interval
+      `;   
+
+    return rows as any[] as (NewReservation & { email: string })[];
 }
