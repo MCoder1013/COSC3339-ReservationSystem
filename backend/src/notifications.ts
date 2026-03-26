@@ -29,45 +29,39 @@ interface NewReservation {
 
 
 async function sendEmailNotificationToUserForResource(userEmail: string, reservation: NewReservation) {
-    await transporter.sendMail({
-        from: process.env.EMAIL, 
-        to: userEmail, 
-        subject: "Reservation happening soon", 
-         html: `
-        <h2>Upcoming Reservation</h2>
-        <p>Your reservation for <strong>${await getItemFromID(reservation.resource_id)}</strong> 
-         is coming up at ${reservation.start_time}.</p>
-    `
+    try {
+        if(reservation.resource_id != null) {
+            await transporter.sendMail({
+            from: process.env.EMAIL, 
+            to: userEmail, 
+            subject: "Reservation happening soon", 
+            html: `
+            <h2>Upcoming Reservation</h2>
+            <p>Your reservation for <strong>${await getItemFromID(reservation.resource_id)}</strong> 
+            is coming up at ${reservation.start_time}.</p>
+            `
     });
+    }
+    }catch(error) {
+        console.error("error sending email notification", error); 
+        throw error; 
+    }
 }
 
 cron.schedule('0 * * * * *', async () => {
-    console.log('cron running...'); // confirm cron is firing
     const upcoming = await checkUpcomingReservations(10);
-    console.log('upcoming reservations:', upcoming); // see what's returned
     for(const reservation of upcoming) {
-        console.log('sending email to:', reservation.email);
         await sendEmailNotificationToUserForResource(reservation.email, reservation);
-        console.log('email sent!');
     }
 });
 
 
-// // check for upcoming reservations every min 
-// cron.schedule('0 * * * * *', async () => {
-//     const upcoming = await checkUpcomingReservations(10);
 
-//     for(const reservation of upcoming) {
-//         await sendEmailNotificationToUserForResource(reservation.email, reservation);
-//     }
-// });
 
 
 // Query to check for upcoming reservations
 async function checkUpcomingReservations(minsAhead: number): Promise<(NewReservation & { email: string })[]>  {
 
-    const all = await sql`SELECT id, start_time FROM reservations WHERE start_time > NOW() LIMIT 5`;                                                                                                                    
-    console.log('upcoming reservations in db:', all); 
     const rows = await sql`                                                                                                                                                                                             
       SELECT r.*, u.email                                                                                                                                                                                             
       FROM reservations r
