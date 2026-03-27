@@ -48,3 +48,13 @@ export async function deleteStaff(id: number): Promise<number | undefined> {
         throw error;
     }
 }
+
+
+export async function getStaffNameFromID(id: number): Promise<string> {
+
+    const staffName = await sql`
+    SELECT name FROM staff WHERE id = ${id}
+    `;
+
+    return staffName[0].name; 
+}
