@@ -12,7 +12,9 @@ const { user } = useAuth();
 
 const canEditInventory = user?.role === "staff" && Boolean(user.canEditInventory);
 
-const [formError, setFormError] = useState<string>("");
+  const [formError, setFormError] = useState<string>("");
+
+  const [secondaryFilter, setSecondaryFilter] = useState("All");
 
   //tabs
   const categories = ["Rooms", "Items"] as const;
@@ -53,24 +55,51 @@ const [formError, setFormError] = useState<string>("");
   //delete form state
   const [deleteId, setDeleteId] = useState("");
 
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("All");
+
   //fetch data from backend API
   useEffect(() => {
     const loadInventory = async () => {
       try {
-        const roomsData = await fetchData("/api/rooms");
-        const itemsData = await fetchData("/api/resources");
-
-        setInventoryData({
-          Rooms: roomsData,
-          Items: itemsData,
-        });
+        if (activeCategory === "Rooms") {
+          const roomsData = await fetchData("/api/rooms");
+          setInventoryData((prev) => ({
+            ...prev,
+            Rooms: roomsData,
+          }));
+        } else {
+          const itemsData = await fetchData("/api/resources");
+          setInventoryData((prev) => ({
+            ...prev,
+            Items: itemsData,
+          }));
+        }
       } catch (error) {
         console.error("Error fetching inventory:", error);
       }
     };
 
     loadInventory();
-  }, []);
+  }, [activeCategory]);
+
+  const filteredData = inventoryData[activeCategory].filter((item) => {
+    const search = searchTerm.toLowerCase();
+
+    if (activeCategory === "Rooms") {
+      return (
+        item.cabin_number.toLowerCase().includes(search) &&
+        (statusFilter === "All" || item.status === statusFilter) &&
+        (secondaryFilter === "All" || item.type === secondaryFilter)
+      );
+    } else {
+      return (
+        item.name.toLowerCase().includes(search) &&
+        (statusFilter === "All" || item.status === statusFilter) &&
+        (secondaryFilter === "All" || item.category === secondaryFilter)
+      );
+    }
+  });
 
 
   //form submission
@@ -195,7 +224,10 @@ const [formError, setFormError] = useState<string>("");
           {categories.map((category) => (
             <button
               key={category}
-              onClick={() => setActiveCategory(category)}
+              onClick={() => {setActiveCategory(category);
+                   setSearchTerm("");
+                  setStatusFilter("All");
+                  setSecondaryFilter("All");}}
               className={activeCategory === category ? "activeTab" : ""}
             >
               {category}
@@ -214,6 +246,58 @@ const [formError, setFormError] = useState<string>("");
         ) : (
           <p>View-only mode: only admin staff can edit inventory.</p>
         )}
+
+        <br />
+        <br />
+
+        <div className="filterBar">
+          <input
+            type="text"
+            placeholder={`Search ${activeCategory}`}
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="searchInput"
+          />
+
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="filterSelect"
+          >
+            <option value="All">All Status</option>
+            <option value="Available">Available</option>
+            <option value="Unavailable">Unavailable</option>
+            <option value="Maintenance">Maintenance</option>
+            {activeCategory === "Items" && <option value="Out">Out</option>}
+          </select>
+          
+          <select
+            value={secondaryFilter}
+            onChange={(e) => setSecondaryFilter(e.target.value)}
+            className="filterSelect"
+          >
+            <option value="All">
+              {activeCategory === "Rooms" ? "All Room Types" : "All Categories"}
+            </option>
+
+            {activeCategory === "Rooms" ? (
+              <>
+                <option value="Economy">Economy</option>
+                <option value="Oceanview">Oceanview</option>
+                <option value="Balcony">Balcony</option>
+                <option value="Suite">Suite</option>
+              </>
+            ) : (
+              <>
+                <option value="Gear">Gear</option>
+                <option value="Medical">Medical</option>
+                <option value="Event">Event</option>
+                <option value="Cleaning">Cleaning</option>
+                <option value="Other">Other</option>
+              </>
+            )}
+          </select>
+        </div>
 
         {/*changes table dynamically */}
         <table className="inventoryTable">
@@ -235,7 +319,7 @@ const [formError, setFormError] = useState<string>("");
           </thead>
 
           <tbody>
-            {inventoryData[activeCategory].map((item) =>
+            {filteredData.map((item) =>
               activeCategory === "Rooms" ? (
                 <tr key={item.id}>
                   <td>{item.cabin_number}</td>

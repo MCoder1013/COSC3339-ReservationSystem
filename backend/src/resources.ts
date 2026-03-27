@@ -137,3 +137,17 @@ export async function countRemaining(
 
     return availableQuantity;
 }
+
+
+export async function getItemFromID (id : number) { 
+    const resourceRows = await sql`SELECT name FROM resources WHERE id = ${id}`;
+     
+    if(resourceRows.length == 0) {
+        throw new Error("Resource not found"); 
+    }
+
+    const resourceID = resourceRows[0].name;
+
+    return resourceID;
+
+}
