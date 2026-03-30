@@ -6,7 +6,19 @@ export async function tryRegister(firstName: string, lastName: string, email: st
             (first_name, last_name, email, password_hash, user_role)
         VALUES
             (${firstName}, ${lastName}, ${email}, ${passwordHash}, ${role})
+        RETURNING id;
     `;
+
+    return result[0].id;
+}
+
+export async function insertStaff(staff_id: number, role: string, shift: string) {
+  await sql`
+    INSERT INTO staff
+      (staff_id, role, shift)
+    VALUES
+      (${staff_id}, ${role}, ${shift});
+  `;
 }
 
 export async function getUserByEmail(email: string) {

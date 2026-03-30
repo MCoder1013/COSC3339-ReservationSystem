@@ -19,72 +19,84 @@ if (!jwtSecret) {
   jwtSecret = 'devsecret'
 }
 
-router.post('/register', async (req, res) => {
+router.post('/register', async (req, res) => { 
   const firstName = req.body.firstName;
   const lastName = req.body.lastName;
   let email = req.body.email;
   const password = req.body.password;
   const confirmPassword = req.body.confirmPassword;
   const employeeCode = req.body.employeeCode;
-  const role = employeeCode === process.env.EMPLOYEE_CODE ? "staff" : "normal";
+
+  let userRole = "normal";
+  let staffRole = null;
+
+  if (employeeCode === process.env.ADMIN_CODE) {
+    userRole = "staff";
+    staffRole = "admin";
+  } else if (employeeCode === process.env.CREW_CODE) {
+    userRole = "staff";
+    staffRole = "crew";
+  }
 
   email = email.toLowerCase();
 
   const emailValid = emailRegex.test(email);
   if (!emailValid) {
-    return res.status(400).json({
-      'error': 'invalid email'
-    });
+    return res.status(400).json({ error: 'invalid email' });
   }
 
   if (password !== confirmPassword) {
     return res.status(400).json({
-      'error': 'password and confirmed password do not match'
+      error: 'password and confirmed password do not match'
     });
   }
 
   if (password.length > 100) {
-    return res.status(400).json({
-      error: 'Password is too long'
-    });
+    return res.status(400).json({ error: 'Password is too long' });
   } else if (password.length < 8) {
-    return res.status(400).json({
-      error: 'Password is too short'
-    });
+    return res.status(400).json({ error: 'Password is too short' });
   } else if (!(/[a-zA-Z]/.test(password))) {
-    return res.status(400).json({
-      error: 'Password must contain letters'
-    });
+    return res.status(400).json({ error: 'Password must contain letters' });
   } else if (!(/[0-9]/.test(password))) {
-    return res.status(400).json({
-      error: 'Password must contain numbers'
-    });
+    return res.status(400).json({ error: 'Password must contain numbers' });
   } else if (!(/[@$!%*#?&]/.test(password))) {
-    return res.status(400).json({
-      error: 'Password must contain a special character'
-    });
+    return res.status(400).json({ error: 'Password must contain a special character' });
   }
 
   const passwordHash = await argon2.hash(password);
 
+  let userId;
+
   try {
-    await database.tryRegister(firstName, lastName, email, passwordHash, role);
+    // ✅ MUST RETURN insertId from this function
+    userId = await database.tryRegister(firstName, lastName, email, passwordHash, userRole);
   } catch (err) {
     if ((err as any).code === 'ER_DUP_ENTRY') {
       return res.status(400).json({
         error: 'User with that email already exists'
-      })
+      });
     }
-    console.error('Unknown registration error:', err)
+    console.error('Unknown registration error:', err);
     return res.status(400).json({
       error: 'Unknown error!'
-    })
+    });
+  }
+
+  if (userRole === "staff" && staffRole) {
+    try {
+      await database.insertStaff(userId, staffRole, "day");
+    } catch (err) {
+      console.error('Error inserting staff:', err);
+      return res.status(500).json({
+        error: 'Error creating staff record'
+      });
+    }
   }
 
   res.json({
     message: 'Successfully registered!'
   });
-})
+});
 
 
 // Additional login information for authorization
