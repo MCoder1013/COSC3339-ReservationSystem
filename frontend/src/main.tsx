@@ -10,6 +10,7 @@ import ReservationTable from "./ReservationViewTable";
 import UserReservationTable from "./UserReservationViewTable";
 import Reservation from "./Reservation";
 import ViewUsers from "./ViewAllUsers"
+import Analytics from "./Analytics";
 import "./index.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
@@ -25,6 +26,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           <Route path="/user-reservations" element={<UserReservationTable />} />
           <Route path="/reservation" element={<Reservation />} />
           <Route path="/view-users" element={<ViewUsers />} />
+          <Route path="/analytics" element={<Analytics />} />
         </Routes>
       </AuthProvider>
     </BrowserRouter>

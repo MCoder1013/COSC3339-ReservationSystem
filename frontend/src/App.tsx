@@ -59,6 +59,16 @@ export default function App() {
                     </button>
                   </div>
                 )}
+
+                {user.role === "staff" && user.canEditInventory && (
+                  <div className="dashboardCard">
+                    <h3>Analytics</h3>
+                    <p>Review cruise performance and reporting insights</p>
+                    <button onClick={() => navigate("/analytics")} className="primaryBtn">
+                      Open Analytics
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </section>
