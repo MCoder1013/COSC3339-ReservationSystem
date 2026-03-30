@@ -3,6 +3,8 @@ import { pullRooms, addRoom, deleteRoom } from '../rooms.js';
 import { pullResources, addResources, deleteResource, countRemaining } from '../resources.js';
 import { pullStaff, addStaff, deleteStaff } from '../staff.js';
 import { pullCruises } from '../cruises.js';
+import { getAuthenticatedUserId } from './auth.js';
+import { isUserStaffAdmin } from '../users.js';
 
 const router = Router();
 
