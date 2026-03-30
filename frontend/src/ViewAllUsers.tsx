@@ -2,13 +2,18 @@
 import { useState, useEffect } from "react";
 import "./App.css";
 import { fetchData } from "./api";
+import { useAuth } from "./AuthContext";
 import NavBar from "./NavBar";
 
 export default function ViewAllUsers() {
   const shipName = "Starlight Pearl Cruises";
+  const { user } = useAuth();
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [formError, setFormError] = useState<string>("");
+  const [showRoleModal, setShowRoleModal] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<any>(null);
+  const [newRole, setNewRole] = useState<string>("normal");
 
   const loadUsers = async () => {
     setLoading(true);
@@ -62,6 +67,42 @@ export default function ViewAllUsers() {
     loadUsers();
   }, []);
 
+  const handleEditRole = (userRow: any) => {
+    setSelectedUser(userRow);
+    setNewRole("normal");
+    setShowRoleModal(true);
+  };
+
+  const handleRoleUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedUser) return;
+
+    try {
+      const response = await fetch("/api/auth/update-user-role", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: selectedUser.id,
+          newRole: newRole,
+        }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        setFormError(data.error || "Failed to update user role");
+        return;
+      }
+
+      setFormError("");
+      setShowRoleModal(false);
+      setSelectedUser(null);
+      loadUsers(); // Refresh the user list
+    } catch (error) {
+      console.error("Error updating role:", error);
+      setFormError("An error occurred while updating the role.");
+    }
+  };
+
   return (
     <div className="page">
       <NavBar shipName={shipName} />
@@ -87,21 +128,73 @@ export default function ViewAllUsers() {
                 <th>Total Reservations</th>
                 <th>Past Reservations</th>
                 <th>Upcoming Reservations</th>
+                {user?.canEditInventory && <th>Actions</th>}
               </tr>
             </thead>
             <tbody>
-              {users.map((user) => (
-                <tr key={user.id}>
-                  <td>{user.id}</td>
-                  <td>{user.email}</td>
-                  <td>{user.daysRegistered}</td>
-                  <td>{user.totalReservations}</td>
-                  <td>{user.pastReservations}</td>
-                  <td>{user.upcomingReservations}</td>
+              {users.map((userRow) => (
+                <tr key={userRow.id}>
+                  <td>{userRow.id}</td>
+                  <td>{userRow.email}</td>
+                  <td>{userRow.daysRegistered}</td>
+                  <td>{userRow.totalReservations}</td>
+                  <td>{userRow.pastReservations}</td>
+                  <td>{userRow.upcomingReservations}</td>
+                  {user?.canEditInventory && (
+                    <td>
+                      <button
+                        className="primaryBtn"
+                        onClick={() => handleEditRole(userRow)}
+                        style={{ padding: "5px 10px", fontSize: "12px" }}
+                      >
+                        Edit Role
+                      </button>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
           </table>
+        )}
+
+        {showRoleModal && selectedUser && (
+          <div className="modal" onClick={() => setShowRoleModal(false)}>
+            <div className="modalContent" onClick={(e) => e.stopPropagation()}>
+              <h3>Edit User Role</h3>
+              <p>User: {selectedUser.email}</p>
+
+              <form onSubmit={handleRoleUpdate}>
+                <label>
+                  New Role:
+                  <select
+                    value={newRole}
+                    onChange={(e) => setNewRole(e.target.value)}
+                  >
+                    <option value="normal">Normal User</option>
+                    <option value="staff">Staff</option>
+                    <option value="admin">Admin (Staff with Admin role)</option>
+                  </select>
+                </label>
+
+                <br />
+                <br />
+
+                {formError && <div className="errorMessage">{formError}</div>}
+
+                <button type="submit" className="primaryBtn">
+                  Update Role
+                </button>
+                <button
+                  type="button"
+                  className="deleteButton"
+                  onClick={() => setShowRoleModal(false)}
+                  style={{ marginLeft: "10px" }}
+                >
+                  Cancel
+                </button>
+              </form>
+            </div>
+          </div>
         )}
       </main>
 

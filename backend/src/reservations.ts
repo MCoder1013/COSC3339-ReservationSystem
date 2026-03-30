@@ -6,6 +6,7 @@ type ReservationStatus = 'Pending' | 'Confirmed' | 'Cancelled';
 
 interface ReservationCheck {
     id: number
+    cruise_id: number | null
     start_time: string
     end_time: string
 }
@@ -15,6 +16,7 @@ interface NewReservation {
     cabin_id: number
     resource_id: number
     staff_id: number
+    cruise_id: number | null
     start_time: string
     end_time: string
     quantity_reserved: number
@@ -26,6 +28,7 @@ interface Reservation {
     cabin_id: number
     resource_id: number
     staff_id: number
+    cruise_id: number | null
     start_time: string
     end_time: string
     status: ReservationStatus
@@ -39,6 +42,7 @@ async function checkResourceTime(r: ReservationCheck, sql: TransactionSql<{}>) {
         SELECT id FROM reservations
         WHERE
             resource_id = ${r.id}
+            AND cruise_id IS NOT DISTINCT FROM ${r.cruise_id}
             AND start_time < ${r.end_time}
             AND end_time > ${r.start_time}
     `;
@@ -53,6 +57,7 @@ async function checkCabinTime(r: ReservationCheck, sql: TransactionSql<{}>) {
         SELECT id FROM reservations
         WHERE
             cabin_id = ${r.id}
+            AND cruise_id IS NOT DISTINCT FROM ${r.cruise_id}
             AND start_time < ${r.end_time}
             AND end_time > ${r.start_time}
     `;
@@ -67,6 +72,7 @@ async function checkStaffTime(r: ReservationCheck, sql: TransactionSql<{}>) {
         SELECT id FROM reservations
         WHERE
             staff_id = ${r.id}
+            AND cruise_id IS NOT DISTINCT FROM ${r.cruise_id}
             AND start_time < ${r.end_time}
             AND end_time > ${r.start_time}
     `;
@@ -87,7 +93,8 @@ export async function addReservationWithTransaction(sql: postgres.TransactionSql
         await checkStaffTime({
             start_time: r.start_time,
             end_time: r.end_time,
-            id: r.staff_id
+            id: r.staff_id,
+            cruise_id: r.cruise_id
         }, sql);
     }
 
@@ -95,7 +102,8 @@ export async function addReservationWithTransaction(sql: postgres.TransactionSql
         await checkCabinTime({
             start_time: r.start_time,
             end_time: r.end_time,
-            id: r.cabin_id
+            id: r.cabin_id,
+            cruise_id: r.cruise_id
         }, sql);
     }
 
@@ -105,10 +113,10 @@ export async function addReservationWithTransaction(sql: postgres.TransactionSql
 
     const result = await sql`
         INSERT INTO reservations
-            (user_id, cabin_id, resource_id, staff_id,
+            (user_id, cabin_id, resource_id, staff_id, cruise_id,
             start_time, end_time, quantity_reserved)
         VALUES
-            (${r.user_id}, ${r.cabin_id}, ${r.resource_id}, ${r.staff_id},
+            (${r.user_id}, ${r.cabin_id}, ${r.resource_id}, ${r.staff_id}, ${r.cruise_id},
             ${r.start_time}, ${r.end_time}, ${r.quantity_reserved})
         RETURNING id
     `;
@@ -133,7 +141,7 @@ export async function pullReservations(): Promise<Reservation[]> {
 
     const rows = await sql`
         SELECT
-            r.id, user_id, cabin_id, resource_id, staff_id, start_time, end_time, r.status, r.created_at, r.quantity_reserved, u.email
+            r.id, user_id, cabin_id, resource_id, staff_id, cruise_id, start_time, end_time, r.status, r.created_at, r.quantity_reserved, u.email
         FROM
             reservations r,
             users u
@@ -155,6 +163,7 @@ export async function getAllReservationsWithDetails() {
                 r.cabin_id,
                 r.resource_id,
                 r.staff_id,
+                r.cruise_id,
                 r.start_time,
                 r.end_time,
                 r.status,
@@ -166,11 +175,13 @@ export async function getAllReservationsWithDetails() {
                 c.type,
                 c.deck,
                 c.capacity,
+                cr.cruise_name,
                 res.name AS resource_name,
                 res.category
             FROM reservations r
             LEFT JOIN users u ON r.user_id = u.id
             LEFT JOIN cabins c ON r.cabin_id = c.id
+            LEFT JOIN cruises cr ON r.cruise_id = cr.id
             LEFT JOIN resources res ON r.resource_id = res.id
             ORDER BY r.start_time DESC
         `;
@@ -189,14 +200,17 @@ export async function getReservationsByUser(userId: number): Promise<RowList<Row
             r.end_time,
             r.resource_id,
             r.cabin_id,
+            r.cruise_id,
             r.quantity_reserved,
             u.email,
+            cr.cruise_name,
             res.name AS resource_name,
             c.cabin_number
         FROM reservations r
         JOIN users u ON r.user_id = u.id
         LEFT JOIN resources res ON r.resource_id = res.id
         LEFT JOIN cabins c ON r.cabin_id = c.id
+        LEFT JOIN cruises cr ON r.cruise_id = cr.id
         WHERE r.user_id = ${userId}
         ORDER BY r.start_time DESC
     `;
@@ -220,12 +234,15 @@ export async function getUserItemReservations(userId: number) {
                 u.last_name,
                 res.name AS resource_name,
                 res.category,
+                r.cruise_id,
+                cr.cruise_name,
                 r.start_time,
                 r.end_time,
                 r.status
             FROM reservations r
             JOIN users u ON r.user_id = u.id
             JOIN resources res ON r.resource_id = res.id
+            LEFT JOIN cruises cr ON r.cruise_id = cr.id
             WHERE r.user_id = ${userId} AND r.resource_id IS NOT NULL
             ORDER BY r.start_time DESC
         `;
@@ -244,12 +261,15 @@ export async function getUserRoomReservations(userId: number) {
                 u.first_name,
                 u.last_name,
                 c.cabin_number,
+                r.cruise_id,
+                cr.cruise_name,
                 r.start_time,
                 r.end_time,
                 r.status
             FROM reservations r
             JOIN users u ON r.user_id = u.id
             JOIN cabins c ON r.cabin_id = c.id
+            LEFT JOIN cruises cr ON r.cruise_id = cr.id
             WHERE r.user_id = ${userId}
                 AND r.cabin_id IS NOT NULL
             ORDER BY r.start_time DESC
