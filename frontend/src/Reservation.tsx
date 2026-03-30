@@ -8,6 +8,7 @@ import "react-date-picker/dist/DatePicker.css";
 import "react-calendar/dist/Calendar.css";
 import { formatInTimeZone } from 'date-fns-tz';
 import NavBar from "./NavBar";
+import { useAuth } from "./useAuth";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -16,16 +17,27 @@ type Value = ValuePiece | [ValuePiece, ValuePiece];
 
 export default function Reservation() {
   const shipName = "Starlight Pearl Cruises";
+  const { user } = useAuth();
 
 
 
   const [formError, setFormError] = useState<string>("");
   const [currentAvailability, setCurrentAvailability] = useState<number | null>(null);
   const categories = ["Items", "Rooms", "Packages"] as const;
+  const isStaffUser = user?.role === "staff";
+  const visibleCategories = isStaffUser
+    ? categories.filter((category) => category !== "Rooms")
+    : categories;
 
   //current selected tab/category
   const [activeCategory, setActiveCategory] =
     useState<(typeof categories)[number]>("Items");
+
+  useEffect(() => {
+    if (isStaffUser && activeCategory === "Rooms") {
+      setActiveCategory("Items");
+    }
+  }, [isStaffUser, activeCategory]);
   
   //available items from database
   const [availableItems, setAvailableItems] = useState<any[]>([]);
@@ -614,6 +626,11 @@ useEffect(() => {
 
     setFormError("");
 
+    if (isStaffUser && activeCategory === "Rooms") {
+      setFormError("Staff users cannot create room reservations.");
+      return;
+    }
+
     if (activeCategory === "Items") {
       //validate item selection
       if (!itemReservationForm.itemId) {
@@ -822,7 +839,7 @@ useEffect(() => {
 
         {/*buttons to switch tabs */}
         <div className="tabButtons">
-          {categories.map((category) => (
+          {visibleCategories.map((category) => (
             <button
               key={category}
               onClick={() => setActiveCategory(category)}

@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { addReservation, deleteReservation, getAllReservationsWithDetails, getReservationsByUser,
     updateReservation, getUserRoomReservations, getUserItemReservations, addGuestsToReservation } from '../reservations.js';
-import { validateGuestEmails } from '../users.js';
+import { validateGuestEmails, getUserById } from '../users.js';
 import { getAuthenticatedUserId } from './auth.js';
 
 const router = Router();
@@ -17,6 +17,15 @@ router.post("/reservations", async (req: Request, res: Response) => {
     }
 
     try {
+      const currentUser = await getUserById(user_id);
+      if (!currentUser) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      if (currentUser.user_role === 'staff' && cabin_id != null) {
+        return res.status(403).json({ error: 'Staff users cannot create room reservations' });
+      }
+
         // Validate additional guest emails if provided
         if (additional_guest_emails && Array.isArray(additional_guest_emails) && additional_guest_emails.length > 0) {
             const validation = await validateGuestEmails(additional_guest_emails);
