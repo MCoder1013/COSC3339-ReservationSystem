@@ -838,8 +838,11 @@ useEffect(() => {
 
         {/*reservation form */}
         <div className="reservationForm">
-          <form onSubmit={handleReservationSubmit}>
-            {activeCategory === "Items" ? (
+          {activeCategory === "Packages" ? (
+            <PackageEventsTab />
+          ) : (
+            <form onSubmit={handleReservationSubmit}>
+              {activeCategory === "Items" ? (
               <>
                 <label>
                   Select Item:
@@ -942,7 +945,7 @@ useEffect(() => {
                   </select>
                 </label>
               </>
-            ) : activeCategory === "Rooms" ? (
+            ) : (
               <>
                 <label>
                   Select Room:
@@ -1073,22 +1076,19 @@ useEffect(() => {
                   )}
                 </div>
               </>
-            ) : (
-              <PackageEventsTab />
-            )}
+              )}
 
-            {formError && (
-              <div className="errorMessage">
-                {formError}
-              </div>
-            )}
+              {formError && (
+                <div className="errorMessage">
+                  {formError}
+                </div>
+              )}
 
-            {(activeCategory === "Items" || activeCategory === "Rooms") && (
               <button type="submit" className="submitButton">
                 Submit Reservation
               </button>
-            )}
-          </form>
+            </form>
+          )}
         </div>
       </main>
       <footer className="footer">

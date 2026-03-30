@@ -6,7 +6,7 @@ import DatePicker from 'react-date-picker';
 import 'react-date-picker/dist/DatePicker.css';
 import 'react-calendar/dist/Calendar.css';
 
-const API_URL = import.meta.env.VITE_API_URL;
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 const MIDNIGHT_NEXT_DAY = '__MIDNIGHT_NEXT_DAY__';
 
 type Shift = 'Morning' | 'Day' | 'Night';
@@ -135,6 +135,7 @@ export default function PackageEventsTab() {
   const [resources, setResources] = useState<any[]>([]);
   const [staffMembers, setStaffMembers] = useState<any[]>([]);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [formState, setFormState] = useState<EventFormState>(emptyForm);
 
   const canCreate = user?.role === 'staff';
@@ -302,6 +303,7 @@ export default function PackageEventsTab() {
 
   const resetForm = () => {
     setFormState(emptyForm);
+    setSuccess('');
   };
 
   const validateForm = () => {
@@ -363,6 +365,7 @@ export default function PackageEventsTab() {
   const submitForm = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setSuccess('');
 
     const validationError = validateForm();
     if (validationError) {
@@ -398,12 +401,22 @@ export default function PackageEventsTab() {
         body: JSON.stringify(payload),
       });
 
-      const body = await response.json().catch(() => null);
+      const contentType = response.headers.get('content-type') || '';
+      const body = contentType.includes('application/json')
+        ? await response.json().catch(() => null)
+        : null;
+
       if (!response.ok) {
         throw new Error(body?.error || 'Could not save the event. Please try again.');
       }
 
+      if (!body || typeof body.eventId !== 'number') {
+        throw new Error('The server response was invalid. The event may not have been saved.');
+      }
+
       resetForm();
+      setSuccess(`Event created successfully (ID: ${body.eventId}).`);
+      window.dispatchEvent(new CustomEvent('package-events-updated'));
     } catch (err: any) {
       console.error(err);
       setError(err.message || 'Could not save the event. Please try again.');
@@ -415,6 +428,8 @@ export default function PackageEventsTab() {
       {canCreate && (
         <div style={{ marginBottom: '24px', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '8px', padding: '16px' }}>
           <h3 style={{ marginTop: 0 }}>Create Event</h3>
+          {error && <div className="errorMessage" style={{ marginBottom: '10px' }}>{error}</div>}
+          {success && <div style={{ color: '#0f7b0f', marginBottom: '10px' }}>{success}</div>}
           <form onSubmit={submitForm}>
             <label>
               Event Name:
@@ -585,8 +600,6 @@ export default function PackageEventsTab() {
           </form>
         </div>
       )}
-
-      {error && <div className="errorMessage">{error}</div>}
 
       {!canCreate && <p>Only staff can create events.</p>}
     </div>

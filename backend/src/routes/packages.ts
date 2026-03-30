@@ -5,6 +5,7 @@ import {
     getPackageEventById,
     joinPackageEvent,
     listActivePackageEvents,
+    listJoinedPackageEvents,
     updatePackageEvent,
     type PackageEventInput,
 } from '../packages.js';
@@ -114,6 +115,21 @@ router.get('/packages/events', async (req: Request, res: Response) => {
     } catch (error) {
         console.error('Failed to list package events:', error);
         res.status(500).json({ error: 'Unable to load package events right now.' });
+    }
+});
+
+router.get('/packages/my-events', async (req: Request, res: Response) => {
+    const userId = getSafeAuthenticatedUserId(req);
+    if (!userId) {
+        return res.status(401).json({ error: 'Please sign in to continue.' });
+    }
+
+    try {
+        const events = await listJoinedPackageEvents(userId);
+        res.json(events);
+    } catch (error) {
+        console.error('Failed to list joined package events:', error);
+        res.status(500).json({ error: 'Unable to load your package events right now.' });
     }
 });
 

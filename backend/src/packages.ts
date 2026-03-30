@@ -15,12 +15,53 @@ function minutesSinceMidnightUTC(d: Date) {
     return d.getUTCHours() * 60 + d.getUTCMinutes();
 }
 
-function minutesSinceMidnightLocal(d: Date) {
-    return d.getHours() * 60 + d.getMinutes();
+const SHIFT_TIME_ZONE = process.env.SHIFT_TIME_ZONE || 'America/Chicago';
+
+const shiftTimeFormatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: SHIFT_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+});
+
+function getShiftTimeParts(date: Date) {
+    const parts = shiftTimeFormatter.formatToParts(date);
+    const map = Object.fromEntries(parts.map((p) => [p.type, p.value]));
+
+    const year = Number(map.year);
+    const month = Number(map.month);
+    const day = Number(map.day);
+    const hour = Number(map.hour);
+    const minute = Number(map.minute);
+
+    return {
+        year,
+        month,
+        day,
+        hour,
+        minute,
+        dayIndex: Math.floor(Date.UTC(year, month - 1, day) / 86400000),
+    };
 }
 
-function getStartOfLocalDay(d: Date) {
-    return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+function minutesSinceMidnightShiftTime(d: Date) {
+    const parts = getShiftTimeParts(d);
+    return parts.hour * 60 + parts.minute;
+}
+
+function isSameShiftDay(a: Date, b: Date) {
+    const left = getShiftTimeParts(a);
+    const right = getShiftTimeParts(b);
+    return left.year === right.year && left.month === right.month && left.day === right.day;
+}
+
+function isNextShiftDay(a: Date, b: Date) {
+    const left = getShiftTimeParts(a);
+    const right = getShiftTimeParts(b);
+    return right.dayIndex === left.dayIndex + 1;
 }
 
 function roundUpToNextThirtyMinutes(d: Date) {
@@ -54,34 +95,23 @@ function isNextUtcDay(a: Date, b: Date) {
 }
 
 function isWithinShiftWindow(shift: string, start: Date, end: Date): boolean {
-    const startMinutes = minutesSinceMidnightLocal(start);
-    const endMinutes = minutesSinceMidnightLocal(end);
+    const startMinutes = minutesSinceMidnightShiftTime(start);
+    const endMinutes = minutesSinceMidnightShiftTime(end);
 
-    const isSameLocalDay = (
-        start.getFullYear() === end.getFullYear() &&
-        start.getMonth() === end.getMonth() &&
-        start.getDate() === end.getDate()
-    );
-
-    const nextStartDay = getStartOfLocalDay(start);
-    nextStartDay.setDate(nextStartDay.getDate() + 1);
-    const isNextLocalDay = (
-        nextStartDay.getFullYear() === end.getFullYear() &&
-        nextStartDay.getMonth() === end.getMonth() &&
-        nextStartDay.getDate() === end.getDate()
-    );
+    const sameShiftDay = isSameShiftDay(start, end);
+    const nextShiftDay = isNextShiftDay(start, end);
 
     if (shift === 'Morning') {
-        return isSameLocalDay && startMinutes >= 360 && endMinutes <= 720;
+        return sameShiftDay && startMinutes >= 360 && endMinutes <= 720;
     }
 
     if (shift === 'Day') {
-        return isSameLocalDay && startMinutes >= 720 && endMinutes <= 1080;
+        return sameShiftDay && startMinutes >= 720 && endMinutes <= 1080;
     }
 
     if (shift === 'Night') {
-        const sameDayNight = isSameLocalDay && startMinutes >= 1080 && endMinutes <= 1439;
-        const midnightBoundary = isNextLocalDay && startMinutes >= 1080 && endMinutes === 0;
+        const sameDayNight = sameShiftDay && startMinutes >= 1080 && endMinutes <= 1439;
+        const midnightBoundary = nextShiftDay && startMinutes >= 1080 && endMinutes === 0;
         return sameDayNight || midnightBoundary;
     }
 
@@ -98,26 +128,16 @@ function validateEventWindowRules(start: Date, end: Date) {
         throw new Error('Please choose a future start time.');
     }
 
-    const sameDay = (
-        start.getFullYear() === end.getFullYear() &&
-        start.getMonth() === end.getMonth() &&
-        start.getDate() === end.getDate()
-    );
+    const sameDay = isSameShiftDay(start, end);
 
     if (sameDay) {
         return;
     }
 
-    const nextStartDay = getStartOfLocalDay(start);
-    nextStartDay.setDate(nextStartDay.getDate() + 1);
-    const isNextDay = (
-        nextStartDay.getFullYear() === end.getFullYear() &&
-        nextStartDay.getMonth() === end.getMonth() &&
-        nextStartDay.getDate() === end.getDate()
-    );
+    const isNextDay = isNextShiftDay(start, end);
 
-    const startMinutes = minutesSinceMidnightLocal(start);
-    const endMinutes = minutesSinceMidnightLocal(end);
+    const startMinutes = minutesSinceMidnightShiftTime(start);
+    const endMinutes = minutesSinceMidnightShiftTime(end);
 
     if (!isNextDay || startMinutes < 1080 || endMinutes !== 0) {
         throw new Error('Events must start and end on the same day. Night-shift events may end at midnight.');
@@ -416,6 +436,39 @@ export async function listActivePackageEvents(userId?: number) {
         ) staff ON staff.event_id = e.id
         WHERE e.status <> 'Cancelled'
         ORDER BY e.start_time
+    `;
+
+    return rows;
+}
+
+export async function listJoinedPackageEvents(userId: number) {
+    const rows = await sql`
+        SELECT
+            e.id,
+            e.name,
+            e.description,
+            e.start_time,
+            e.end_time,
+            e.status,
+            pea.joined_at,
+            COALESCE(staff.staff_names, '') AS staff_names
+        FROM package_event_attendees pea
+        JOIN package_events e ON e.id = pea.event_id
+        LEFT JOIN (
+            SELECT
+                pes.event_id,
+                STRING_AGG(
+                    COALESCE(NULLIF(CONCAT_WS(' ', u.first_name, u.last_name), ''), u.email, CAST(s.staff_id AS TEXT)),
+                    ', '
+                    ORDER BY COALESCE(NULLIF(CONCAT_WS(' ', u.first_name, u.last_name), ''), u.email, CAST(s.staff_id AS TEXT))
+                ) AS staff_names
+            FROM package_event_staff pes
+            JOIN staff s ON s.staff_id = pes.staff_id
+            LEFT JOIN users u ON u.id = s.staff_id
+            GROUP BY pes.event_id
+        ) staff ON staff.event_id = e.id
+        WHERE pea.user_id = ${userId}
+        ORDER BY e.start_time DESC
     `;
 
     return rows;

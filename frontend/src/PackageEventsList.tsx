@@ -6,7 +6,7 @@ import DatePicker from 'react-date-picker';
 import 'react-date-picker/dist/DatePicker.css';
 import 'react-calendar/dist/Calendar.css';
 
-const API_URL = import.meta.env.VITE_API_URL;
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 const MIDNIGHT_NEXT_DAY = '__MIDNIGHT_NEXT_DAY__';
 
 type Shift = 'Morning' | 'Day' | 'Night';
@@ -272,10 +272,38 @@ export default function PackageEventsList({ showManagement = false }: Props) {
     loadEditFormData();
   }, []);
 
+  useEffect(() => {
+    const refreshOnUpdate = () => {
+      loadEvents();
+    };
+
+    window.addEventListener('package-events-updated', refreshOnUpdate);
+    return () => {
+      window.removeEventListener('package-events-updated', refreshOnUpdate);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!showDetailModal) return;
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setShowDetailModal(false);
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [showDetailModal]);
+
   const openEventDetail = async (eventId: number) => {
     setError('');
     try {
       const detail = await fetchData(`/api/packages/events/${eventId}`);
+      setEditingEventId(null);
+      setEditFormState(emptyForm);
       setSelectedEvent(detail);
       setShowDetailModal(true);
     } catch (err) {
@@ -309,6 +337,9 @@ export default function PackageEventsList({ showManagement = false }: Props) {
     setError('');
     try {
       const detail = await fetchData(`/api/packages/events/${eventId}`);
+
+      setSelectedEvent(detail);
+      setShowDetailModal(true);
 
       setEditingEventId(eventId);
       setEditFormState({
@@ -581,9 +612,31 @@ export default function PackageEventsList({ showManagement = false }: Props) {
       )}
 
       {showDetailModal && selectedEvent && (
-        <div className="modalOverlay">
-          <div className="modalContent" style={{ maxWidth: '700px', padding: '20px' }}>
-            <h3>{selectedEvent.name}</h3>
+        <div
+          className="modalOverlay"
+          onClick={() => {
+            setShowDetailModal(false);
+            setEditingEventId(null);
+          }}
+        >
+          <div
+            className="modalContent packageEventModalContent"
+            style={{ maxWidth: '700px', padding: '20px', maxHeight: '85vh', overflowY: 'auto', overflowX: 'hidden' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modalHeader">
+              <h3 style={{ margin: 0 }}>{selectedEvent.name}</h3>
+              <button
+                className="modalCloseButton"
+                onClick={() => {
+                  setShowDetailModal(false);
+                  setEditingEventId(null);
+                }}
+                aria-label="Close event details"
+              >
+                x
+              </button>
+            </div>
             <p>{selectedEvent.description}</p>
             <p><strong>Spots Left:</strong> {Number(selectedEvent.spots_left) <= 0 ? 'FULL' : selectedEvent.spots_left}</p>
             <p><strong>Start:</strong> {toReadableDateTime(selectedEvent.start_time)}</p>
@@ -743,17 +796,14 @@ export default function PackageEventsList({ showManagement = false }: Props) {
                   <button className="submitButton" onClick={() => saveEdit(selectedEvent.id)}>
                     Save Changes
                   </button>
-                  <button className="primaryButton" onClick={() => setEditingEventId(null)}>
-                    Stop Editing
+                  <button type="button" className="cancelButton" onClick={() => setEditingEventId(null)}>
+                    Cancel Editing
                   </button>
                 </div>
               </div>
             )}
 
-            <div style={{ marginTop: '14px', display: 'flex', gap: '8px' }}>
-              <button className="primaryButton" onClick={() => setShowDetailModal(false)}>
-                Close
-              </button>
+            <div style={{ marginTop: '14px', display: 'flex', gap: '8px', justifyContent: 'center' }}>
               {user && Number(selectedEvent.spots_left) > 0 && !selectedEvent.is_joined && (
                 <button className="submitButton" onClick={() => handleJoinEvent(selectedEvent.id)}>
                   Reserve My Spot
