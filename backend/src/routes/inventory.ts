@@ -6,6 +6,27 @@ import { pullCruises } from '../cruises.js';
 
 const router = Router();
 
+async function ensureInventoryEditor(req: Request, res: Response): Promise<boolean> {
+    try {
+        const userId = getAuthenticatedUserId(req);
+        if (!userId) {
+            res.status(401).json({ error: 'Not authenticated' });
+            return false;
+        }
+
+        const canEdit = await isUserStaffAdmin(userId);
+        if (!canEdit) {
+            res.status(403).json({ error: 'Forbidden: admin staff only' });
+            return false;
+        }
+
+        return true;
+    } catch {
+        res.status(401).json({ error: 'Invalid token' });
+        return false;
+    }
+}
+
 
 // ROOMS 
 
@@ -22,6 +43,10 @@ router.get('/rooms', async (req: Request, res: Response) => {
 
 // ROOMS-POST 
 router.post("/rooms", async (req: Request, res: Response) => {
+    if (!(await ensureInventoryEditor(req, res))) {
+        return;
+    }
+
     const { cabin_number, deck, type, capacity, status } = req.body;
 
     try {
@@ -40,6 +65,10 @@ router.post("/rooms", async (req: Request, res: Response) => {
 
 // ROOMS-DELETE - deletes room by cabin number
 router.delete('/rooms/:cabin_number', async (req: Request, res: Response) => {
+    if (!(await ensureInventoryEditor(req, res))) {
+        return;
+    }
+
     const cabinNumber = req.params.cabin_number as string;
 
     try {
@@ -136,6 +165,10 @@ router.get('/resources/availability', async(req: Request, res: Response) => {
 
 // RES-DELETE
 router.delete('/resources/:name', async (req: Request, res: Response) => {
+    if (!(await ensureInventoryEditor(req, res))) {
+        return;
+    }
+
     const name = req.params.name as string;
 
     try {
@@ -152,6 +185,10 @@ router.delete('/resources/:name', async (req: Request, res: Response) => {
 
 // RES-POST
 router.post("/resources", async (req: Request, res: Response) => {
+    if (!(await ensureInventoryEditor(req, res))) {
+        return;
+    }
+
     const { name, category, quantity, status } = req.body;
 
     try {

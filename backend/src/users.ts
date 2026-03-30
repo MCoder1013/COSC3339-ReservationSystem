@@ -6,7 +6,19 @@ export async function tryRegister(firstName: string, lastName: string, email: st
             (first_name, last_name, email, password_hash, user_role)
         VALUES
             (${firstName}, ${lastName}, ${email}, ${passwordHash}, ${role})
+        RETURNING id;
     `;
+
+    return result[0].id;
+}
+
+export async function insertStaff(staff_id: number, role: string, shift: string) {
+  await sql`
+    INSERT INTO staff
+      (staff_id, role, shift)
+    VALUES
+      (${staff_id}, ${role}, ${shift});
+  `;
 }
 
 export async function getUserByEmail(email: string) {
@@ -42,6 +54,30 @@ export async function getAllUsers() {
         ORDER BY id ASC
     `;
     return result;
+}
+
+export async function getStaffRoleByUserId(userId: number): Promise<string | null> {
+    const result = await sql`
+        SELECT role
+        FROM staff
+        WHERE staff_id = ${userId}
+        LIMIT 1
+    `;
+
+    return (result[0]?.role as string | undefined) ?? null;
+}
+
+export async function isUserStaffAdmin(userId: number): Promise<boolean> {
+    const staffRole = await getStaffRoleByUserId(userId);
+    return staffRole?.trim().toLowerCase() === 'admin';
+}
+
+export async function updateUserRole(userId: number, newRole: string): Promise<void> {
+    await sql`
+        UPDATE users
+        SET user_role = ${newRole}
+        WHERE id = ${userId}
+    `;
 }
 
 // Validate guest emails and return their user IDs
