@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { pullRooms, addRoom, deleteRoom } from '../rooms.js';
 import { pullResources, addResources, deleteResource, countRemaining } from '../resources.js';
 import { pullStaff, addStaff, deleteStaff } from '../staff.js';
+import { pullCruises } from '../cruises.js';
 
 const router = Router();
 
@@ -102,16 +103,27 @@ router.get('/staff', async (req: Request, res: Response) => {
 
 // RESOURCES -- RES
 
+// CRUISES-GET - gets all cruises
+router.get('/cruises', async (_req: Request, res: Response) => {
+        try {
+                const cruises = await pullCruises();
+                res.json(cruises);
+        } catch (error) {
+                res.status(500).json({ error: 'Failed to load cruises' });
+        }
+});
+
 // RES-GETAVAILABLE - gets avaialbel at current time  
 router.get('/resources/availability', async(req: Request, res: Response) => {
     try {
-        const { resource_id, start_time, end_time } = req.query;
+                const { resource_id, start_time, end_time, cruise_id } = req.query;
 
         const remaining = await countRemaining(
       {
         resource_id: Number(resource_id),
         start_time: String(start_time),
-        end_time: String(end_time)
+                end_time: String(end_time),
+                cruise_id: cruise_id == null ? null : Number(cruise_id)
       }
     );
 

@@ -14,6 +14,29 @@ const API_URL = import.meta.env.VITE_API_URL;
 type ValuePiece = Date | null;
 type Value = ValuePiece | [ValuePiece, ValuePiece];
 
+type CruiseOption = {
+  id: string;
+  name: string;
+};
+
+type ItemReservationWindow = {
+  start: Date;
+  end: Date;
+  quantityReserved: number;
+};
+
+type RoomReservationWindow = {
+  start: Date;
+  end: Date;
+};
+
+const RESERVATION_CRUISE_MAP_KEY = "reservationCruiseMapV1";
+const DEFAULT_CRUISES: CruiseOption[] = [
+  { id: "demo-cruise-a", name: "Cruise A - Caribbean Explorer" },
+  { id: "demo-cruise-b", name: "Cruise B - Mediterranean Escape" },
+  { id: "demo-cruise-c", name: "Cruise C - Alaskan Discovery" },
+];
+
 export default function Reservation() {
   const shipName = "Starlight Pearl Cruises";
 
@@ -22,6 +45,11 @@ export default function Reservation() {
   const [formError, setFormError] = useState<string>("");
   const [currentAvailability, setCurrentAvailability] = useState<number | null>(null);
   const categories = ["Items", "Rooms", "Packages"] as const;
+  const [cruises, setCruises] = useState<CruiseOption[]>([]);
+  const [selectedCruiseId, setSelectedCruiseId] = useState<string>("");
+  const [isCruiseLoading, setIsCruiseLoading] = useState<boolean>(true);
+  const [reservationCruiseMap, setReservationCruiseMap] = useState<Record<string, string>>({});
+  const isCruiseSelected = selectedCruiseId !== "";
 
   //current selected tab/category
   const [activeCategory, setActiveCategory] =
@@ -58,6 +86,89 @@ export default function Reservation() {
   itemStartTime &&
   itemEndDate &&
   itemEndTime;
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(RESERVATION_CRUISE_MAP_KEY);
+      if (!raw) return;
+
+      const parsed = JSON.parse(raw) as Record<string, string>;
+      if (parsed && typeof parsed === "object") {
+        setReservationCruiseMap(parsed);
+      }
+    } catch (error) {
+      console.error("Error loading reservation cruise mappings:", error);
+    }
+  }, []);
+
+  const saveReservationCruiseMapping = (reservationId: number | string, cruiseId: string) => {
+    const id = String(reservationId);
+    if (!id || !cruiseId) return;
+
+    setReservationCruiseMap((previous) => {
+      const next = {
+        ...previous,
+        [id]: cruiseId,
+      };
+
+      try {
+        localStorage.setItem(RESERVATION_CRUISE_MAP_KEY, JSON.stringify(next));
+      } catch (error) {
+        console.error("Error saving reservation cruise mapping:", error);
+      }
+
+      return next;
+    });
+  };
+
+  const getReservationCruiseId = (reservation: any): string | undefined => {
+    if (reservation?.cruise_id !== null && reservation?.cruise_id !== undefined) {
+      return String(reservation.cruise_id);
+    }
+
+    const reservationId = reservation?.id;
+    if (reservationId === null || reservationId === undefined) return undefined;
+    return reservationCruiseMap[String(reservationId)];
+  };
+
+  const belongsToSelectedCruise = (reservation: any): boolean => {
+    if (!selectedCruiseId) return false;
+    return getReservationCruiseId(reservation) === selectedCruiseId;
+  };
+
+  const normalizeCruiseIdForPayload = (cruiseId: string) => {
+    const numericId = Number(cruiseId);
+    return Number.isNaN(numericId) ? cruiseId : numericId;
+  };
+
+  const loadCruises = async () => {
+    setIsCruiseLoading(true);
+    try {
+      const cruiseData = await fetchData("/api/cruises");
+      const normalized = Array.isArray(cruiseData)
+        ? cruiseData
+            .map((cruise: any) => ({
+              id: String(cruise?.id ?? ""),
+              name: String(cruise?.name ?? cruise?.cruise_name ?? cruise?.title ?? ""),
+            }))
+            .filter((cruise: CruiseOption) => cruise.id && cruise.name)
+        : [];
+
+      if (normalized.length > 0) {
+        setCruises(normalized);
+      } else {
+        setCruises(DEFAULT_CRUISES);
+      }
+    } catch (_error) {
+      setCruises(DEFAULT_CRUISES);
+    } finally {
+      setIsCruiseLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadCruises();
+  }, []);
 
   //date and time picker state for Rooms
   const [roomStartDate, setRoomStartDate] = useState<ValuePiece>(new Date());
@@ -130,25 +241,23 @@ export default function Reservation() {
   endDate: Date,
   endTime: string
 ) => {
-  if (!resourceId || !startDate || !startTime || !endDate || !endTime) {
+  if (!selectedCruiseId || !resourceId || !startDate || !startTime || !endDate || !endTime) {
     setCurrentAvailability(null);
     return;
   }
 
   try {
-    const start = combineDateAndTime(startDate, startTime);
-    const end = combineDateAndTime(endDate, endTime);
+    const startDateTime = combineDateAndTime(startDate, startTime);
+    const endDateTime = combineDateAndTime(endDate, endTime);
+    const selectedItem = availableItems.find((item) => String(item.id) === String(resourceId));
+    const totalQuantity = selectedItem ? Number(selectedItem.quantity) : 0;
 
-    const formatForAPI = (date: Date) =>
-      formatInTimeZone(date, "UTC", "yyyy-MM-dd HH:mm:ss");
+    const scopedReservations = await getItemReservations(resourceId);
+    const reservedQty = scopedReservations
+      .filter((res) => intervalsOverlap(startDateTime, endDateTime, res.start, res.end))
+      .reduce((sum, res) => sum + res.quantityReserved, 0);
 
-    const response = await fetch(
-      `${API_URL}/api/resources/availability?resource_id=${resourceId}&start_time=${formatForAPI(start)}&end_time=${formatForAPI(end)}`
-    );
-
-    const data = await response.json();
-
-    setCurrentAvailability(data.remaining);
+    setCurrentAvailability(Math.max(totalQuantity - reservedQty, 0));
   } catch (error) {
     console.error("Error fetching availability:", error);
     setCurrentAvailability(null);
@@ -173,11 +282,13 @@ useEffect(() => {
     );
   }
 }, [
+  selectedCruiseId,
   itemReservationForm.itemId,
   itemStartDate,
   itemStartTime,
   itemEndDate,
   itemEndTime,
+  availableItems,
 ]);
 
 
@@ -257,11 +368,15 @@ useEffect(() => {
     return dateTime.getHours() * 60 + dateTime.getMinutes();
   };
 
-  const getItemReservations = async (itemId: string) => {
+  const getItemReservations = async (itemId: string): Promise<ItemReservationWindow[]> => {
+    if (!selectedCruiseId) {
+      return [];
+    }
+
     const allReservations = await fetchData(`/api/reservations?resource_id=${itemId}`);
 
     return allReservations
-      .filter((res: any) => res.resource_id === Number(itemId))
+      .filter((res: any) => res.resource_id === Number(itemId) && belongsToSelectedCruise(res))
       .map((res: any) => ({
         start: new Date(res.start_time),
         end: new Date(res.end_time),
@@ -269,11 +384,15 @@ useEffect(() => {
       }));
   };
 
-  const getRoomReservations = async (cabinId: string) => {
+  const getRoomReservations = async (cabinId: string): Promise<RoomReservationWindow[]> => {
+    if (!selectedCruiseId) {
+      return [];
+    }
+
     const allReservations = await fetchData(`/api/reservations?cabin_id=${cabinId}`);
 
     return allReservations
-      .filter((res: any) => res.cabin_id === Number(cabinId))
+      .filter((res: any) => res.cabin_id === Number(cabinId) && belongsToSelectedCruise(res))
       .map((res: any) => ({
         start: new Date(res.start_time),
         end: new Date(res.end_time),
@@ -575,7 +694,7 @@ useEffect(() => {
       // Auto-sync end date to start date when start date changes
       setItemEndDate(itemStartDate);
     }
-  }, [itemReservationForm.itemId, itemReservationForm.quantity, itemStartDate, availableItems]);
+  }, [selectedCruiseId, itemReservationForm.itemId, itemReservationForm.quantity, itemStartDate, availableItems]);
 
   // Update available end times for items when start time changes
   useEffect(() => {
@@ -583,7 +702,7 @@ useEffect(() => {
       getAvailableItemEndTimes(itemReservationForm.itemId, itemReservationForm.quantity, itemStartDate, itemEndDate, itemStartTime);
       setItemEndTime("");
     }
-  }, [itemStartTime, itemEndDate, itemReservationForm.itemId, itemReservationForm.quantity, itemStartDate, availableItems]);
+  }, [selectedCruiseId, itemStartTime, itemEndDate, itemReservationForm.itemId, itemReservationForm.quantity, itemStartDate, availableItems]);
 
   // Update available start times for rooms when date or room changes
   useEffect(() => {
@@ -598,7 +717,7 @@ useEffect(() => {
       setAdditionalGuestEmails([]);
       setGuestEmailError("");
     }
-  }, [roomReservationForm.cabinId, roomStartDate, availableRooms]);
+  }, [selectedCruiseId, roomReservationForm.cabinId, roomStartDate, availableRooms]);
 
   // Update available end times for rooms when start time changes
   useEffect(() => {
@@ -606,13 +725,41 @@ useEffect(() => {
       getAvailableRoomEndTimes(roomReservationForm.cabinId, roomStartDate, roomEndDate, roomStartTime);
       setRoomEndTime("");
     }
-  }, [roomStartTime, roomEndDate, roomReservationForm.cabinId, roomStartDate, availableRooms]);
+  }, [selectedCruiseId, roomStartTime, roomEndDate, roomReservationForm.cabinId, roomStartDate, availableRooms]);
+
+  useEffect(() => {
+    setFormError("");
+    setCurrentAvailability(null);
+
+    setItemReservationForm({ itemId: "", quantity: "" });
+    setItemStartDate(new Date());
+    setItemStartTime("");
+    setItemEndDate(new Date());
+    setItemEndTime("");
+    setAvailableItemStartTimes([]);
+    setAvailableItemEndTimes([]);
+
+    setRoomReservationForm({ cabinId: "" });
+    setRoomStartDate(new Date());
+    setRoomStartTime("");
+    setRoomEndDate(new Date());
+    setRoomEndTime("");
+    setAvailableRoomStartTimes([]);
+    setAvailableRoomEndTimes([]);
+    setAdditionalGuestEmails([]);
+    setGuestEmailError("");
+  }, [selectedCruiseId]);
 
   //reservation submission
   const handleReservationSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     setFormError("");
+
+    if (!selectedCruiseId) {
+      setFormError("Please select a cruise before making a reservation.");
+      return;
+    }
 
     if (activeCategory === "Items") {
       //validate item selection
@@ -673,6 +820,7 @@ useEffect(() => {
         };
 
         const reservationData = {
+          cruise_id: normalizeCruiseIdForPayload(selectedCruiseId),
           resource_id: Number(itemReservationForm.itemId),
           start_time: formatForMySQL(startDateTime),
           end_time: formatForMySQL(endDateTime),
@@ -687,10 +835,15 @@ useEffect(() => {
           body: JSON.stringify(reservationData),
         });
 
+        const responseData = await response.json().catch(() => null);
+
         if (!response.ok) {
-           const errorData = await response.json();
-           console.error("Backend error:", errorData);
+           console.error("Backend error:", responseData);
            throw new Error(`Failed to create reservation: ${response.status}`);
+        }
+
+        if (responseData?.reservationId) {
+          saveReservationCruiseMapping(responseData.reservationId, selectedCruiseId);
         }
 
         // Reset form
@@ -764,6 +917,7 @@ useEffect(() => {
         };
 
         const reservationData = {
+          cruise_id: normalizeCruiseIdForPayload(selectedCruiseId),
           cabin_id: Number(roomReservationForm.cabinId),
           start_time: formatForMySQL(startDateTime),
           end_time: formatForMySQL(endDateTime),
@@ -780,10 +934,15 @@ useEffect(() => {
           body: JSON.stringify(reservationData),
         });
 
+        const responseData = await response.json().catch(() => null);
+
         if (!response.ok) {
-          const errorData = await response.json();
-          console.error("Backend error:", errorData);
-          throw new Error(errorData.error || "Failed to create reservation");
+          console.error("Backend error:", responseData);
+          throw new Error(responseData?.error || "Failed to create reservation");
+        }
+
+        if (responseData?.reservationId) {
+          saveReservationCruiseMapping(responseData.reservationId, selectedCruiseId);
         }
         
         // Reset form
@@ -827,6 +986,7 @@ useEffect(() => {
               key={category}
               onClick={() => setActiveCategory(category)}
               className={activeCategory === category ? "activeTab" : ""}
+              disabled={!isCruiseSelected}
             >
               {category}
             </button>
@@ -838,6 +998,34 @@ useEffect(() => {
         {/*reservation form */}
         <div className="reservationForm">
           <form onSubmit={handleReservationSubmit}>
+            <label>
+              Select Cruise:
+              <select
+                className="itemInput"
+                value={selectedCruiseId}
+                onChange={(e) => setSelectedCruiseId(e.target.value)}
+                required
+                disabled={isCruiseLoading}
+              >
+                <option value="">-- Choose a cruise --</option>
+                {cruises.map((cruise) => (
+                  <option key={cruise.id} value={cruise.id}>
+                    {cruise.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            {!isCruiseSelected && (
+              <div className="errorMessage" style={{ marginTop: "10px" }}>
+                Choose a cruise to unlock item and room reservation options.
+              </div>
+            )}
+
+            <fieldset
+              disabled={!isCruiseSelected}
+              style={{ border: "none", padding: 0, margin: 0, minInlineSize: "auto" }}
+            >
             {activeCategory === "Items" ? (
               <>
                 <label>
@@ -1090,6 +1278,7 @@ useEffect(() => {
                 Submit Reservation
               </button>
             )}
+            </fieldset>
           </form>
         </div>
       </main>

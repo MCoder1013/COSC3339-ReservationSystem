@@ -9,6 +9,7 @@ interface ResourceCountCheck {
     quantity_reserved: number
     start_time: string
     end_time: string
+    cruise_id: number | null
 }
 
 // pulls the resources from the resources table in the SQL
@@ -78,6 +79,7 @@ export async function checkResourceCount(
         SELECT quantity_reserved
         FROM reservations
         WHERE resource_id = ${r.resource_id}
+            AND cruise_id IS NOT DISTINCT FROM ${r.cruise_id}
             AND start_time < ${r.end_time}
             AND end_time > ${r.start_time}
     `;
@@ -110,7 +112,8 @@ export async function countRemaining(
     r: {
         resource_id: number,
         start_time: string,
-        end_time: string
+        end_time: string,
+        cruise_id: number | null
     }
 ): Promise<number> {
 
@@ -128,6 +131,7 @@ export async function countRemaining(
         SELECT COALESCE(SUM(quantity_reserved), 0) AS total_reserved
         FROM reservations
         WHERE resource_id = ${r.resource_id}
+        AND cruise_id IS NOT DISTINCT FROM ${r.cruise_id}
         AND start_time < ${r.end_time}
         AND end_time > ${r.start_time}
     `;
