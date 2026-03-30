@@ -3,6 +3,7 @@ import cors from 'cors'; // Required for Frontend-to-Backend communication
 import inventoryRoutes from "./routes/inventory.js";
 import authRoutes from "./routes/auth.js";
 import reservationRoutes from "./routes/reservations.js";
+import packageRoutes from "./routes/packages.js";
 import cookieParser from 'cookie-parser';
 import './notifications.js';
 
@@ -39,6 +40,9 @@ app.use("/api/auth", authRoutes);
 
 // RESERVATIONS
 app.use("/api", reservationRoutes);
+
+// PACKAGES / EVENTS
+app.use('/api', packageRoutes);
 
 const PORT = 3000;
 

@@ -13,7 +13,17 @@ interface NewStaff {
 // pull all staff from staff table
 export async function pullStaff() {
     try {
-        const result = await sql`SELECT * FROM staff`;
+        const result = await sql`
+            SELECT
+                s.staff_id AS id,
+                s.role,
+                s.shift,
+                COALESCE(NULLIF(CONCAT_WS(' ', u.first_name, u.last_name), ''), u.email, CAST(s.staff_id AS TEXT)) AS name,
+                u.email
+            FROM staff s
+            LEFT JOIN users u ON u.id = s.staff_id
+            ORDER BY name
+        `;
         return result;
     } catch (error) {
         console.error("Error getting staff members: ", error);

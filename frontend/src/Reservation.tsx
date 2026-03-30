@@ -8,6 +8,7 @@ import "react-date-picker/dist/DatePicker.css";
 import "react-calendar/dist/Calendar.css";
 import { formatInTimeZone } from 'date-fns-tz';
 import NavBar from "./NavBar";
+import PackageEventsTab from './PackageEventsTab';
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -1073,10 +1074,7 @@ useEffect(() => {
                 </div>
               </>
             ) : (
-              // Packages tab - placeholder
-              <div className="packagesPlaceholder">
-                <p>Package reservations coming soon!</p>
-              </div>
+              <PackageEventsTab />
             )}
 
             {formError && (
