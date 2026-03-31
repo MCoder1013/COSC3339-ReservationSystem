@@ -11,10 +11,6 @@ export type PackageEventInput = {
     item_requirements: Array<{ resource_id: number; quantity_required: number }>;
 };
 
-function minutesSinceMidnightUTC(d: Date) {
-    return d.getUTCHours() * 60 + d.getUTCMinutes();
-}
-
 const SHIFT_TIME_ZONE = process.env.SHIFT_TIME_ZONE || 'America/Chicago';
 
 const shiftTimeFormatter = new Intl.DateTimeFormat('en-US', {
@@ -73,25 +69,6 @@ function roundUpToNextThirtyMinutes(d: Date) {
         rounded.setMinutes(minutes + (30 - remainder));
     }
     return rounded;
-}
-
-function isSameUtcDay(a: Date, b: Date) {
-    return (
-        a.getUTCFullYear() === b.getUTCFullYear() &&
-        a.getUTCMonth() === b.getUTCMonth() &&
-        a.getUTCDate() === b.getUTCDate()
-    );
-}
-
-function isNextUtcDay(a: Date, b: Date) {
-    const copy = new Date(Date.UTC(a.getUTCFullYear(), a.getUTCMonth(), a.getUTCDate()));
-    copy.setUTCDate(copy.getUTCDate() + 1);
-
-    return (
-        copy.getUTCFullYear() === b.getUTCFullYear() &&
-        copy.getUTCMonth() === b.getUTCMonth() &&
-        copy.getUTCDate() === b.getUTCDate()
-    );
 }
 
 function isWithinShiftWindow(shift: string, start: Date, end: Date): boolean {
