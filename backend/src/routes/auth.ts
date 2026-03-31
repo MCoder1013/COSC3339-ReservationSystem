@@ -240,8 +240,13 @@ router.post('/update-profile', upload.single('profilePicture'), async (req: Requ
 export function getAuthenticatedUserId(req: Request): number | undefined {
   const cookie = req.cookies['jwt']
   if (!cookie) return undefined
-  const decoded = jwt.verify(cookie, jwtSecret) as { id: number } | undefined;
-  return decoded?.id
+
+  try {
+    const decoded = jwt.verify(cookie, jwtSecret) as { id: number } | undefined;
+    return decoded?.id
+  } catch {
+    return undefined
+  }
 }
 
 export default router; 

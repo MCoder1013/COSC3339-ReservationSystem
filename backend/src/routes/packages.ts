@@ -14,14 +14,6 @@ import { getAuthenticatedUserId } from './auth.js';
 
 const router = Router();
 
-function getSafeAuthenticatedUserId(req: Request) {
-    try {
-        return getAuthenticatedUserId(req);
-    } catch {
-        return undefined;
-    }
-}
-
 function parseEventInput(body: any): PackageEventInput {
     const itemRequirements = Array.isArray(body.item_requirements)
         ? body.item_requirements.map((item: any) => ({
@@ -85,7 +77,7 @@ function validateBasicInput(input: PackageEventInput): string | null {
 }
 
 async function getRoleForRequest(req: Request) {
-    const userId = getSafeAuthenticatedUserId(req);
+    const userId = getAuthenticatedUserId(req);
     if (!userId) return null;
 
     const user = await getUserById(userId);
@@ -109,7 +101,7 @@ function canManageEvent(role: string, creatorId: number, userId: number) {
 
 router.get('/packages/events', async (req: Request, res: Response) => {
     try {
-        const userId = getSafeAuthenticatedUserId(req);
+        const userId = getAuthenticatedUserId(req);
         const events = await listActivePackageEvents(userId);
         res.json(events);
     } catch (error) {
@@ -119,7 +111,7 @@ router.get('/packages/events', async (req: Request, res: Response) => {
 });
 
 router.get('/packages/my-events', async (req: Request, res: Response) => {
-    const userId = getSafeAuthenticatedUserId(req);
+    const userId = getAuthenticatedUserId(req);
     if (!userId) {
         return res.status(401).json({ error: 'Please sign in to continue.' });
     }
@@ -251,7 +243,7 @@ router.post('/packages/events/:id/join', async (req: Request, res: Response) => 
         return res.status(400).json({ error: 'Please provide a valid event ID.' });
     }
 
-    const userId = getSafeAuthenticatedUserId(req);
+    const userId = getAuthenticatedUserId(req);
     if (!userId) {
         return res.status(401).json({ error: 'Please sign in to continue.' });
     }
