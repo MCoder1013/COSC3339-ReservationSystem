@@ -5,6 +5,7 @@ import "./App.css";
 import { Link } from "react-router-dom";
 import { fetchData } from "./api";
 import NavBar from "./NavBar";
+import PackageEventsList from './PackageEventsList';
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -280,9 +281,7 @@ export default function ReservationTable() {
         )}
 
         {activeCategory === "Packages" ? (
-          <div style={{ textAlign: "center", padding: "40px" }}>
-            Package Reservations Coming Soon!
-          </div>
+          <PackageEventsList />
         ) : loading ? (
           <p>Loading...</p>
         ) : reservationData[activeCategory].length === 0 ? (

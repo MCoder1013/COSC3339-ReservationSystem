@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import "./App.css";
 import { fetchData } from "./api";
 import NavBar from "./NavBar";
+import PackageEventsList from './PackageEventsList';
 const API_URL = import.meta.env.VITE_API_URL;
 
 export default function ReservationTable() {
@@ -140,9 +141,7 @@ export default function ReservationTable() {
         )}
 
         {activeCategory === "Packages" ? (
-          <div style={{ textAlign: "center", padding: "40px", fontSize: "18px", color: "white" }}>
-            <p>Package Reservations Coming Soon!</p>
-          </div>
+          <PackageEventsList showManagement={true} />
         ) : loading ? (
           <p>Loading reservations...</p>
         ) : reservationData[activeCategory].length === 0 ? (

@@ -8,6 +8,7 @@ import "react-date-picker/dist/DatePicker.css";
 import "react-calendar/dist/Calendar.css";
 import { formatInTimeZone } from 'date-fns-tz';
 import NavBar from "./NavBar";
+import PackageEventsTab from './PackageEventsTab';
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -1129,7 +1130,7 @@ useEffect(() => {
                   </select>
                 </label>
               </>
-            ) : activeCategory === "Rooms" ? (
+            ) : (
               <>
                 <label>
                   Select Room:
@@ -1260,20 +1261,14 @@ useEffect(() => {
                   )}
                 </div>
               </>
-            ) : (
-              // Packages tab - placeholder
-              <div className="packagesPlaceholder">
-                <p>Package reservations coming soon!</p>
-              </div>
-            )}
+              )}
 
-            {formError && (
-              <div className="errorMessage">
-                {formError}
-              </div>
-            )}
+              {formError && (
+                <div className="errorMessage">
+                  {formError}
+                </div>
+              )}
 
-            {(activeCategory === "Items" || activeCategory === "Rooms") && (
               <button type="submit" className="submitButton">
                 Submit Reservation
               </button>
