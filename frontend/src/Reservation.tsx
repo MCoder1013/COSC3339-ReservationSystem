@@ -160,7 +160,8 @@ export default function Reservation() {
       } else {
         setCruises(DEFAULT_CRUISES);
       }
-    } catch (_error) {
+    } catch (error) {
+      console.log(error);
       setCruises(DEFAULT_CRUISES);
     } finally {
       setIsCruiseLoading(false);
@@ -1027,7 +1028,9 @@ useEffect(() => {
               disabled={!isCruiseSelected}
               style={{ border: "none", padding: 0, margin: 0, minInlineSize: "auto" }}
             >
-            {activeCategory === "Items" ? (
+            {activeCategory === "Packages" ? (
+              <PackageEventsTab />
+            ) : activeCategory === "Items" ? (
               <>
                 <label>
                   Select Item:
@@ -1272,7 +1275,6 @@ useEffect(() => {
               <button type="submit" className="submitButton">
                 Submit Reservation
               </button>
-            )}
             </fieldset>
           </form>
         </div>

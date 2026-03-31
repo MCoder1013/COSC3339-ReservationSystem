@@ -2,12 +2,12 @@
 import { useState, useEffect } from "react";
 import "./App.css";
 import { fetchData } from "./api";
-import { useAuth } from "./AuthContext";
+// import { useAuth } from "./AuthContext";
 import NavBar from "./NavBar";
 
 export default function ViewAllUsers() {
   const shipName = "Starlight Pearl Cruises";
-  const { user } = useAuth();
+  // const { user } = useAuth();
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [formError, setFormError] = useState<string>("");
@@ -67,11 +67,11 @@ export default function ViewAllUsers() {
     loadUsers();
   }, []);
 
-  const handleEditRole = (userRow: any) => {
-    setSelectedUser(userRow);
-    setNewRole("normal");
-    setShowRoleModal(true);
-  };
+  // const handleEditRole = (userRow: any) => {
+  //   setSelectedUser(userRow);
+  //   setNewRole("normal");
+  //   setShowRoleModal(true);
+  // };
 
   const handleRoleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -128,7 +128,7 @@ export default function ViewAllUsers() {
                 <th>Total Reservations</th>
                 <th>Past Reservations</th>
                 <th>Upcoming Reservations</th>
-                {user?.canEditInventory && <th>Actions</th>}
+                {/* {user?.canEditInventory && <th>Actions</th>} */}
               </tr>
             </thead>
             <tbody>
@@ -140,7 +140,7 @@ export default function ViewAllUsers() {
                   <td>{userRow.totalReservations}</td>
                   <td>{userRow.pastReservations}</td>
                   <td>{userRow.upcomingReservations}</td>
-                  {user?.canEditInventory && (
+                  {/* {user?.canEditInventory && (
                     <td>
                       <button
                         className="primaryBtn"
@@ -150,7 +150,7 @@ export default function ViewAllUsers() {
                         Edit Role
                       </button>
                     </td>
-                  )}
+                  )} */}
                 </tr>
               ))}
             </tbody>
