@@ -2,8 +2,32 @@ import { Router, Request, Response } from 'express';
 import { pullRooms, addRoom, deleteRoom } from '../rooms.js';
 import { pullResources, addResources, deleteResource, countRemaining } from '../resources.js';
 import { pullStaff, addStaff, deleteStaff } from '../staff.js';
+import { pullCruises } from '../cruises.js';
+import { getAuthenticatedUserId } from './auth.js';
+import { isUserStaffAdmin } from '../users.js';
 
 const router = Router();
+
+async function ensureInventoryEditor(req: Request, res: Response): Promise<boolean> {
+    try {
+        const userId = getAuthenticatedUserId(req);
+        if (!userId) {
+            res.status(401).json({ error: 'Not authenticated' });
+            return false;
+        }
+
+        const canEdit = await isUserStaffAdmin(userId);
+        if (!canEdit) {
+            res.status(403).json({ error: 'Forbidden: admin staff only' });
+            return false;
+        }
+
+        return true;
+    } catch {
+        res.status(401).json({ error: 'Invalid token' });
+        return false;
+    }
+}
 
 
 // ROOMS 
@@ -21,6 +45,10 @@ router.get('/rooms', async (req: Request, res: Response) => {
 
 // ROOMS-POST 
 router.post("/rooms", async (req: Request, res: Response) => {
+    if (!(await ensureInventoryEditor(req, res))) {
+        return;
+    }
+
     const { cabin_number, deck, type, capacity, status } = req.body;
 
     try {
@@ -39,6 +67,10 @@ router.post("/rooms", async (req: Request, res: Response) => {
 
 // ROOMS-DELETE - deletes room by cabin number
 router.delete('/rooms/:cabin_number', async (req: Request, res: Response) => {
+    if (!(await ensureInventoryEditor(req, res))) {
+        return;
+    }
+
     const cabinNumber = req.params.cabin_number as string;
 
     try {
@@ -102,16 +134,27 @@ router.get('/staff', async (req: Request, res: Response) => {
 
 // RESOURCES -- RES
 
+// CRUISES-GET - gets all cruises
+router.get('/cruises', async (_req: Request, res: Response) => {
+        try {
+                const cruises = await pullCruises();
+                res.json(cruises);
+        } catch (error) {
+                res.status(500).json({ error: 'Failed to load cruises' });
+        }
+});
+
 // RES-GETAVAILABLE - gets avaialbel at current time  
 router.get('/resources/availability', async(req: Request, res: Response) => {
     try {
-        const { resource_id, start_time, end_time } = req.query;
+                const { resource_id, start_time, end_time, cruise_id } = req.query;
 
         const remaining = await countRemaining(
       {
         resource_id: Number(resource_id),
         start_time: String(start_time),
-        end_time: String(end_time)
+                end_time: String(end_time),
+                cruise_id: cruise_id == null ? null : Number(cruise_id)
       }
     );
 
@@ -124,6 +167,10 @@ router.get('/resources/availability', async(req: Request, res: Response) => {
 
 // RES-DELETE
 router.delete('/resources/:name', async (req: Request, res: Response) => {
+    if (!(await ensureInventoryEditor(req, res))) {
+        return;
+    }
+
     const name = req.params.name as string;
 
     try {
@@ -140,6 +187,10 @@ router.delete('/resources/:name', async (req: Request, res: Response) => {
 
 // RES-POST
 router.post("/resources", async (req: Request, res: Response) => {
+    if (!(await ensureInventoryEditor(req, res))) {
+        return;
+    }
+
     const { name, category, quantity, status } = req.body;
 
     try {

@@ -9,11 +9,16 @@ const router = Router();
 // RES-POST
 router.post("/reservations", async (req: Request, res: Response) => {
     // Need a safe way to get the user id and add it in since we are not getting that from the frontend
-    const { cabin_id, resource_id, staff_id, start_time, end_time, quantity_reserved, additional_guest_emails } = req.body;
+  const { cabin_id, resource_id, staff_id, start_time, end_time, quantity_reserved, additional_guest_emails, cruise_id } = req.body;
     const user_id = getAuthenticatedUserId(req);
 
     if (!user_id) {
         return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const normalizedCruiseId = cruise_id == null ? null : Number(cruise_id);
+    if ((cabin_id != null || resource_id != null) && (normalizedCruiseId == null || Number.isNaN(normalizedCruiseId))) {
+      return res.status(400).json({ error: 'cruise_id is required for room and item reservations' });
     }
 
     try {
@@ -33,6 +38,7 @@ router.post("/reservations", async (req: Request, res: Response) => {
                 cabin_id: cabin_id ??  null,
                 resource_id: resource_id ?? null,
                 staff_id: staff_id ?? null,
+              cruise_id: normalizedCruiseId,
                 start_time,
                 end_time,
                 quantity_reserved
@@ -56,6 +62,7 @@ router.post("/reservations", async (req: Request, res: Response) => {
             cabin_id: cabin_id ??  null,
             resource_id: resource_id ?? null,
             staff_id: staff_id ?? null,
+          cruise_id: normalizedCruiseId,
             start_time,
             end_time,
             quantity_reserved

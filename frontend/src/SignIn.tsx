@@ -33,7 +33,9 @@ export default function SignIn() {
       login({
         userId: data.userId,
         firstName: data.firstName,
-        role: data.role
+        role: data.role,
+        staffRole: data.staffRole ?? null,
+        canEditInventory: Boolean(data.isStaffAdmin)
       });
 
       setLogInMessage("Successful login!");
