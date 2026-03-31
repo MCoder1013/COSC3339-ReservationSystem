@@ -88,21 +88,23 @@ function roundUpToNextThirtyMinutes(d: Date) {
 }
 
 function isWithinShiftWindow(shift: string, start: Date, end: Date): boolean {
+    const normalized = shift.charAt(0).toUpperCase() + shift.slice(1).toLowerCase();
+
     const startMinutes = minutesSinceMidnightShiftTime(start);
     const endMinutes = minutesSinceMidnightShiftTime(end);
 
     const sameShiftDay = isSameShiftDay(start, end);
     const nextShiftDay = isNextShiftDay(start, end);
 
-    if (shift === 'Morning') {
+    if (normalized  === 'Morning') {
         return sameShiftDay && startMinutes >= 360 && endMinutes <= 720;
     }
 
-    if (shift === 'Day') {
+    if (normalized  === 'Day') {
         return sameShiftDay && startMinutes >= 720 && endMinutes <= 1080;
     }
 
-    if (shift === 'Night') {
+    if (normalized  === 'Night') {
         const sameDayNight = sameShiftDay && startMinutes >= 1080 && endMinutes <= 1439;
         const midnightBoundary = nextShiftDay && startMinutes >= 1080 && endMinutes === 0;
         return sameDayNight || midnightBoundary;
