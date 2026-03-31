@@ -3,10 +3,14 @@ import { useState, useEffect } from "react";
 import "./App.css";
 import { fetchData } from "./api";
 import NavBar from "./NavBar";
+import { useAuth } from "./AuthContext";
 const API_URL = import.meta.env.VITE_API_URL;
 
 export default function Inventory() {
-  const shipName = "Starlight Pearl Cruises";
+const shipName = "Starlight Pearl Cruises";
+const { user } = useAuth();
+
+const canEditInventory = user?.role === "staff" && Boolean(user.canEditInventory);
 
   const [formError, setFormError] = useState<string>("");
 
@@ -102,6 +106,11 @@ export default function Inventory() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (!canEditInventory) {
+      setFormError("View-only access: only admin staff can edit inventory.");
+      return;
+    }
+
     setFormError("");
 
     try {
@@ -170,6 +179,11 @@ export default function Inventory() {
   const handleDeleteSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (!canEditInventory) {
+      setFormError("View-only access: only admin staff can edit inventory.");
+      return;
+    }
+
     try {
       const endpoint =
         activeCategory === "Rooms"
@@ -222,10 +236,16 @@ export default function Inventory() {
         </div>
         
         {/*Add/Delete buttons */}
-        <button className="addButton" onClick={() => setShowModal(true)}>
-          Add {activeCategory.slice(0, -1)}
-        </button>
-        <button className="deleteButton" onClick={() => setShowDeleteModal(true)}>Delete {activeCategory.slice(0, -1)}</button>
+        {canEditInventory ? (
+          <>
+            <button className="addButton" onClick={() => setShowModal(true)}>
+              Add {activeCategory.slice(0, -1)}
+            </button>
+            <button className="deleteButton" onClick={() => setShowDeleteModal(true)}>Delete {activeCategory.slice(0, -1)}</button>
+          </>
+        ) : (
+          <p>View-only mode: only admin staff can edit inventory.</p>
+        )}
 
         <br />
         <br />
@@ -324,7 +344,7 @@ export default function Inventory() {
       </footer>
 
       {/*modal for adding rooms/items */}
-      {showModal && (
+      {showModal && canEditInventory && (
         <div className="modal" onClick={() => setShowModal(false)}>
           <div className="modalContent" onClick={(e) => e.stopPropagation()}>
             <h3>Add {activeCategory.slice(0, -1)}</h3>
@@ -458,7 +478,7 @@ export default function Inventory() {
       )}
 
       {/*modal for deleting rooms/items */}
-      {showDeleteModal && (
+      {showDeleteModal && canEditInventory && (
         <div className="modal" onClick={() => setShowDeleteModal(false)}>
           <div className="modalContent" onClick={(e) => e.stopPropagation()}>
             <h3>Delete {activeCategory.slice(0, -1)}</h3>

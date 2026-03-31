@@ -5,6 +5,8 @@ export interface User {
   userId: number;
   firstName: string;
   role: string;
+  staffRole?: string | null;
+  canEditInventory?: boolean;
 }
 
 interface AuthContextType {
