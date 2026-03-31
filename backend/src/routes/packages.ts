@@ -90,7 +90,7 @@ async function getRoleForRequest(req: Request) {
 }
 
 function canCreateEvent(role: string) {
-    return role === 'staff';
+    return role === 'staff' || role === 'admin';
 }
 
 function canManageEvent(role: string, creatorId: number, userId: number) {
@@ -155,7 +155,7 @@ router.post('/packages/events', async (req: Request, res: Response) => {
     }
 
     if (!canCreateEvent(auth.role)) {
-        return res.status(403).json({ error: 'Only staff can create events.' });
+        return res.status(403).json({ error: 'Only staff and admins can create events.' });
     }
 
     const input = parseEventInput(req.body);

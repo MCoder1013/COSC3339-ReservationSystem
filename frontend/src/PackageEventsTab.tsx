@@ -138,7 +138,7 @@ export default function PackageEventsTab() {
   const [success, setSuccess] = useState('');
   const [formState, setFormState] = useState<EventFormState>(emptyForm);
 
-  const canCreate = user?.role === 'staff';
+  const canCreate = user?.role === 'staff' || user?.role === 'admin';
 
   const staffOptions = useMemo(() => {
     return staffMembers.filter((staff) => !!staff.id);
@@ -601,7 +601,7 @@ export default function PackageEventsTab() {
         </div>
       )}
 
-      {!canCreate && <p>Only staff can create events.</p>}
+      {!canCreate && <p>Only staff and admins can create events.</p>}
     </div>
   );
 }
