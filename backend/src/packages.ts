@@ -13,6 +13,22 @@ export type PackageEventInput = {
 
 const SHIFT_TIME_ZONE = process.env.SHIFT_TIME_ZONE || 'America/Chicago';
 
+// Reused SQL snippets for consistent staff display names across package-event queries.
+const STAFF_DISPLAY_NAME_SQL = "COALESCE(NULLIF(CONCAT_WS(' ', u.first_name, u.last_name), ''), u.email, CAST(s.staff_id AS TEXT))";
+const STAFF_NAME_AGGREGATE_BY_EVENT_SQL = `
+    SELECT
+        pes.event_id,
+        STRING_AGG(
+            ${STAFF_DISPLAY_NAME_SQL},
+            ', '
+            ORDER BY ${STAFF_DISPLAY_NAME_SQL}
+        ) AS staff_names
+    FROM package_event_staff pes
+    JOIN staff s ON s.staff_id = pes.staff_id
+    LEFT JOIN users u ON u.id = s.staff_id
+    GROUP BY pes.event_id
+`;
+
 const shiftTimeFormatter = new Intl.DateTimeFormat('en-US', {
     timeZone: SHIFT_TIME_ZONE,
     year: 'numeric',
@@ -134,7 +150,7 @@ async function validateStaffShiftWindows(staffIds: number[], startTime: string, 
     const rows = await tx`
         SELECT
             s.staff_id AS id,
-            COALESCE(NULLIF(CONCAT_WS(' ', u.first_name, u.last_name), ''), u.email, CAST(s.staff_id AS TEXT)) AS name,
+            ${sql.unsafe(STAFF_DISPLAY_NAME_SQL)} AS name,
             s.shift
         FROM staff s
         LEFT JOIN users u ON u.id = s.staff_id
@@ -156,7 +172,7 @@ async function validateCreatorShiftWindow(createdBy: number, start: Date, end: D
     const rows = await tx`
         SELECT
             s.staff_id AS id,
-            COALESCE(NULLIF(CONCAT_WS(' ', u.first_name, u.last_name), ''), u.email, CAST(s.staff_id AS TEXT)) AS name,
+            ${sql.unsafe(STAFF_DISPLAY_NAME_SQL)} AS name,
             s.shift
         FROM staff s
         LEFT JOIN users u ON u.id = s.staff_id
@@ -347,7 +363,7 @@ export async function getPackageEventById(eventId: number) {
     const staffRows = await sql`
         SELECT
             s.staff_id AS id,
-            COALESCE(NULLIF(CONCAT_WS(' ', u.first_name, u.last_name), ''), u.email, CAST(s.staff_id AS TEXT)) AS name,
+            ${sql.unsafe(STAFF_DISPLAY_NAME_SQL)} AS name,
             s.role,
             s.shift
         FROM package_event_staff pes
@@ -399,17 +415,7 @@ export async function listActivePackageEvents(userId?: number) {
             GROUP BY event_id
         ) att ON att.event_id = e.id
         LEFT JOIN (
-            SELECT
-                pes.event_id,
-                STRING_AGG(
-                    COALESCE(NULLIF(CONCAT_WS(' ', u.first_name, u.last_name), ''), u.email, CAST(s.staff_id AS TEXT)),
-                    ', '
-                    ORDER BY COALESCE(NULLIF(CONCAT_WS(' ', u.first_name, u.last_name), ''), u.email, CAST(s.staff_id AS TEXT))
-                ) AS staff_names
-            FROM package_event_staff pes
-            JOIN staff s ON s.staff_id = pes.staff_id
-            LEFT JOIN users u ON u.id = s.staff_id
-            GROUP BY pes.event_id
+            ${sql.unsafe(STAFF_NAME_AGGREGATE_BY_EVENT_SQL)}
         ) staff ON staff.event_id = e.id
         WHERE e.status <> 'Cancelled'
         ORDER BY e.start_time
@@ -432,17 +438,7 @@ export async function listJoinedPackageEvents(userId: number) {
         FROM package_event_attendees pea
         JOIN package_events e ON e.id = pea.event_id
         LEFT JOIN (
-            SELECT
-                pes.event_id,
-                STRING_AGG(
-                    COALESCE(NULLIF(CONCAT_WS(' ', u.first_name, u.last_name), ''), u.email, CAST(s.staff_id AS TEXT)),
-                    ', '
-                    ORDER BY COALESCE(NULLIF(CONCAT_WS(' ', u.first_name, u.last_name), ''), u.email, CAST(s.staff_id AS TEXT))
-                ) AS staff_names
-            FROM package_event_staff pes
-            JOIN staff s ON s.staff_id = pes.staff_id
-            LEFT JOIN users u ON u.id = s.staff_id
-            GROUP BY pes.event_id
+            ${sql.unsafe(STAFF_NAME_AGGREGATE_BY_EVENT_SQL)}
         ) staff ON staff.event_id = e.id
         WHERE pea.user_id = ${userId}
         ORDER BY e.start_time DESC
