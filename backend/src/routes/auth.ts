@@ -84,7 +84,7 @@ router.post('/register', async (req, res) => {
 
   if (userRole === "staff" && staffRole) {
     try {
-      await database.insertStaff(userId, staffRole, "day");
+      await database.insertStaff(userId, staffRole, "Day");
     } catch (err) {
       console.error('Error inserting staff:', err);
       return res.status(500).json({
