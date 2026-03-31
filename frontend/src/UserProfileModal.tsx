@@ -30,6 +30,17 @@ interface RoomReservation {
   end_time: string;
 }
 
+interface PackageReservation {
+  id: number;
+  name: string;
+  description: string;
+  start_time: string;
+  end_time: string;
+  status: string;
+  joined_at: string;
+  staff_names: string;
+}
+
 
 
 export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
@@ -41,6 +52,7 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
   const [userProfile, setUserProfile] = useState<UserProfile>();
   const [itemsReservations, setItemsReservations] = useState<ItemReservation[]>([]);
   const [roomsReservations, setRoomsReservations] = useState<RoomReservation[]>([]);
+  const [packagesReservations, setPackagesReservations] = useState<PackageReservation[]>([]);
   const [bio, setBio] = useState("");
   const [iconFile, setIconFile] = useState<File | null>(null);
   const [iconPreview, setIconPreview] = useState("");
@@ -83,6 +95,19 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
 
         const roomsData = await roomsRes.json();
         setRoomsReservations(roomsData);
+
+        const packagesRes = await fetch("api/packages/my-events", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (packagesRes.ok) {
+          const packagesData = await packagesRes.json();
+          setPackagesReservations(Array.isArray(packagesData) ? packagesData : []);
+        } else {
+          setPackagesReservations([]);
+        }
 
       } catch (err) {
         console.error(err);
@@ -223,28 +248,26 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
               </div>
 
               {/* Time period tabs for Past, Current, Future */}
-              {reservationCategory !== "Packages" && (
-                <div className="timePeriodTabs">
-                  <button
-                    className={`timePeriodBtn ${timePeriod === "Past" ? "active" : ""}`}
-                    onClick={() => setTimePeriod("Past")}
-                  >
-                    Past
-                  </button>
-                  <button
-                    className={`timePeriodBtn ${timePeriod === "Current" ? "active" : ""}`}
-                    onClick={() => setTimePeriod("Current")}
-                  >
-                    Current
-                  </button>
-                  <button
-                    className={`timePeriodBtn ${timePeriod === "Future" ? "active" : ""}`}
-                    onClick={() => setTimePeriod("Future")}
-                  >
-                    Future
-                  </button>
-                </div>
-              )}
+              <div className="timePeriodTabs">
+                <button
+                  className={`timePeriodBtn ${timePeriod === "Past" ? "active" : ""}`}
+                  onClick={() => setTimePeriod("Past")}
+                >
+                  Past
+                </button>
+                <button
+                  className={`timePeriodBtn ${timePeriod === "Current" ? "active" : ""}`}
+                  onClick={() => setTimePeriod("Current")}
+                >
+                  Current
+                </button>
+                <button
+                  className={`timePeriodBtn ${timePeriod === "Future" ? "active" : ""}`}
+                  onClick={() => setTimePeriod("Future")}
+                >
+                  Future
+                </button>
+              </div>
 
               {/* Content for each category */}
               {reservationCategory === "Items" && (
@@ -314,9 +337,35 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
               )}
 
               {reservationCategory === "Packages" && (
-                <div style={{ textAlign: "center", padding: "40px", fontSize: "16px" }}>
-                  <p>Package Reservations Coming Soon!</p>
-                </div>
+                (() => {
+                  const filteredPackages = filterByTimePeriod(packagesReservations);
+                  return filteredPackages.length === 0 ? (
+                    <p className="noDataMessage">You have no {timePeriod.toLowerCase()} package events.</p>
+                  ) : (
+                    <table className="reservationsTable">
+                      <thead>
+                        <tr>
+                          <th>Event Name</th>
+                          <th>Staff Running</th>
+                          <th>Start</th>
+                          <th>End</th>
+                          <th>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredPackages.map((res) => (
+                          <tr key={res.id}>
+                            <td>{res.name}</td>
+                            <td>{res.staff_names || "TBD"}</td>
+                            <td>{formatDateTime(res.start_time)}</td>
+                            <td>{formatDateTime(res.end_time)}</td>
+                            <td>{res.status}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  );
+                })()
               )}
             </div>
           )}
