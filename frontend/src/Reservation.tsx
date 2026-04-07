@@ -8,7 +8,7 @@ import "react-date-picker/dist/DatePicker.css";
 import "react-calendar/dist/Calendar.css";
 import { formatInTimeZone } from 'date-fns-tz';
 import NavBar from "./NavBar";
-import PackageEventsTab from './PackageEventsTab';
+import PackageEventsList from './PackageEventsList';
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -44,9 +44,11 @@ export default function Reservation() {
 
 
   const [formError, setFormError] = useState<string>("");
+  const [formSuccess, setFormSuccess] = useState<string>("");
   const [currentAvailability, setCurrentAvailability] = useState<number | null>(null);
   const categories = ["Items", "Rooms", "Packages"] as const;
   const [cruises, setCruises] = useState<CruiseOption[]>([]);
+  const [accessibleCruises, setAccessibleCruises] = useState<CruiseOption[]>([]);
   const [selectedCruiseId, setSelectedCruiseId] = useState<string>("");
   const [isCruiseLoading, setIsCruiseLoading] = useState<boolean>(true);
   const [reservationCruiseMap, setReservationCruiseMap] = useState<Record<string, string>>({});
@@ -54,7 +56,8 @@ export default function Reservation() {
 
   //current selected tab/category
   const [activeCategory, setActiveCategory] =
-    useState<(typeof categories)[number]>("Items");
+    useState<(typeof categories)[number]>("Rooms");
+  const cruiseOptions = activeCategory === "Rooms" ? cruises : accessibleCruises;
   
   //available items from database
   const [availableItems, setAvailableItems] = useState<any[]>([]);
@@ -142,12 +145,38 @@ export default function Reservation() {
     return Number.isNaN(numericId) ? cruiseId : numericId;
   };
 
+  const isUpcomingCruise = (cruise: any) => {
+    const rawReturnDate = cruise?.return_date ?? cruise?.returnDate;
+    if (!rawReturnDate) return true;
+
+    const returnDate = new Date(rawReturnDate);
+    if (Number.isNaN(returnDate.getTime())) return true;
+
+    returnDate.setHours(23, 59, 59, 999);
+    return returnDate >= new Date();
+  };
+
   const loadCruises = async () => {
     setIsCruiseLoading(true);
     try {
-      const cruiseData = await fetchData("/api/cruises");
+      const [cruiseData, eligibleCruiseData] = await Promise.all([
+        fetchData("/api/cruises"),
+        fetchData("/api/reservations/eligible-cruises"),
+      ]);
+
       const normalized = Array.isArray(cruiseData)
         ? cruiseData
+            .filter(isUpcomingCruise)
+            .map((cruise: any) => ({
+              id: String(cruise?.id ?? ""),
+              name: String(cruise?.name ?? cruise?.cruise_name ?? cruise?.title ?? ""),
+            }))
+            .filter((cruise: CruiseOption) => cruise.id && cruise.name)
+        : [];
+
+      const normalizedEligible = Array.isArray(eligibleCruiseData)
+        ? eligibleCruiseData
+            .filter(isUpcomingCruise)
             .map((cruise: any) => ({
               id: String(cruise?.id ?? ""),
               name: String(cruise?.name ?? cruise?.cruise_name ?? cruise?.title ?? ""),
@@ -160,9 +189,12 @@ export default function Reservation() {
       } else {
         setCruises(DEFAULT_CRUISES);
       }
+
+      setAccessibleCruises(normalizedEligible);
     } catch (error) {
       console.log(error);
       setCruises(DEFAULT_CRUISES);
+      setAccessibleCruises([]);
     } finally {
       setIsCruiseLoading(false);
     }
@@ -171,6 +203,19 @@ export default function Reservation() {
   useEffect(() => {
     loadCruises();
   }, []);
+
+  useEffect(() => {
+    if (accessibleCruises.length === 0 && activeCategory !== "Rooms") {
+      setActiveCategory("Rooms");
+    }
+  }, [accessibleCruises.length, activeCategory]);
+
+  useEffect(() => {
+    const allowedIds = new Set(cruiseOptions.map((cruise) => cruise.id));
+    if (selectedCruiseId && !allowedIds.has(selectedCruiseId)) {
+      setSelectedCruiseId("");
+    }
+  }, [cruiseOptions, selectedCruiseId]);
 
   //date and time picker state for Rooms
   const [roomStartDate, setRoomStartDate] = useState<ValuePiece>(new Date());
@@ -652,7 +697,14 @@ useEffect(() => {
 
   useEffect(() => {
     setFormError("");
+    setFormSuccess("");
   }, [activeCategory]);
+
+  useEffect(() => {
+    if (formError) {
+      setFormSuccess("");
+    }
+  }, [formError]);
 
   // Fetch available rooms from backend API
   const loadAvailableRooms = async () => {
@@ -757,6 +809,7 @@ useEffect(() => {
     e.preventDefault();
 
     setFormError("");
+    setFormSuccess("");
 
     if (!selectedCruiseId) {
       setFormError("Please select a cruise before making a reservation.");
@@ -847,6 +900,8 @@ useEffect(() => {
         if (responseData?.reservationId) {
           saveReservationCruiseMapping(responseData.reservationId, selectedCruiseId);
         }
+
+        setFormSuccess("Item reservation submitted successfully.");
 
         // Reset form
         setItemReservationForm({ itemId: "", quantity: "" });
@@ -946,6 +1001,8 @@ useEffect(() => {
         if (responseData?.reservationId) {
           saveReservationCruiseMapping(responseData.reservationId, selectedCruiseId);
         }
+
+        setFormSuccess("Room reservation submitted successfully.");
         
         // Reset form
         setRoomReservationForm({ cabinId: "" });
@@ -958,14 +1015,15 @@ useEffect(() => {
         
         // Refresh available rooms to show updated availability
         await loadAvailableRooms();
+        await loadCruises();
       } 
       catch (error: any) {
         console.error("Failed to create reservation:", error);
         setFormError(error.message);
       }
     } else {
-      // Packages tab - placeholder for future implementation
-      setFormError("Package reservations are not yet implemented.");
+      // Package reservations are handled inside the package events list.
+      return;
     }
   };
 
@@ -983,16 +1041,33 @@ useEffect(() => {
 
         {/*buttons to switch tabs */}
         <div className="tabButtons">
-          {categories.map((category) => (
-            <button
-              key={category}
-              onClick={() => setActiveCategory(category)}
-              className={activeCategory === category ? "activeTab" : ""}
-              disabled={!isCruiseSelected}
-            >
-              {category}
-            </button>
-          ))}
+          <button
+            key="Rooms"
+            onClick={() => setActiveCategory("Rooms")}
+            className={activeCategory === "Rooms" ? "activeTab" : ""}
+          >
+            Rooms
+          </button>
+
+          {accessibleCruises.length > 0 && (
+            <>
+              <button
+                key="Items"
+                onClick={() => setActiveCategory("Items")}
+                className={activeCategory === "Items" ? "activeTab" : ""}
+              >
+                Items
+              </button>
+
+              <button
+                key="Packages"
+                onClick={() => setActiveCategory("Packages")}
+                className={activeCategory === "Packages" ? "activeTab" : ""}
+              >
+                Packages
+              </button>
+            </>
+          )}
         </div>
 
         <br />
@@ -1010,7 +1085,7 @@ useEffect(() => {
                 disabled={isCruiseLoading}
               >
                 <option value="">-- Choose a cruise --</option>
-                {cruises.map((cruise) => (
+                {cruiseOptions.map((cruise) => (
                   <option key={cruise.id} value={cruise.id}>
                     {cruise.name}
                   </option>
@@ -1018,9 +1093,15 @@ useEffect(() => {
               </select>
             </label>
 
+            {activeCategory !== "Rooms" && !isCruiseLoading && cruiseOptions.length === 0 && (
+              <div className="errorMessage" style={{ marginTop: "10px" }}>
+                You need a room reservation on a cruise before booking items there.
+              </div>
+            )}
+
             {!isCruiseSelected && (
               <div className="errorMessage" style={{ marginTop: "10px" }}>
-                Choose a cruise to unlock item and room reservation options.
+                Choose a cruise to continue with this reservation.
               </div>
             )}
 
@@ -1029,7 +1110,7 @@ useEffect(() => {
               style={{ border: "none", padding: 0, margin: 0, minInlineSize: "auto" }}
             >
             {activeCategory === "Packages" ? (
-              <PackageEventsTab />
+              <PackageEventsList />
             ) : activeCategory === "Items" ? (
               <>
                 <label>
@@ -1272,9 +1353,24 @@ useEffect(() => {
                 </div>
               )}
 
-              <button type="submit" className="submitButton">
-                Submit Reservation
-              </button>
+              {formSuccess && (
+                <div
+                  className="errorMessage"
+                  style={{
+                    backgroundColor: "rgba(36, 128, 52, 0.18)",
+                    color: "#0e4a1a",
+                    border: "1px solid rgba(36, 128, 52, 0.4)",
+                  }}
+                >
+                  {formSuccess}
+                </div>
+              )}
+
+              {activeCategory !== "Packages" && (
+                <button type="submit" className="submitButton">
+                  Submit Reservation
+                </button>
+              )}
             </fieldset>
           </form>
         </div>

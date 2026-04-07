@@ -236,6 +236,13 @@ export default function PackageEventsList({ showManagement = false }: Props) {
     return user.role === 'staff' && Number(event.created_by) === Number(user.userId);
   };
 
+  const isEventJoined = (event: any) => {
+    if (!event) return false;
+    if (Boolean(event.is_joined)) return true;
+
+    return events.some((listedEvent) => Number(listedEvent.id) === Number(event.id) && Boolean(listedEvent.is_joined));
+  };
+
   const loadEvents = async () => {
     setLoading(true);
     setError('');
@@ -330,6 +337,27 @@ export default function PackageEventsList({ showManagement = false }: Props) {
     } catch (err: any) {
       console.error(err);
       setError(err.message || 'Could not join this event right now.');
+    }
+  };
+
+  const handleLeaveEvent = async (eventId: number) => {
+    setError('');
+    try {
+      const response = await fetch(`${API_URL}/api/packages/events/${eventId}/leave`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+
+      const body = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(body?.error || 'Could not cancel this reservation right now.');
+      }
+
+      await loadEvents();
+      await openEventDetail(eventId);
+    } catch (err: any) {
+      console.error(err);
+      setError(err.message || 'Could not cancel this reservation right now.');
     }
   };
 
@@ -592,7 +620,7 @@ export default function PackageEventsList({ showManagement = false }: Props) {
                 <td>{event.staff_names || 'TBD'}</td>
                 <td>
                   <button className="smallButton" onClick={() => openEventDetail(event.id)}>
-                    View
+                    View Details
                   </button>
                   {canManageEvent(event) && (
                     <>
@@ -803,13 +831,20 @@ export default function PackageEventsList({ showManagement = false }: Props) {
               </div>
             )}
 
-            <div style={{ marginTop: '14px', display: 'flex', gap: '8px', justifyContent: 'center' }}>
-              {user && Number(selectedEvent.spots_left) > 0 && !selectedEvent.is_joined && (
+            <div style={{ marginTop: '14px', display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center' }}>
+              {user && Number(selectedEvent.spots_left) > 0 && !isEventJoined(selectedEvent) && (
                 <button className="submitButton" onClick={() => handleJoinEvent(selectedEvent.id)}>
                   Reserve My Spot
                 </button>
               )}
-              {selectedEvent.is_joined && <span>You already joined this event.</span>}
+              {isEventJoined(selectedEvent) && (
+                <>
+                  <span>Spot Reserved</span>
+                  <button className="cancelButton" onClick={() => handleLeaveEvent(selectedEvent.id)}>
+                    Cancel Reservation
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>

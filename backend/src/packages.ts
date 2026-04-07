@@ -486,3 +486,28 @@ export async function joinPackageEvent(eventId: number, userId: number) {
         `;
     });
 }
+
+export async function leavePackageEvent(eventId: number, userId: number) {
+    return await sql.begin(async (tx) => {
+        const eventRows = await tx`
+            SELECT id, status
+            FROM package_events
+            WHERE id = ${eventId}
+            FOR UPDATE
+        `;
+
+        if (eventRows.length === 0) {
+            throw new Error('This event could not be found.');
+        }
+
+        const result = await tx`
+            DELETE FROM package_event_attendees
+            WHERE event_id = ${eventId}
+              AND user_id = ${userId}
+        `;
+
+        if (result.count === 0) {
+            throw new Error('You do not currently have a reservation for this event.');
+        }
+    });
+}

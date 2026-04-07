@@ -4,6 +4,7 @@ import {
     createPackageEvent,
     getPackageEventById,
     joinPackageEvent,
+    leavePackageEvent,
     listActivePackageEvents,
     listJoinedPackageEvents,
     updatePackageEvent,
@@ -254,6 +255,26 @@ router.post('/packages/events/:id/join', async (req: Request, res: Response) => 
     } catch (error: any) {
         console.error('Failed to join package event:', error);
         res.status(400).json({ error: error.message || 'Could not join this event right now.' });
+    }
+});
+
+router.post('/packages/events/:id/leave', async (req: Request, res: Response) => {
+    const eventId = Number(req.params.id);
+    if (Number.isNaN(eventId)) {
+        return res.status(400).json({ error: 'Please provide a valid event ID.' });
+    }
+
+    const userId = getAuthenticatedUserId(req);
+    if (!userId) {
+        return res.status(401).json({ error: 'Please sign in to continue.' });
+    }
+
+    try {
+        await leavePackageEvent(eventId, userId);
+        res.json({ message: 'Reservation cancelled successfully' });
+    } catch (error: any) {
+        console.error('Failed to leave package event:', error);
+        res.status(400).json({ error: error.message || 'Could not cancel this reservation right now.' });
     }
 });
 

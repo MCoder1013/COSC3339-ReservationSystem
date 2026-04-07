@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { addReservation, deleteReservation, getAllReservationsWithDetails, getReservationsByUser,
-    updateReservation, getUserRoomReservations, getUserItemReservations, addGuestsToReservation } from '../reservations.js';
+  updateReservation, getUserRoomReservations, getUserItemReservations, addGuestsToReservation, getUserRoomCruises } from '../reservations.js';
 import { validateGuestEmails } from '../users.js';
 import { getAuthenticatedUserId } from './auth.js';
 
@@ -42,7 +42,7 @@ router.post("/reservations", async (req: Request, res: Response) => {
                 start_time,
                 end_time,
                 quantity_reserved
-            });
+            }, [user_id, ...validation.userIds]);
 
             // Add primary user to reservation_groups table
             await addGuestsToReservation(reservationId, [user_id]);
@@ -224,5 +224,21 @@ router.get('/reservations/rooms', async (req: Request, res: Response) => {
         res.status(500).json({ error: 'Failed to load room reservations' });
     }
 });
+
+  router.get('/reservations/eligible-cruises', async (req: Request, res: Response) => {
+    try {
+      const userId = getAuthenticatedUserId(req);
+
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      const cruises = await getUserRoomCruises(userId);
+      res.json(cruises);
+    } catch (error) {
+      console.error('Error fetching eligible cruises:', error);
+      res.status(500).json({ error: 'Failed to load eligible cruises' });
+    }
+  });
 
 export default router;
