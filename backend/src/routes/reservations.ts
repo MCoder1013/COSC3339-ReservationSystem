@@ -42,7 +42,7 @@ router.post("/reservations", async (req: Request, res: Response) => {
                 start_time,
                 end_time,
                 quantity_reserved
-            });
+            }, [user_id, ...validation.userIds]);
 
             // Add primary user to reservation_groups table
             await addGuestsToReservation(reservationId, [user_id]);
@@ -73,10 +73,17 @@ router.post("/reservations", async (req: Request, res: Response) => {
             reservationId
         });
     } catch (error: any) {
-        console.error(error);
-        res.status(400).json({
-            error: error.message || "Error when adding reservation"
+      console.error(error);
+
+      if (error?.code === '23505' && error?.constraint_name === 'unique_user_cruise_room') {
+        return res.status(400).json({
+          error: 'You already have an active room reservation for this cruise.'
         });
+      }
+
+      res.status(400).json({
+        error: error.message || "Error when adding reservation"
+      });
     }
 })
 
