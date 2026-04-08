@@ -352,15 +352,19 @@ export async function updatePackageEvent(eventId: number, input: PackageEventInp
     });
 }
 
-export async function cancelPackageEvent(eventId: number) {
+export async function cancelPackageEvent(eventId: number, cancelledByUserId: number, cancelledByRole: string, cancellationReason: string) {
     await sql`
         UPDATE package_events
-        SET status = 'Cancelled'
+        SET status = 'Cancelled',
+            cancellation_reason = ${cancellationReason},
+            cancelled_by_user_id = ${cancelledByUserId},
+            cancelled_by_role = ${cancelledByRole},
+            cancelled_at = NOW()
         WHERE id = ${eventId}
     `;
 }
 
-export async function getPackageEventById(eventId: number) {
+export async function getPackageEventById(eventId: number, viewerUserId?: number) {
     const eventRows = await sql`
         SELECT
             e.id,
@@ -374,7 +378,19 @@ export async function getPackageEventById(eventId: number) {
             e.created_by,
             COALESCE(att.total_attendees, 0) AS total_attendees,
             GREATEST(e.capacity - COALESCE(att.total_attendees, 0), 0) AS spots_left,
-            (COALESCE(att.total_attendees, 0) >= e.capacity) AS is_full
+                        (COALESCE(att.total_attendees, 0) >= e.capacity) AS is_full,
+                        EXISTS(
+                                SELECT 1
+                                FROM package_event_attendees pea
+                                WHERE pea.event_id = e.id
+                                    AND pea.user_id = ${viewerUserId ?? null}
+                        ) AS is_joined,
+                        EXISTS(
+                                SELECT 1
+                                FROM package_event_staff pes
+                                WHERE pes.event_id = e.id
+                                    AND pes.staff_id = ${viewerUserId ?? null}
+                        ) AS is_staffed
         FROM package_events e
         LEFT JOIN (
             SELECT event_id, COUNT(*)::INT AS total_attendees
@@ -421,6 +437,22 @@ export async function getPackageEventById(eventId: number) {
         staff: staffRows,
         items: itemRows,
     };
+}
+
+export async function listPackageEventAttendees(eventId: number) {
+    const rows = await sql`
+        SELECT
+            u.id,
+            COALESCE(NULLIF(CONCAT_WS(' ', u.first_name, u.last_name), ''), u.email, CAST(u.id AS TEXT)) AS name,
+            u.email,
+            pea.joined_at
+        FROM package_event_attendees pea
+        JOIN users u ON u.id = pea.user_id
+        WHERE pea.event_id = ${eventId}
+        ORDER BY pea.joined_at ASC
+    `;
+
+    return rows;
 }
 
 export async function listActivePackageEvents(userId?: number, cruiseId?: number) {
@@ -612,5 +644,30 @@ export async function joinPackageEvent(eventId: number, userId: number) {
             VALUES (${eventId}, ${userId})
             ON CONFLICT (event_id, user_id) DO NOTHING
         `;
+    });
+}
+
+export async function leavePackageEvent(eventId: number, userId: number) {
+    return await sql.begin(async (tx) => {
+        const eventRows = await tx`
+            SELECT id, status
+            FROM package_events
+            WHERE id = ${eventId}
+            FOR UPDATE
+        `;
+
+        if (eventRows.length === 0) {
+            throw new Error('This event could not be found.');
+        }
+
+        const result = await tx`
+            DELETE FROM package_event_attendees
+            WHERE event_id = ${eventId}
+              AND user_id = ${userId}
+        `;
+
+        if (result.count === 0) {
+            throw new Error('You do not currently have a reservation for this event.');
+        }
     });
 }

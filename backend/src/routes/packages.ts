@@ -4,12 +4,14 @@ import {
     createPackageEvent,
     getPackageEventById,
     joinPackageEvent,
+    leavePackageEvent,
+    listPackageEventAttendees,
     listActivePackageEvents,
     listJoinedPackageEvents,
     updatePackageEvent,
     type PackageEventInput,
 } from '../packages.js';
-import { getUserById } from '../users.js';
+import { getUserById, isUserStaffAdmin } from '../users.js';
 import { getAuthenticatedUserId } from './auth.js';
 
 const router = Router();
@@ -85,9 +87,17 @@ async function getRoleForRequest(req: Request) {
     const user = await getUserById(userId);
     if (!user) return null;
 
+    let role = user.user_role as string;
+    if (role === 'staff') {
+        const staffAdmin = await isUserStaffAdmin(userId);
+        if (staffAdmin) {
+            role = 'admin';
+        }
+    }
+
     return {
         userId,
-        role: user.user_role as string,
+        role,
     };
 }
 
@@ -99,6 +109,25 @@ function canManageEvent(role: string, creatorId: number, userId: number) {
     if (role === 'admin') return true;
     if (role === 'staff' && creatorId === userId) return true;
     return false;
+}
+
+function validateCancellationReason(rawReason: unknown): string | null {
+    const reason = String(rawReason ?? '').trim();
+    if (reason.length < 10) {
+        return null;
+    }
+
+    if (reason.length > 500) {
+        return null;
+    }
+
+    // Allow plain language with common punctuation, disallow markup/code symbols.
+    const safeTextPattern = /^[A-Za-z0-9 ,.!?'"()\-:\n\r]+$/;
+    if (!safeTextPattern.test(reason)) {
+        return null;
+    }
+
+    return reason;
 }
 
 router.get('/packages/events', async (req: Request, res: Response) => {
@@ -140,13 +169,25 @@ router.get('/packages/events/:id', async (req: Request, res: Response) => {
     }
 
     try {
-        const event: any = await getPackageEventById(eventId);
+        const auth = await getRoleForRequest(req);
+        const event: any = await getPackageEventById(eventId, auth?.userId);
         if (!event) {
             return res.status(404).json({ error: 'This event could not be found.' });
         }
 
         if (event.status === 'Cancelled') {
             return res.status(404).json({ error: 'This event could not be found.' });
+        }
+
+        const isAssignedStaff = Boolean(auth && auth.role === 'staff' && Array.isArray(event.staff)
+            && event.staff.some((staffMember: any) => Number(staffMember.id) === Number(auth.userId)));
+        const canViewAttendees = Boolean(auth && (
+            auth.role === 'admin'
+            || (auth.role === 'staff' && (Number(event.created_by) === Number(auth.userId) || isAssignedStaff))
+        ));
+
+        if (canViewAttendees) {
+            event.attendees = await listPackageEventAttendees(eventId);
         }
 
         res.json(event);
@@ -240,8 +281,21 @@ router.post('/packages/events/:id/cancel', async (req: Request, res: Response) =
             return res.status(403).json({ error: 'You do not have permission to cancel this event.' });
         }
 
-        await cancelPackageEvent(eventId);
-        res.json({ message: 'Event cancelled successfully' });
+        const cancellationReason = validateCancellationReason(req.body?.reason);
+        if (!cancellationReason) {
+            return res.status(400).json({
+                error: 'Please provide a valid cancellation reason (10-500 characters, plain text only).',
+            });
+        }
+
+        await cancelPackageEvent(eventId, auth.userId, auth.role, cancellationReason);
+        res.json({
+            message: 'Event cancelled successfully',
+            cancellation: {
+                cancelledBy: auth.role === 'admin' ? 'admin' : 'event creator',
+                reason: cancellationReason,
+            },
+        });
     } catch (error: any) {
         console.error('Failed to cancel package event:', error);
         res.status(400).json({ error: error.message || 'Could not cancel the event. Please try again.' });
@@ -265,6 +319,26 @@ router.post('/packages/events/:id/join', async (req: Request, res: Response) => 
     } catch (error: any) {
         console.error('Failed to join package event:', error);
         res.status(400).json({ error: error.message || 'Could not join this event right now.' });
+    }
+});
+
+router.post('/packages/events/:id/leave', async (req: Request, res: Response) => {
+    const eventId = Number(req.params.id);
+    if (Number.isNaN(eventId)) {
+        return res.status(400).json({ error: 'Please provide a valid event ID.' });
+    }
+
+    const userId = getAuthenticatedUserId(req);
+    if (!userId) {
+        return res.status(401).json({ error: 'Please sign in to continue.' });
+    }
+
+    try {
+        await leavePackageEvent(eventId, userId);
+        res.json({ message: 'Reservation cancelled successfully' });
+    } catch (error: any) {
+        console.error('Failed to leave package event:', error);
+        res.status(400).json({ error: error.message || 'Could not cancel this reservation right now.' });
     }
 });
 

@@ -162,6 +162,9 @@ export default function PackageEventsList({ showManagement = false, onlyJoined =
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [editingEventId, setEditingEventId] = useState<number | null>(null);
   const [editFormState, setEditFormState] = useState<EventFormState>(emptyForm);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelEventId, setCancelEventId] = useState<number | null>(null);
+  const [cancelReason, setCancelReason] = useState('');
 
   const editCreatorShift = useMemo(() => {
     if (!selectedEvent?.created_by) return null;
@@ -232,10 +235,36 @@ export default function PackageEventsList({ showManagement = false, onlyJoined =
     return options;
   }, [editActiveWindow, editFormState.start_time, editingEventId]);
 
+  const isAdminUser = Boolean(
+    user && (
+      user.role === 'admin'
+      || user.canEditInventory === true
+      || String(user.staffRole ?? '').trim().toLowerCase() === 'admin'
+    )
+  );
+
   const canManageEvent = (event: any) => {
     if (!showManagement || !user) return false;
-    if (user.role === 'admin') return true;
+    if (isAdminUser) return true;
     return user.role === 'staff' && Number(event.created_by) === Number(user.userId);
+  };
+
+  const validateCancellationReason = (value: string) => {
+    const reason = value.trim();
+    if (reason.length < 10) {
+      return 'Please enter at least 10 characters for the cancellation reason.';
+    }
+
+    if (reason.length > 500) {
+      return 'Cancellation reason must be 500 characters or less.';
+    }
+
+    const safeTextPattern = /^[A-Za-z0-9 ,.!?'"()\-:\n\r]+$/;
+    if (!safeTextPattern.test(reason)) {
+      return 'Use plain text only (letters, numbers, spaces, and common punctuation).';
+    }
+
+    return null;
   };
 
   const loadEvents = async () => {
@@ -360,6 +389,32 @@ export default function PackageEventsList({ showManagement = false, onlyJoined =
     }
   };
 
+  const handleLeaveEvent = async (eventId: number) => {
+    setError('');
+    try {
+      const response = await fetch(`${API_URL}/api/packages/events/${eventId}/leave`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+
+      const body = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(body?.error || 'Could not cancel this reservation right now.');
+      }
+
+      await loadEvents();
+      if (onlyJoined) {
+        setShowDetailModal(false);
+        setSelectedEvent(null);
+      } else {
+        await openEventDetail(eventId);
+      }
+    } catch (err: any) {
+      console.error(err);
+      setError(err.message || 'Could not cancel this reservation right now.');
+    }
+  };
+
   const beginEditEvent = async (eventId: number) => {
     setError('');
     try {
@@ -411,12 +466,37 @@ export default function PackageEventsList({ showManagement = false, onlyJoined =
     }
   }, [editEndTimeOptions, editFormState.end_time, editFormState.start_time, editStartTimeOptions, editingEventId]);
 
-  const cancelEvent = async (eventId: number) => {
+  const openCancelModal = (eventId: number) => {
+    setCancelEventId(eventId);
+    setCancelReason('');
+    setShowCancelModal(true);
+  };
+
+  const closeCancelModal = () => {
+    setShowCancelModal(false);
+    setCancelEventId(null);
+    setCancelReason('');
+  };
+
+  const cancelEvent = async () => {
+    if (cancelEventId === null) return;
+
     setError('');
+
+    const validationError = validateCancellationReason(cancelReason);
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
     try {
-      const response = await fetch(`${API_URL}/api/packages/events/${eventId}/cancel`, {
+      const response = await fetch(`${API_URL}/api/packages/events/${cancelEventId}/cancel`, {
         method: 'POST',
         credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ reason: cancelReason.trim() }),
       });
 
       const body = await response.json().catch(() => null);
@@ -425,10 +505,12 @@ export default function PackageEventsList({ showManagement = false, onlyJoined =
       }
 
       await loadEvents();
-      if (selectedEvent?.id === eventId) {
+      if (selectedEvent?.id === cancelEventId) {
         setShowDetailModal(false);
         setSelectedEvent(null);
       }
+
+      closeCancelModal();
     } catch (err: any) {
       console.error(err);
       setError(err.message || 'Could not cancel this event right now.');
@@ -626,7 +708,7 @@ export default function PackageEventsList({ showManagement = false, onlyJoined =
                       <button type="button" className="smallButton" onClick={() => beginEditEvent(event.id)}>
                         Edit
                       </button>
-                      <button type="button" className="smallButton" onClick={() => cancelEvent(event.id)}>
+                      <button type="button" className="smallButton" onClick={() => openCancelModal(event.id)}>
                         Cancel
                       </button>
                     </>
@@ -674,6 +756,23 @@ export default function PackageEventsList({ showManagement = false, onlyJoined =
                 ? selectedEvent.staff.map((staff: any) => `${staff.name} (${staff.shift})`).join(', ')
                 : 'TBD'}
             </p>
+
+            {Array.isArray(selectedEvent.attendees) && (
+              <div>
+                <p style={{ marginBottom: '8px' }}><strong>Attendees:</strong></p>
+                {selectedEvent.attendees.length === 0 ? (
+                  <p style={{ marginTop: 0 }}>No attendees have joined yet.</p>
+                ) : (
+                  <ul style={{ marginTop: 0, paddingLeft: '20px' }}>
+                    {selectedEvent.attendees.map((attendee: any) => (
+                      <li key={attendee.id}>
+                        {attendee.name} ({attendee.email})
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
 
             {editingEventId === selectedEvent.id && (
               <div style={{ marginTop: '14px', borderTop: '1px solid #ddd', paddingTop: '14px' }}>
@@ -836,7 +935,60 @@ export default function PackageEventsList({ showManagement = false, onlyJoined =
                   Reserve My Spot
                 </button>
               )}
-              {selectedEvent.is_joined && <span>You already joined this event.</span>}
+              {selectedEvent.is_joined && (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                  <span>Spot Reserved</span>
+                  <button type="button" className="cancelButton" onClick={() => handleLeaveEvent(selectedEvent.id)}>
+                    Cancel Reservation
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showCancelModal && cancelEventId !== null && (
+        <div className="modalOverlay" onClick={closeCancelModal}>
+          <div
+            className="modalContent packageEventModalContent"
+            style={{ maxWidth: '560px', padding: '20px' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modalHeader">
+              <h3 style={{ margin: 0 }}>Cancel Event</h3>
+              <button className="modalCloseButton" onClick={closeCancelModal} aria-label="Close cancel event dialog">
+                x
+              </button>
+            </div>
+
+            <p style={{ marginBottom: '8px' }}>
+              Enter a cancellation reason. This reason will be included in event status notifications.
+            </p>
+
+            <label htmlFor="cancel-reason-input" style={{ display: 'block', marginBottom: '6px' }}>
+              Reason
+            </label>
+            <textarea
+              id="cancel-reason-input"
+              className="itemInput"
+              style={{ width: '100%', minHeight: '120px', resize: 'vertical' }}
+              maxLength={500}
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+              placeholder="Example: Weather alert requires cancellation for guest safety."
+            />
+            <p style={{ marginTop: '6px', marginBottom: '0', fontSize: '0.9rem' }}>
+              {cancelReason.trim().length}/500 characters
+            </p>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '14px' }}>
+              <button type="button" className="cancelButton" onClick={closeCancelModal}>
+                Keep Event
+              </button>
+              <button type="button" className="submitButton" onClick={cancelEvent}>
+                Submit Cancellation
+              </button>
             </div>
           </div>
         </div>
