@@ -13,7 +13,7 @@ export async function tryRegister(firstName: string, lastName: string, email: st
 }
 
 export async function insertStaff(staff_id: number, role: string, shift: string) {
-  await sql`
+    await sql`
     INSERT INTO staff
       (staff_id, role, shift)
     VALUES
@@ -26,6 +26,8 @@ export async function getUserByEmail(email: string) {
     return result[0]; // first user or undefined
 }
 
+export type UserRole = 'normal' | 'staff' | 'admin';
+
 export interface User {
     id: number;
     email: string;
@@ -35,7 +37,7 @@ export interface User {
     created_at: Date;
     profile_picture: string;
     biography: string;
-    user_role: 'normal' | 'staff' | 'admin';
+    user_role: UserRole;
 }
 export async function getUserById(id: number): Promise<User | null> {
     const result = await sql`SELECT * FROM users WHERE id = ${id}`;
@@ -76,11 +78,6 @@ export async function getStaffRoleByUserId(userId: number): Promise<string | nul
     `;
 
     return (result[0]?.role as string | undefined) ?? null;
-}
-
-export async function isUserStaffAdmin(userId: number): Promise<boolean> {
-    const staffRole = await getStaffRoleByUserId(userId);
-    return staffRole?.trim().toLowerCase() === 'admin';
 }
 
 export async function updateUserRole(userId: number, newRole: string): Promise<void> {
