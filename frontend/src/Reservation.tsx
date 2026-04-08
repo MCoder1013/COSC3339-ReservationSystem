@@ -9,6 +9,7 @@ import "react-calendar/dist/Calendar.css";
 import { formatInTimeZone } from 'date-fns-tz';
 import NavBar from "./NavBar";
 import PackageEventsTab from './PackageEventsTab';
+import { useAuth } from './AuthContext';
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -34,6 +35,7 @@ type RoomReservationWindow = {
 const RESERVATION_CRUISE_MAP_KEY = "reservationCruiseMapV1";
 
 export default function Reservation() {
+  const { user } = useAuth();
   const shipName = "Starlight Pearl Cruises";
 
 
@@ -48,6 +50,8 @@ export default function Reservation() {
   const [isCruiseLoading, setIsCruiseLoading] = useState<boolean>(true);
   const [reservationCruiseMap, setReservationCruiseMap] = useState<Record<string, string>>({});
   const isCruiseSelected = selectedCruiseId !== "";
+  const normalizedRole = String(user?.role ?? "").toLowerCase();
+  const hideRoomsTab = normalizedRole === "staff" || normalizedRole === "admin" || String(user?.staffRole ?? "").toLowerCase() === "admin";
 
   //current selected tab/category
   const [activeCategory, setActiveCategory] =
@@ -196,10 +200,17 @@ export default function Reservation() {
   }, []);
 
   useEffect(() => {
+    if (hideRoomsTab) {
+      if (activeCategory === "Rooms") {
+        setActiveCategory("Items");
+      }
+      return;
+    }
+
     if (accessibleCruises.length === 0 && activeCategory !== "Rooms") {
       setActiveCategory("Rooms");
     }
-  }, [accessibleCruises.length, activeCategory]);
+  }, [accessibleCruises.length, activeCategory, hideRoomsTab]);
 
   useEffect(() => {
     const allowedIds = new Set(cruiseOptions.map((cruise) => cruise.id));
@@ -1037,13 +1048,15 @@ useEffect(() => {
 
         {/*buttons to switch tabs */}
         <div className="tabButtons">
-          <button
-            key="Rooms"
-            onClick={() => setActiveCategory("Rooms")}
-            className={activeCategory === "Rooms" ? "activeTab" : ""}
-          >
-            Rooms
-          </button>
+          {!hideRoomsTab && (
+            <button
+              key="Rooms"
+              onClick={() => setActiveCategory("Rooms")}
+              className={activeCategory === "Rooms" ? "activeTab" : ""}
+            >
+              Rooms
+            </button>
+          )}
 
           {accessibleCruises.length > 0 && (
             <>
