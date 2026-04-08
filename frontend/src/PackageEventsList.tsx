@@ -24,6 +24,8 @@ const SHIFT_WINDOWS: Record<Shift, ShiftWindow> = {
 
 type Props = {
   showManagement?: boolean;
+  onlyJoined?: boolean;
+  cruiseId?: string;
 };
 
 type ItemRequirement = {
@@ -147,7 +149,7 @@ function toReadableDateTime(value: string) {
   return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
 }
 
-export default function PackageEventsList({ showManagement = false }: Props) {
+export default function PackageEventsList({ showManagement = false, onlyJoined = false, cruiseId }: Props) {
   const { user } = useAuth();
 
   const [events, setEvents] = useState<any[]>([]);
@@ -247,8 +249,32 @@ export default function PackageEventsList({ showManagement = false }: Props) {
     setLoading(true);
     setError('');
     try {
-      const data = await fetchData('/api/packages/events');
-      setEvents(Array.isArray(data) ? data : []);
+      const baseEndpoint = onlyJoined ? '/api/packages/my-events' : '/api/packages/events';
+      const endpoint = cruiseId
+        ? `${baseEndpoint}?cruise_id=${encodeURIComponent(cruiseId)}`
+        : baseEndpoint;
+      const data = await fetchData(endpoint);
+      const list = Array.isArray(data) ? data : [];
+
+      if (onlyJoined) {
+        const now = new Date();
+        const currentAndFuture = list.filter((event: any) => {
+          if (String(event?.status ?? '').toLowerCase() === 'cancelled') {
+            return false;
+          }
+
+          const end = new Date(event.end_time);
+          if (Number.isNaN(end.getTime())) {
+            return false;
+          }
+
+          return end >= now;
+        });
+
+        setEvents(currentAndFuture);
+      } else {
+        setEvents(list);
+      }
     } catch (err) {
       console.error(err);
       setError('Unable to load package events right now. Please try again.');
@@ -277,7 +303,7 @@ export default function PackageEventsList({ showManagement = false }: Props) {
   useEffect(() => {
     loadEvents();
     loadEditFormData();
-  }, []);
+  }, [cruiseId, onlyJoined]);
 
   useEffect(() => {
     const refreshOnUpdate = () => {
@@ -354,7 +380,12 @@ export default function PackageEventsList({ showManagement = false }: Props) {
       }
 
       await loadEvents();
-      await openEventDetail(eventId);
+      if (onlyJoined) {
+        setShowDetailModal(false);
+        setSelectedEvent(null);
+      } else {
+        await openEventDetail(eventId);
+      }
     } catch (err: any) {
       console.error(err);
       setError(err.message || 'Could not cancel this reservation right now.');
@@ -551,6 +582,7 @@ export default function PackageEventsList({ showManagement = false }: Props) {
     }
 
     const payload = {
+      cruise_id: Number(selectedEvent?.cruise_id),
       name: editFormState.name.trim(),
       description: editFormState.description.trim(),
       capacity: Number(editFormState.capacity),
@@ -601,7 +633,7 @@ export default function PackageEventsList({ showManagement = false }: Props) {
       {error && <div className="errorMessage">{error}</div>}
 
       {events.length === 0 ? (
-        <p>No active package events are available right now.</p>
+        <p>{onlyJoined ? 'You have no current or future package reservations.' : 'No active package events are available right now.'}</p>
       ) : (
         <table className="inventoryTable">
           <thead>
@@ -619,15 +651,15 @@ export default function PackageEventsList({ showManagement = false }: Props) {
                 <td>{Number(event.spots_left) <= 0 ? 'FULL' : event.spots_left}</td>
                 <td>{event.staff_names || 'TBD'}</td>
                 <td>
-                  <button className="smallButton" onClick={() => openEventDetail(event.id)}>
+                  <button type="button" className="smallButton" onClick={() => openEventDetail(event.id)}>
                     View Details
                   </button>
                   {canManageEvent(event) && (
                     <>
-                      <button className="smallButton" onClick={() => beginEditEvent(event.id)}>
+                      <button type="button" className="smallButton" onClick={() => beginEditEvent(event.id)}>
                         Edit
                       </button>
-                      <button className="smallButton" onClick={() => cancelEvent(event.id)}>
+                      <button type="button" className="smallButton" onClick={() => cancelEvent(event.id)}>
                         Cancel
                       </button>
                     </>
@@ -655,6 +687,7 @@ export default function PackageEventsList({ showManagement = false }: Props) {
             <div className="modalHeader">
               <h3 style={{ margin: 0 }}>{selectedEvent.name}</h3>
               <button
+                type="button"
                 className="modalCloseButton"
                 onClick={() => {
                   setShowDetailModal(false);
@@ -821,7 +854,7 @@ export default function PackageEventsList({ showManagement = false }: Props) {
                 </div>
 
                 <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
-                  <button className="submitButton" onClick={() => saveEdit(selectedEvent.id)}>
+                  <button type="button" className="submitButton" onClick={() => saveEdit(selectedEvent.id)}>
                     Save Changes
                   </button>
                   <button type="button" className="cancelButton" onClick={() => setEditingEventId(null)}>
@@ -833,14 +866,14 @@ export default function PackageEventsList({ showManagement = false }: Props) {
 
             <div style={{ marginTop: '14px', display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center' }}>
               {user && Number(selectedEvent.spots_left) > 0 && !isEventJoined(selectedEvent) && (
-                <button className="submitButton" onClick={() => handleJoinEvent(selectedEvent.id)}>
+                <button type="button" className="submitButton" onClick={() => handleJoinEvent(selectedEvent.id)}>
                   Reserve My Spot
                 </button>
               )}
               {isEventJoined(selectedEvent) && (
                 <>
                   <span>Spot Reserved</span>
-                  <button className="cancelButton" onClick={() => handleLeaveEvent(selectedEvent.id)}>
+                  <button type="button" className="cancelButton" onClick={() => handleLeaveEvent(selectedEvent.id)}>
                     Cancel Reservation
                   </button>
                 </>

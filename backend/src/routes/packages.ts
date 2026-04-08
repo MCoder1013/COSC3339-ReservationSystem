@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import {
+    canUserAccessCruiseEvents,
     cancelPackageEvent,
     createPackageEvent,
     getPackageEventById,
@@ -28,6 +29,7 @@ function parseEventInput(body: any): PackageEventInput {
         : [];
 
     return {
+        cruise_id: Number(body.cruise_id),
         name: String(body.name ?? '').trim(),
         description: String(body.description ?? '').trim(),
         capacity: Number(body.capacity),
@@ -42,6 +44,7 @@ function parseEventInput(body: any): PackageEventInput {
 }
 
 function validateBasicInput(input: PackageEventInput): string | null {
+    if (!Number.isInteger(input.cruise_id) || input.cruise_id < 1) return 'A valid cruise must be selected.';
     if (!input.name) return 'Event name is required.';
     if (!input.description) return 'Event description is required.';
     if (!Number.isInteger(input.capacity) || input.capacity < 1) return 'Capacity must be at least 1.';
@@ -102,8 +105,23 @@ function canManageEvent(role: string, creatorId: number, userId: number) {
 
 router.get('/packages/events', async (req: Request, res: Response) => {
     try {
-        const userId = getAuthenticatedUserId(req);
-        const events = await listActivePackageEvents(userId);
+        const auth = await getRoleForRequest(req);
+        if (!auth) {
+            return res.status(401).json({ error: 'Please sign in to continue.' });
+        }
+
+        const cruiseIdParam = req.query.cruise_id;
+        const cruiseId = cruiseIdParam == null ? undefined : Number(cruiseIdParam);
+
+        if (cruiseIdParam != null && Number.isNaN(cruiseId)) {
+            return res.status(400).json({ error: 'Please provide a valid cruise ID.' });
+        }
+
+        if (auth.role === 'normal' && cruiseId == null) {
+            return res.json([]);
+        }
+
+        const events = await listActivePackageEvents(auth.userId, cruiseId);
         res.json(events);
     } catch (error) {
         console.error('Failed to list package events:', error);
@@ -133,6 +151,11 @@ router.get('/packages/events/:id', async (req: Request, res: Response) => {
     }
 
     try {
+        const auth = await getRoleForRequest(req);
+        if (!auth) {
+            return res.status(401).json({ error: 'Please sign in to continue.' });
+        }
+
         const event: any = await getPackageEventById(eventId);
         if (!event) {
             return res.status(404).json({ error: 'This event could not be found.' });
@@ -140,6 +163,17 @@ router.get('/packages/events/:id', async (req: Request, res: Response) => {
 
         if (event.status === 'Cancelled') {
             return res.status(404).json({ error: 'This event could not be found.' });
+        }
+
+        if (auth.role === 'normal') {
+            const cruiseId = Number(event.cruise_id);
+            const canAccess = Number.isInteger(cruiseId) && cruiseId > 0
+                ? await canUserAccessCruiseEvents(auth.userId, cruiseId)
+                : false;
+
+            if (!canAccess) {
+                return res.status(403).json({ error: 'You do not have access to events on this cruise.' });
+            }
         }
 
         res.json(event);

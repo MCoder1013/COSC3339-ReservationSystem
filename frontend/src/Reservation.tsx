@@ -1110,7 +1110,13 @@ useEffect(() => {
               style={{ border: "none", padding: 0, margin: 0, minInlineSize: "auto" }}
             >
             {activeCategory === "Packages" ? (
-              <PackageEventsList />
+              isCruiseSelected ? (
+                <PackageEventsList cruiseId={selectedCruiseId} />
+              ) : (
+                <div className="errorMessage" style={{ marginTop: "10px" }}>
+                  Select a cruise to view available package events.
+                </div>
+              )
             ) : activeCategory === "Items" ? (
               <>
                 <label>
