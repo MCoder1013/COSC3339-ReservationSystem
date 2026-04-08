@@ -155,7 +155,7 @@ export default function Reservation() {
     setIsCruiseLoading(true);
     try {
       const [cruiseData, eligibleCruiseData] = await Promise.all([
-        fetchData("/api/cruises"),
+        fetchData("/api/cruises?scope=all"),
         fetchData("/api/reservations/eligible-cruises"),
       ]);
 
@@ -1091,7 +1091,7 @@ useEffect(() => {
 
             {activeCategory === "Rooms" && !isCruiseLoading && cruiseOptions.length === 0 && (
               <div className="errorMessage" style={{ marginTop: "10px" }}>
-                No cruises available for your account yet. Ask an admin to assign you to a cruise first.
+                No currently available cruises can be booked right now.
               </div>
             )}
 

@@ -143,6 +143,12 @@ router.get('/cruises', async (req: Request, res: Response) => {
             return res.status(401).json({ error: 'Not authenticated' });
         }
 
+        const scope = typeof req.query.scope === 'string' ? req.query.scope.toLowerCase() : '';
+        if (scope === 'all') {
+            const cruises = await pullCruises();
+            return res.json(cruises);
+        }
+
         const user = await getUserById(userId);
         if (!user) {
             return res.status(404).json({ error: 'User not found' });

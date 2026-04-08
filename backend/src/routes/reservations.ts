@@ -76,6 +76,11 @@ router.post("/reservations", async (req: Request, res: Response) => {
         });
     } catch (error: any) {
         console.error(error);
+        if (error?.code === '23505' && error?.constraint_name === 'unique_user_cruise') {
+          return res.status(409).json({
+            error: 'You already have an active room reservation on this cruise.'
+          });
+        }
         res.status(400).json({
             error: error.message || "Error when adding reservation"
         });
