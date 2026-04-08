@@ -10,7 +10,7 @@ import {
     type PackageEventInput,
 } from '../packages.js';
 import { getUserById } from '../users.js';
-import { getAuthenticatedUserId } from './auth.js';
+import { authRequired } from './index.js';
 
 const router = Router();
 
@@ -77,8 +77,7 @@ function validateBasicInput(input: PackageEventInput): string | null {
 }
 
 async function getRoleForRequest(req: Request) {
-    const userId = getAuthenticatedUserId(req);
-    if (!userId) return null;
+    const userId = req.user!.id;
 
     const user = await getUserById(userId);
     if (!user) return null;
@@ -99,9 +98,9 @@ function canManageEvent(role: string, creatorId: number, userId: number) {
     return false;
 }
 
-router.get('/packages/events', async (req: Request, res: Response) => {
+router.get('/packages/events', authRequired, async (req: Request, res: Response) => {
     try {
-        const userId = getAuthenticatedUserId(req);
+        const userId = req.user!.id;
         const events = await listActivePackageEvents(userId);
         res.json(events);
     } catch (error) {
@@ -110,11 +109,8 @@ router.get('/packages/events', async (req: Request, res: Response) => {
     }
 });
 
-router.get('/packages/my-events', async (req: Request, res: Response) => {
-    const userId = getAuthenticatedUserId(req);
-    if (!userId) {
-        return res.status(401).json({ error: 'Please sign in to continue.' });
-    }
+router.get('/packages/my-events', authRequired, async (req: Request, res: Response) => {
+    const userId = req.user!.id;
 
     try {
         const events = await listJoinedPackageEvents(userId);
@@ -125,7 +121,7 @@ router.get('/packages/my-events', async (req: Request, res: Response) => {
     }
 });
 
-router.get('/packages/events/:id', async (req: Request, res: Response) => {
+router.get('/packages/events/:id', authRequired, async (req: Request, res: Response) => {
     const eventId = Number(req.params.id);
     if (Number.isNaN(eventId)) {
         return res.status(400).json({ error: 'Please provide a valid event ID.' });
@@ -148,7 +144,7 @@ router.get('/packages/events/:id', async (req: Request, res: Response) => {
     }
 });
 
-router.post('/packages/events', async (req: Request, res: Response) => {
+router.post('/packages/events', authRequired, async (req: Request, res: Response) => {
     const auth = await getRoleForRequest(req);
     if (!auth) {
         return res.status(401).json({ error: 'Please sign in to continue.' });
@@ -173,7 +169,7 @@ router.post('/packages/events', async (req: Request, res: Response) => {
     }
 });
 
-router.put('/packages/events/:id', async (req: Request, res: Response) => {
+router.put('/packages/events/:id', authRequired, async (req: Request, res: Response) => {
     const eventId = Number(req.params.id);
     if (Number.isNaN(eventId)) {
         return res.status(400).json({ error: 'Please provide a valid event ID.' });
@@ -208,7 +204,7 @@ router.put('/packages/events/:id', async (req: Request, res: Response) => {
     }
 });
 
-router.post('/packages/events/:id/cancel', async (req: Request, res: Response) => {
+router.post('/packages/events/:id/cancel', authRequired, async (req: Request, res: Response) => {
     const eventId = Number(req.params.id);
     if (Number.isNaN(eventId)) {
         return res.status(400).json({ error: 'Please provide a valid event ID.' });
@@ -237,16 +233,13 @@ router.post('/packages/events/:id/cancel', async (req: Request, res: Response) =
     }
 });
 
-router.post('/packages/events/:id/join', async (req: Request, res: Response) => {
+router.post('/packages/events/:id/join', authRequired, async (req: Request, res: Response) => {
     const eventId = Number(req.params.id);
     if (Number.isNaN(eventId)) {
         return res.status(400).json({ error: 'Please provide a valid event ID.' });
     }
 
-    const userId = getAuthenticatedUserId(req);
-    if (!userId) {
-        return res.status(401).json({ error: 'Please sign in to continue.' });
-    }
+    const userId = req.user!.id;
 
     try {
         await joinPackageEvent(eventId, userId);

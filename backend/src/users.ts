@@ -26,9 +26,20 @@ export async function getUserByEmail(email: string) {
     return result[0]; // first user or undefined
 }
 
-export async function getUserById(id: number) {
+export interface User {
+    id: number;
+    email: string;
+    first_name: string;
+    last_name: string;
+    password_hash: string;
+    created_at: Date;
+    profile_picture: string;
+    biography: string;
+    user_role: 'normal' | 'staff' | 'admin';
+}
+export async function getUserById(id: number): Promise<User | null> {
     const result = await sql`SELECT * FROM users WHERE id = ${id}`;
-    return result[0] ?? null;
+    return (result[0] as User) ?? null;
 }
 
 export async function updateUserProfile(id: number, biography: string, profilePicture: string) {

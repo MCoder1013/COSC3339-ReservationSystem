@@ -5,6 +5,7 @@ import jwt from 'jsonwebtoken';
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import { authRequired } from './index.js';
 
 
 const router = Router();
@@ -13,13 +14,13 @@ const router = Router();
 const emailRegex = /(?:[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*|"(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21\x23-\x5b\x5d-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])*")@(?:(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?|\[(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?|[a-z0-9-]*[a-z0-9]:(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21-\x5a\x53-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])+)\])/
 
 // TODO: store user sessions in the database!
-let jwtSecret: string = process.env.JWT_SECRET ?? ''
+export let jwtSecret: string = process.env.JWT_SECRET ?? ''
 if (!jwtSecret) {
   console.warn('No JWT_SECRET environment variable is set, please set something if you\'re running in prod')
   jwtSecret = 'devsecret'
 }
 
-router.post('/register', async (req, res) => { 
+router.post('/register', async (req, res) => {
   const firstName = req.body.firstName;
   const lastName = req.body.lastName;
   let email = req.body.email;
@@ -136,7 +137,9 @@ router.post('/login', async (req: Request, res: Response) => {
     res
       .cookie('jwt', token, {
         httpOnly: true,
-        sameSite: 'lax'
+        sameSite: 'lax',
+        // expire after a year
+        maxAge: 31_536_000_000
       })
       .json({
         message: 'Login successful',
@@ -152,18 +155,13 @@ router.post('/login', async (req: Request, res: Response) => {
   }
 });
 
-router.post('/signout', (req: Request, res: Response) => {
+router.post('/signout', authRequired, (req: Request, res: Response) => {
   res.clearCookie('jwt').json({ message: 'Signed out successfully' });
 });
 
-router.get('/me', async (req: Request, res: Response) => {
-  const token = req.cookies?.jwt;
-  if (!token) return res.status(401).json({ error: 'Not authenticated' });
-
+router.get('/me', authRequired, async (req: Request, res: Response) => {
   try {
-    const decoded = jwt.verify(token, jwtSecret) as { id: number };
-    const user = await database.getUserById(decoded.id);
-    if (!user) return res.status(404).json({ error: 'User not found' });
+    const user = req.user!;
 
     const staffRole = user.user_role === 'staff'
       ? await database.getStaffRoleByUserId(user.id)
@@ -263,17 +261,6 @@ router.post('/update-profile', upload.single('profilePicture'), async (req: Requ
   }
 });
 
-export function getAuthenticatedUserId(req: Request): number | undefined {
-  const cookie = req.cookies['jwt']
-  if (!cookie) return undefined
-
-  try {
-    const decoded = jwt.verify(cookie, jwtSecret) as { id: number } | undefined;
-    return decoded?.id
-  } catch {
-    return undefined
-  }
-}
 
 router.post('/update-user-role', async (req: Request, res: Response) => {
   const token = req.cookies?.jwt;

@@ -3,18 +3,14 @@ import { pullRooms, addRoom, deleteRoom } from '../rooms.js';
 import { pullResources, addResources, deleteResource, countRemaining } from '../resources.js';
 import { pullStaff, addStaff, deleteStaff } from '../staff.js';
 import { pullCruises } from '../cruises.js';
-import { getAuthenticatedUserId } from './auth.js';
 import { isUserStaffAdmin } from '../users.js';
+import { authRequired } from './index.js';
 
 const router = Router();
 
 async function ensureInventoryEditor(req: Request, res: Response): Promise<boolean> {
     try {
-        const userId = getAuthenticatedUserId(req);
-        if (!userId) {
-            res.status(401).json({ error: 'Not authenticated' });
-            return false;
-        }
+        const userId = req.user!.id;
 
         const canEdit = await isUserStaffAdmin(userId);
         if (!canEdit) {
@@ -33,7 +29,7 @@ async function ensureInventoryEditor(req: Request, res: Response): Promise<boole
 // ROOMS 
 
 // ROOMS-GET - gets all rooms 
-router.get('/rooms', async (req: Request, res: Response) => {
+router.get('/rooms', authRequired, async (req: Request, res: Response) => {
     try {
         const rooms = await pullRooms();
         res.json(rooms);
@@ -44,7 +40,7 @@ router.get('/rooms', async (req: Request, res: Response) => {
 
 
 // ROOMS-POST 
-router.post("/rooms", async (req: Request, res: Response) => {
+router.post("/rooms", authRequired, async (req: Request, res: Response) => {
     if (!(await ensureInventoryEditor(req, res))) {
         return;
     }
@@ -66,7 +62,7 @@ router.post("/rooms", async (req: Request, res: Response) => {
 
 
 // ROOMS-DELETE - deletes room by cabin number
-router.delete('/rooms/:cabin_number', async (req: Request, res: Response) => {
+router.delete('/rooms/:cabin_number', authRequired, async (req: Request, res: Response) => {
     if (!(await ensureInventoryEditor(req, res))) {
         return;
     }
@@ -88,7 +84,7 @@ router.delete('/rooms/:cabin_number', async (req: Request, res: Response) => {
 // STAFF 
 
 // STAFF-DELETE - deletes staff by id 
-router.delete('/staff/:id', async (req: Request, res: Response) => {
+router.delete('/staff/:id', authRequired, async (req: Request, res: Response) => {
     const id = Number(req.params.id);
     if (isNaN(id)) {
         return res.status(400).json({ message: "Invalid ID format" });
@@ -107,7 +103,7 @@ router.delete('/staff/:id', async (req: Request, res: Response) => {
 });
 
 // STAFF-POST
-router.post("/staff", async (req: Request, res: Response) => {
+router.post("/staff", authRequired, async (req: Request, res: Response) => {
     const { name, role, email, shift } = req.body;
 
     try {
@@ -123,7 +119,7 @@ router.post("/staff", async (req: Request, res: Response) => {
 });
 
 // STAFF-GET - gets all staff 
-router.get('/staff', async (req: Request, res: Response) => {
+router.get('/staff', authRequired, async (req: Request, res: Response) => {
     try {
         const staff = await pullStaff();
         res.json(staff);
@@ -135,7 +131,7 @@ router.get('/staff', async (req: Request, res: Response) => {
 // RESOURCES -- RES
 
 // CRUISES-GET - gets all cruises
-router.get('/cruises', async (_req: Request, res: Response) => {
+router.get('/cruises', authRequired, async (_req: Request, res: Response) => {
         try {
                 const cruises = await pullCruises();
                 res.json(cruises);
@@ -145,7 +141,7 @@ router.get('/cruises', async (_req: Request, res: Response) => {
 });
 
 // RES-GETAVAILABLE - gets avaialbel at current time  
-router.get('/resources/availability', async(req: Request, res: Response) => {
+router.get('/resources/availability', authRequired, async(req: Request, res: Response) => {
     try {
                 const { resource_id, start_time, end_time, cruise_id } = req.query;
 
@@ -166,7 +162,7 @@ router.get('/resources/availability', async(req: Request, res: Response) => {
 });
 
 // RES-DELETE
-router.delete('/resources/:name', async (req: Request, res: Response) => {
+router.delete('/resources/:name', authRequired, async (req: Request, res: Response) => {
     if (!(await ensureInventoryEditor(req, res))) {
         return;
     }
@@ -186,7 +182,7 @@ router.delete('/resources/:name', async (req: Request, res: Response) => {
 });
 
 // RES-POST
-router.post("/resources", async (req: Request, res: Response) => {
+router.post("/resources", authRequired, async (req: Request, res: Response) => {
     if (!(await ensureInventoryEditor(req, res))) {
         return;
     }
@@ -207,7 +203,7 @@ router.post("/resources", async (req: Request, res: Response) => {
 
 
 // RES-GETALL - gets all resources in inventory with total count 
-router.get('/resources', async (req: Request, res: Response) => {
+router.get('/resources', authRequired, async (req: Request, res: Response) => {
     try {
         const items = await pullResources();
         res.json(items);
