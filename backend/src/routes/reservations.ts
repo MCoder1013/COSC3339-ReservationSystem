@@ -3,6 +3,7 @@ import { addReservation, deleteReservation, getAllReservationsWithDetails, getRe
   updateReservation, getUserRoomReservations, getUserItemReservations, addGuestsToReservation, getUserRoomCruises } from '../reservations.js';
 import { validateGuestEmails } from '../users.js';
 import { getAuthenticatedUserId } from './auth.js';
+import { sql } from '../database.js';
 
 const router = Router();
 
@@ -163,7 +164,73 @@ router.delete('/reservations/:id', async (req: Request, res: Response) => {
 // RES-GET - gets all reservations for everyone full information  
 router.get("/reservations", async (req: Request, res: Response) => {
     try {
-        const result = await getAllReservationsWithDetails();
+    const result = await sql`
+      SELECT *
+      FROM (
+        SELECT
+          r.id,
+          'reservation' AS reservation_type,
+          r.user_id,
+          r.cabin_id,
+          r.resource_id,
+          r.staff_id,
+          r.cruise_id,
+          r.start_time,
+          r.end_time,
+          r.status,
+          r.quantity_reserved,
+          u.first_name,
+          u.last_name,
+          u.email,
+          c.cabin_number,
+                    c.type::VARCHAR AS type,
+          c.deck,
+          c.capacity,
+          cr.cruise_name,
+          res.name AS resource_name,
+          res.category,
+          NULL::INT AS event_id,
+          NULL::VARCHAR AS event_name
+        FROM reservations r
+        LEFT JOIN users u ON r.user_id = u.id
+        LEFT JOIN cabins c ON r.cabin_id = c.id
+        LEFT JOIN cruises cr ON r.cruise_id = cr.id
+        LEFT JOIN resources res ON r.resource_id = res.id
+
+        UNION ALL
+
+        SELECT
+          (-1 * (pe.id * 1000 + pei.resource_id))::INT AS id,
+          'package_event_item' AS reservation_type,
+          pe.created_by AS user_id,
+          NULL::INT AS cabin_id,
+          pei.resource_id,
+          NULL::INT AS staff_id,
+          pe.cruise_id,
+          pe.start_time,
+          pe.end_time,
+          'Confirmed'::reservations_status AS status,
+          pei.quantity_required AS quantity_reserved,
+          u.first_name,
+          u.last_name,
+          u.email,
+          NULL::VARCHAR AS cabin_number,
+          NULL::VARCHAR AS type,
+          NULL::INT AS deck,
+          NULL::INT AS capacity,
+          cr.cruise_name,
+          res.name AS resource_name,
+          res.category,
+          pe.id AS event_id,
+          COALESCE(pe.name, CONCAT('Event #', pe.id::TEXT)) AS event_name
+        FROM package_event_items pei
+        JOIN package_events pe ON pe.id = pei.event_id
+        LEFT JOIN users u ON u.id = pe.created_by
+        LEFT JOIN cruises cr ON cr.id = pe.cruise_id
+        JOIN resources res ON res.id = pei.resource_id
+      ) combined
+      ORDER BY combined.start_time DESC
+    `;
 
         res.status(200).json(result);
     } catch (error) {
