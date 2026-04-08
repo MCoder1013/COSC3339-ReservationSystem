@@ -4,6 +4,7 @@ import { addReservation, deleteReservation, getAllReservationsWithDetails, getRe
 import { validateGuestEmails } from '../users.js';
 import { getAuthenticatedUserId } from './auth.js';
 import { sql } from '../database.js';
+import { getCurrentStaffAssignedCruises, getUserById, isUserStaffAdmin } from '../users.js';
 
 const router = Router();
 
@@ -298,6 +299,33 @@ router.get('/reservations/rooms', async (req: Request, res: Response) => {
 
       if (!userId) {
         return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      const user = await getUserById(userId);
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      if (user.user_role === 'staff') {
+        const isAdmin = await isUserStaffAdmin(userId);
+        if (isAdmin) {
+          const cruises = await sql`
+            SELECT
+              id,
+              cruise_name,
+              ship_name,
+              departure_date,
+              return_date,
+              max_passengers
+            FROM cruises
+            WHERE return_date >= CURRENT_DATE
+            ORDER BY departure_date ASC
+          `;
+          return res.json(cruises);
+        }
+
+        const assignedCruises = await getCurrentStaffAssignedCruises(userId);
+        return res.json(assignedCruises);
       }
 
       const cruises = await getUserRoomCruises(userId);

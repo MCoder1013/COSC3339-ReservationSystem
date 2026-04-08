@@ -32,11 +32,6 @@ type RoomReservationWindow = {
 };
 
 const RESERVATION_CRUISE_MAP_KEY = "reservationCruiseMapV1";
-const DEFAULT_CRUISES: CruiseOption[] = [
-  { id: "demo-cruise-a", name: "Cruise A - Caribbean Explorer" },
-  { id: "demo-cruise-b", name: "Cruise B - Mediterranean Escape" },
-  { id: "demo-cruise-c", name: "Cruise C - Alaskan Discovery" },
-];
 
 export default function Reservation() {
   const shipName = "Starlight Pearl Cruises";
@@ -184,16 +179,12 @@ export default function Reservation() {
             .filter((cruise: CruiseOption) => cruise.id && cruise.name)
         : [];
 
-      if (normalized.length > 0) {
-        setCruises(normalized);
-      } else {
-        setCruises(DEFAULT_CRUISES);
-      }
+      setCruises(normalized);
 
       setAccessibleCruises(normalizedEligible);
     } catch (error) {
       console.log(error);
-      setCruises(DEFAULT_CRUISES);
+      setCruises([]);
       setAccessibleCruises([]);
     } finally {
       setIsCruiseLoading(false);
@@ -816,6 +807,11 @@ useEffect(() => {
       return;
     }
 
+    if (!Number.isInteger(Number(selectedCruiseId))) {
+      setFormError("Please choose a valid cruise from the dropdown.");
+      return;
+    }
+
     if (activeCategory === "Items") {
       //validate item selection
       if (!itemReservationForm.itemId) {
@@ -1082,7 +1078,7 @@ useEffect(() => {
                 value={selectedCruiseId}
                 onChange={(e) => setSelectedCruiseId(e.target.value)}
                 required
-                disabled={isCruiseLoading}
+                disabled={isCruiseLoading || cruiseOptions.length === 0}
               >
                 <option value="">-- Choose a cruise --</option>
                 {cruiseOptions.map((cruise) => (
@@ -1092,6 +1088,12 @@ useEffect(() => {
                 ))}
               </select>
             </label>
+
+            {activeCategory === "Rooms" && !isCruiseLoading && cruiseOptions.length === 0 && (
+              <div className="errorMessage" style={{ marginTop: "10px" }}>
+                No cruises available for your account yet. Ask an admin to assign you to a cruise first.
+              </div>
+            )}
 
             {activeCategory !== "Rooms" && !isCruiseLoading && cruiseOptions.length === 0 && (
               <div className="errorMessage" style={{ marginTop: "10px" }}>

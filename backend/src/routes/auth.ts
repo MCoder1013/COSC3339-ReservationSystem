@@ -275,24 +275,43 @@ export function getAuthenticatedUserId(req: Request): number | undefined {
   }
 }
 
-router.post('/update-user-role', async (req: Request, res: Response) => {
+async function requireAdminStaff(req: Request, res: Response): Promise<number | undefined> {
   const token = req.cookies?.jwt;
-  if (!token) return res.status(401).json({ error: 'Not authenticated' });
+  if (!token) {
+    res.status(401).json({ error: 'Not authenticated' });
+    return undefined;
+  }
 
   try {
     const decoded = jwt.verify(token, jwtSecret) as { id: number };
     const currentUser = await database.getUserById(decoded.id);
 
     if (!currentUser || currentUser.user_role !== 'staff') {
-      return res.status(403).json({ error: 'Forbidden: staff only' });
+      res.status(403).json({ error: 'Forbidden: staff only' });
+      return undefined;
     }
 
     const isAdmin = await database.isUserStaffAdmin(decoded.id);
     if (!isAdmin) {
-      return res.status(403).json({ error: 'Forbidden: admin only' });
+      res.status(403).json({ error: 'Forbidden: admin only' });
+      return undefined;
     }
 
-    const { userId, newRole } = req.body;
+    return decoded.id;
+  } catch {
+    res.status(401).json({ error: 'Invalid token' });
+    return undefined;
+  }
+}
+
+router.post('/update-user-role', async (req: Request, res: Response) => {
+  try {
+    const adminId = await requireAdminStaff(req, res);
+    if (!adminId) {
+      return;
+    }
+
+    const { userId, newRole, cruiseIds } = req.body;
 
     if (!userId || !newRole) {
       return res.status(400).json({ error: 'Missing userId or newRole' });
@@ -307,37 +326,100 @@ router.post('/update-user-role', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
+    if (targetUser.id === adminId && newRole !== 'admin') {
+      return res.status(400).json({ error: 'You cannot remove your own admin privileges.' });
+    }
+
+    const normalizedCruiseIds = Array.isArray(cruiseIds)
+      ? cruiseIds.map((id: unknown) => Number(id)).filter((id) => Number.isInteger(id) && id > 0)
+      : [];
+
     // Update user role
     if (newRole === 'admin') {
       // Promote to admin: set user_role to 'staff' and add to staff table with role 'Admin'
       await database.updateUserRole(userId, 'staff');
-      // Insert or update in staff table
-      await (database as any).sql`
-        INSERT INTO staff (staff_id, role, shift)
-        VALUES (${userId}, 'Admin', 'Day')
-        ON CONFLICT (staff_id)
-        DO UPDATE SET role = 'Admin'
-      `;
+      await database.upsertStaffRecord(userId, 'admin', 'Day');
+      await database.replaceStaffCruiseAssignments(userId, normalizedCruiseIds);
     } else if (newRole === 'staff') {
-      // Demote to staff: set user_role to 'staff' and remove from staff table
+      // Promote/demote to regular staff and keep staff record.
       await database.updateUserRole(userId, 'staff');
-      // Delete from staff table if exists
-      await (database as any).sql`
-        DELETE FROM staff WHERE staff_id = ${userId}
-      `;
+      await database.upsertStaffRecord(userId, 'crew', 'Day');
+      await database.replaceStaffCruiseAssignments(userId, normalizedCruiseIds);
     } else {
-      // Downgrade to normal: set user_role to 'normal' and remove from staff table
+      // Downgrade to normal user and remove staff associations.
       await database.updateUserRole(userId, 'normal');
-      // Delete from staff table if exists
-      await (database as any).sql`
-        DELETE FROM staff WHERE staff_id = ${userId}
-      `;
+      await database.replaceStaffCruiseAssignments(userId, []);
+      await database.removeStaffRecord(userId);
     }
 
     res.json({ message: 'User role updated successfully' });
   } catch (err) {
     console.error('Update role error:', err);
     res.status(500).json({ error: 'Failed to update user role' });
+  }
+});
+
+router.get('/staff/:userId/cruises', async (req: Request, res: Response) => {
+  try {
+    const adminId = await requireAdminStaff(req, res);
+    if (!adminId) {
+      return;
+    }
+
+    const userId = Number(req.params.userId);
+    if (!Number.isInteger(userId) || userId < 1) {
+      return res.status(400).json({ error: 'Invalid user ID' });
+    }
+
+    const cruises = await database.getStaffAssignedCruises(userId);
+    res.json(cruises);
+  } catch (err) {
+    console.error('Failed to fetch staff cruises:', err);
+    res.status(500).json({ error: 'Failed to fetch staff cruises' });
+  }
+});
+
+router.post('/add-staff-cruise', async (req: Request, res: Response) => {
+  try {
+    const adminId = await requireAdminStaff(req, res);
+    if (!adminId) {
+      return;
+    }
+
+    const userId = Number(req.body.userId);
+    const cruiseId = Number(req.body.cruiseId);
+
+    if (!Number.isInteger(userId) || userId < 1 || !Number.isInteger(cruiseId) || cruiseId < 1) {
+      return res.status(400).json({ error: 'Invalid userId or cruiseId' });
+    }
+
+    await database.addStaffCruiseAssignment(userId, cruiseId);
+    res.json({ message: 'Cruise assigned successfully' });
+  } catch (err) {
+    console.error('Failed to assign staff cruise:', err);
+    res.status(400).json({ error: (err as Error).message || 'Failed to assign cruise' });
+  }
+});
+
+router.post('/remove-staff-cruise', async (req: Request, res: Response) => {
+  try {
+    const adminId = await requireAdminStaff(req, res);
+    if (!adminId) {
+      return;
+    }
+
+    const userId = Number(req.body.userId);
+    const cruiseId = Number(req.body.cruiseId);
+
+    if (!Number.isInteger(userId) || userId < 1 || !Number.isInteger(cruiseId) || cruiseId < 1) {
+      return res.status(400).json({ error: 'Invalid userId or cruiseId' });
+    }
+
+    await database.removeStaffCruiseAssignment(userId, cruiseId);
+    res.json({ message: 'Cruise assignment removed successfully' });
+  } catch (err) {
+    console.error('Failed to remove staff cruise assignment:', err);
+    res.status(500).json({ error: 'Failed to remove cruise assignment' });
   }
 });
 

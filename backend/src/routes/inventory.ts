@@ -4,7 +4,8 @@ import { pullResources, addResources, deleteResource, countRemaining } from '../
 import { pullStaff, addStaff, deleteStaff } from '../staff.js';
 import { pullCruises } from '../cruises.js';
 import { getAuthenticatedUserId } from './auth.js';
-import { isUserStaffAdmin } from '../users.js';
+import { getCurrentStaffAssignedCruises, getUserById, isUserStaffAdmin } from '../users.js';
+import { getUserRoomCruises } from '../reservations.js';
 
 const router = Router();
 
@@ -135,13 +136,34 @@ router.get('/staff', async (req: Request, res: Response) => {
 // RESOURCES -- RES
 
 // CRUISES-GET - gets all cruises
-router.get('/cruises', async (_req: Request, res: Response) => {
-        try {
-                const cruises = await pullCruises();
-                res.json(cruises);
-        } catch (error) {
-                res.status(500).json({ error: 'Failed to load cruises' });
+router.get('/cruises', async (req: Request, res: Response) => {
+    try {
+        const userId = getAuthenticatedUserId(req);
+        if (!userId) {
+            return res.status(401).json({ error: 'Not authenticated' });
         }
+
+        const user = await getUserById(userId);
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        if (user.user_role === 'staff') {
+            const isAdmin = await isUserStaffAdmin(userId);
+            if (isAdmin) {
+                const cruises = await pullCruises();
+                return res.json(cruises);
+            }
+
+            const assignedCruises = await getCurrentStaffAssignedCruises(userId);
+            return res.json(assignedCruises);
+        }
+
+        const userCruises = await getUserRoomCruises(userId);
+        return res.json(userCruises);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to load cruises' });
+    }
 });
 
 // RES-GETAVAILABLE - gets avaialbel at current time  
