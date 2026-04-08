@@ -1,11 +1,9 @@
 import { Router, Request, Response } from 'express';
 import {
-    canUserAccessCruiseEvents,
     cancelPackageEvent,
     createPackageEvent,
     getPackageEventById,
     joinPackageEvent,
-    leavePackageEvent,
     listActivePackageEvents,
     listJoinedPackageEvents,
     updatePackageEvent,
@@ -104,24 +102,15 @@ function canManageEvent(role: string, creatorId: number, userId: number) {
 }
 
 router.get('/packages/events', async (req: Request, res: Response) => {
+    const cruiseIdParam = req.query.cruise_id;
+    const cruiseId = cruiseIdParam == null ? undefined : Number(cruiseIdParam);
+    if (cruiseIdParam != null && Number.isNaN(cruiseId)) {
+        return res.status(400).json({ error: 'Please provide a valid cruise ID.' });
+    }
+
     try {
-        const auth = await getRoleForRequest(req);
-        if (!auth) {
-            return res.status(401).json({ error: 'Please sign in to continue.' });
-        }
-
-        const cruiseIdParam = req.query.cruise_id;
-        const cruiseId = cruiseIdParam == null ? undefined : Number(cruiseIdParam);
-
-        if (cruiseIdParam != null && Number.isNaN(cruiseId)) {
-            return res.status(400).json({ error: 'Please provide a valid cruise ID.' });
-        }
-
-        if (auth.role === 'normal' && cruiseId == null) {
-            return res.json([]);
-        }
-
-        const events = await listActivePackageEvents(auth.userId, cruiseId);
+        const userId = getAuthenticatedUserId(req);
+        const events = await listActivePackageEvents(userId, cruiseId);
         res.json(events);
     } catch (error) {
         console.error('Failed to list package events:', error);
@@ -151,11 +140,6 @@ router.get('/packages/events/:id', async (req: Request, res: Response) => {
     }
 
     try {
-        const auth = await getRoleForRequest(req);
-        if (!auth) {
-            return res.status(401).json({ error: 'Please sign in to continue.' });
-        }
-
         const event: any = await getPackageEventById(eventId);
         if (!event) {
             return res.status(404).json({ error: 'This event could not be found.' });
@@ -163,17 +147,6 @@ router.get('/packages/events/:id', async (req: Request, res: Response) => {
 
         if (event.status === 'Cancelled') {
             return res.status(404).json({ error: 'This event could not be found.' });
-        }
-
-        if (auth.role === 'normal') {
-            const cruiseId = Number(event.cruise_id);
-            const canAccess = Number.isInteger(cruiseId) && cruiseId > 0
-                ? await canUserAccessCruiseEvents(auth.userId, cruiseId)
-                : false;
-
-            if (!canAccess) {
-                return res.status(403).json({ error: 'You do not have access to events on this cruise.' });
-            }
         }
 
         res.json(event);
@@ -230,6 +203,9 @@ router.put('/packages/events/:id', async (req: Request, res: Response) => {
         }
 
         const input = parseEventInput(req.body);
+        if (!Number.isInteger(input.cruise_id) || input.cruise_id < 1) {
+            input.cruise_id = Number(existing.cruise_id);
+        }
         const inputError = validateBasicInput(input);
         if (inputError) {
             return res.status(400).json({ error: inputError });
@@ -289,26 +265,6 @@ router.post('/packages/events/:id/join', async (req: Request, res: Response) => 
     } catch (error: any) {
         console.error('Failed to join package event:', error);
         res.status(400).json({ error: error.message || 'Could not join this event right now.' });
-    }
-});
-
-router.post('/packages/events/:id/leave', async (req: Request, res: Response) => {
-    const eventId = Number(req.params.id);
-    if (Number.isNaN(eventId)) {
-        return res.status(400).json({ error: 'Please provide a valid event ID.' });
-    }
-
-    const userId = getAuthenticatedUserId(req);
-    if (!userId) {
-        return res.status(401).json({ error: 'Please sign in to continue.' });
-    }
-
-    try {
-        await leavePackageEvent(eventId, userId);
-        res.json({ message: 'Reservation cancelled successfully' });
-    } catch (error: any) {
-        console.error('Failed to leave package event:', error);
-        res.status(400).json({ error: error.message || 'Could not cancel this reservation right now.' });
     }
 });
 

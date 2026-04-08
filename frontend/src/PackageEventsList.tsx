@@ -238,27 +238,21 @@ export default function PackageEventsList({ showManagement = false, onlyJoined =
     return user.role === 'staff' && Number(event.created_by) === Number(user.userId);
   };
 
-  const isEventJoined = (event: any) => {
-    if (!event) return false;
-    if (Boolean(event.is_joined)) return true;
-
-    return events.some((listedEvent) => Number(listedEvent.id) === Number(event.id) && Boolean(listedEvent.is_joined));
-  };
-
   const loadEvents = async () => {
     setLoading(true);
     setError('');
     try {
-      const baseEndpoint = onlyJoined ? '/api/packages/my-events' : '/api/packages/events';
-      const endpoint = cruiseId
-        ? `${baseEndpoint}?cruise_id=${encodeURIComponent(cruiseId)}`
-        : baseEndpoint;
+      const endpoint = onlyJoined
+        ? '/api/packages/my-events'
+        : cruiseId
+          ? `/api/packages/events?cruise_id=${encodeURIComponent(cruiseId)}`
+          : '/api/packages/events';
       const data = await fetchData(endpoint);
-      const list = Array.isArray(data) ? data : [];
+      const allEvents = Array.isArray(data) ? data : [];
 
       if (onlyJoined) {
         const now = new Date();
-        const currentAndFuture = list.filter((event: any) => {
+        const currentAndFuture = allEvents.filter((event: any) => {
           if (String(event?.status ?? '').toLowerCase() === 'cancelled') {
             return false;
           }
@@ -273,11 +267,11 @@ export default function PackageEventsList({ showManagement = false, onlyJoined =
 
         setEvents(currentAndFuture);
       } else {
-        setEvents(list);
+        setEvents(allEvents);
       }
     } catch (err) {
       console.error(err);
-      setError('Unable to load package events right now. Please try again.');
+      setError(onlyJoined ? 'Unable to load your package events right now. Please try again.' : 'Unable to load package events right now. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -363,32 +357,6 @@ export default function PackageEventsList({ showManagement = false, onlyJoined =
     } catch (err: any) {
       console.error(err);
       setError(err.message || 'Could not join this event right now.');
-    }
-  };
-
-  const handleLeaveEvent = async (eventId: number) => {
-    setError('');
-    try {
-      const response = await fetch(`${API_URL}/api/packages/events/${eventId}/leave`, {
-        method: 'POST',
-        credentials: 'include',
-      });
-
-      const body = await response.json().catch(() => null);
-      if (!response.ok) {
-        throw new Error(body?.error || 'Could not cancel this reservation right now.');
-      }
-
-      await loadEvents();
-      if (onlyJoined) {
-        setShowDetailModal(false);
-        setSelectedEvent(null);
-      } else {
-        await openEventDetail(eventId);
-      }
-    } catch (err: any) {
-      console.error(err);
-      setError(err.message || 'Could not cancel this reservation right now.');
     }
   };
 
@@ -582,7 +550,6 @@ export default function PackageEventsList({ showManagement = false, onlyJoined =
     }
 
     const payload = {
-      cruise_id: Number(selectedEvent?.cruise_id),
       name: editFormState.name.trim(),
       description: editFormState.description.trim(),
       capacity: Number(editFormState.capacity),
@@ -687,7 +654,6 @@ export default function PackageEventsList({ showManagement = false, onlyJoined =
             <div className="modalHeader">
               <h3 style={{ margin: 0 }}>{selectedEvent.name}</h3>
               <button
-                type="button"
                 className="modalCloseButton"
                 onClick={() => {
                   setShowDetailModal(false);
@@ -854,7 +820,7 @@ export default function PackageEventsList({ showManagement = false, onlyJoined =
                 </div>
 
                 <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
-                  <button type="button" className="submitButton" onClick={() => saveEdit(selectedEvent.id)}>
+                  <button className="submitButton" onClick={() => saveEdit(selectedEvent.id)}>
                     Save Changes
                   </button>
                   <button type="button" className="cancelButton" onClick={() => setEditingEventId(null)}>
@@ -864,20 +830,13 @@ export default function PackageEventsList({ showManagement = false, onlyJoined =
               </div>
             )}
 
-            <div style={{ marginTop: '14px', display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center' }}>
-              {user && Number(selectedEvent.spots_left) > 0 && !isEventJoined(selectedEvent) && (
-                <button type="button" className="submitButton" onClick={() => handleJoinEvent(selectedEvent.id)}>
+            <div style={{ marginTop: '14px', display: 'flex', gap: '8px', justifyContent: 'center' }}>
+              {user && Number(selectedEvent.spots_left) > 0 && !selectedEvent.is_joined && (
+                <button className="submitButton" onClick={() => handleJoinEvent(selectedEvent.id)}>
                   Reserve My Spot
                 </button>
               )}
-              {isEventJoined(selectedEvent) && (
-                <>
-                  <span>Spot Reserved</span>
-                  <button type="button" className="cancelButton" onClick={() => handleLeaveEvent(selectedEvent.id)}>
-                    Cancel Reservation
-                  </button>
-                </>
-              )}
+              {selectedEvent.is_joined && <span>You already joined this event.</span>}
             </div>
           </div>
         </div>

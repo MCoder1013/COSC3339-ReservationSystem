@@ -8,7 +8,7 @@ import "react-date-picker/dist/DatePicker.css";
 import "react-calendar/dist/Calendar.css";
 import { formatInTimeZone } from 'date-fns-tz';
 import NavBar from "./NavBar";
-import PackageEventsList from './PackageEventsList';
+import PackageEventsTab from './PackageEventsTab';
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -1111,7 +1111,7 @@ useEffect(() => {
             >
             {activeCategory === "Packages" ? (
               isCruiseSelected ? (
-                <PackageEventsList cruiseId={selectedCruiseId} />
+                <PackageEventsTab cruiseId={selectedCruiseId} />
               ) : (
                 <div className="errorMessage" style={{ marginTop: "10px" }}>
                   Select a cruise to view available package events.

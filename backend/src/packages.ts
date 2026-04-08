@@ -18,16 +18,22 @@ const SHIFT_TIME_ZONE = process.env.SHIFT_TIME_ZONE || 'America/Chicago';
 const STAFF_DISPLAY_NAME_SQL = "COALESCE(NULLIF(CONCAT_WS(' ', u.first_name, u.last_name), ''), u.email, CAST(s.staff_id AS TEXT))";
 const STAFF_NAME_AGGREGATE_BY_EVENT_SQL = `
     SELECT
-        pes.event_id,
+        mapping.event_id,
         STRING_AGG(
             ${STAFF_DISPLAY_NAME_SQL},
             ', '
             ORDER BY ${STAFF_DISPLAY_NAME_SQL}
         ) AS staff_names
-    FROM package_event_staff pes
-    JOIN staff s ON s.staff_id = pes.staff_id
+    FROM (
+        SELECT pes.event_id, pes.staff_id
+        FROM package_event_staff pes
+        UNION
+        SELECT e.id AS event_id, e.created_by AS staff_id
+        FROM package_events e
+    ) mapping
+    JOIN staff s ON s.staff_id = mapping.staff_id
     LEFT JOIN users u ON u.id = s.staff_id
-    GROUP BY pes.event_id
+    GROUP BY mapping.event_id
 `;
 
 const shiftTimeFormatter = new Intl.DateTimeFormat('en-US', {
@@ -194,7 +200,6 @@ async function validateCreatorShiftWindow(createdBy: number, start: Date, end: D
 
 async function validateItemAvailability(
     itemRequirements: Array<{ resource_id: number; quantity_required: number }>,
-    cruiseId: number,
     startTime: string,
     endTime: string,
     tx: postgres.TransactionSql<{}>,
@@ -216,7 +221,6 @@ async function validateItemAvailability(
             SELECT COALESCE(SUM(quantity_reserved), 0) AS total_reserved
             FROM reservations
             WHERE resource_id = ${item.resource_id}
-              AND cruise_id = ${cruiseId}
               AND start_time < ${endTime}
               AND end_time > ${startTime}
         `;
@@ -226,7 +230,6 @@ async function validateItemAvailability(
             FROM package_events e
             JOIN package_event_items ei ON ei.event_id = e.id
             WHERE e.status <> 'Cancelled'
-                            AND e.cruise_id = ${cruiseId}
               AND ei.resource_id = ${item.resource_id}
               AND e.start_time < ${endTime}
               AND e.end_time > ${startTime}
@@ -242,50 +245,6 @@ async function validateItemAvailability(
             throw new Error(`Not enough ${resource.name}. Requested ${item.quantity_required}, available ${Math.max(available, 0)}.`);
         }
     }
-}
-
-async function validateCruiseExists(cruiseId: number, tx: postgres.TransactionSql<{}>) {
-    const rows = await tx`
-        SELECT id
-        FROM cruises
-        WHERE id = ${cruiseId}
-          AND return_date >= CURRENT_DATE
-        LIMIT 1
-    `;
-
-    if (rows.length === 0) {
-        throw new Error('Please select a valid current or future cruise for this event.');
-    }
-}
-
-async function hasUserCruiseRoomAccess(userId: number, cruiseId: number, tx: postgres.TransactionSql<{}>) {
-    const rows = await tx`
-        SELECT 1
-        FROM reservations r
-        WHERE
-            r.cabin_id IS NOT NULL
-            AND r.cruise_id = ${cruiseId}
-            AND r.status <> 'Cancelled'
-            AND r.end_time > NOW()
-            AND (
-                r.user_id = ${userId}
-                OR EXISTS (
-                    SELECT 1
-                    FROM reservation_groups rg
-                    WHERE rg.reservation_id = r.id
-                        AND rg.user_id = ${userId}
-                )
-            )
-        LIMIT 1
-    `;
-
-    return rows.length > 0;
-}
-
-export async function canUserAccessCruiseEvents(userId: number, cruiseId: number) {
-    return await sql.begin(async (tx) => {
-        return await hasUserCruiseRoomAccess(userId, cruiseId, tx);
-    });
 }
 
 async function replaceEventStaff(eventId: number, staffIds: number[], tx: postgres.TransactionSql<{}>) {
@@ -315,26 +274,39 @@ async function replaceEventItems(
     }
 }
 
+function withRequiredStaffMember(staffIds: number[], requiredStaffId: number) {
+    const unique = new Set(staffIds.filter((id) => Number.isInteger(id) && id > 0));
+    if (Number.isInteger(requiredStaffId) && requiredStaffId > 0) {
+        unique.add(requiredStaffId);
+    }
+    return Array.from(unique);
+}
+
 export async function createPackageEvent(createdBy: number, input: PackageEventInput) {
     return await sql.begin(async (tx) => {
+        const creatorId = Number(createdBy);
+        if (!Number.isInteger(creatorId) || creatorId < 1) {
+            throw new Error('Could not verify the authenticated user for this request.');
+        }
+
         const start = new Date(input.start_time);
         const end = new Date(input.end_time);
+        const assignedStaffIds = withRequiredStaffMember(input.staff_ids, creatorId);
 
         validateEventWindowRules(start, end);
-        await validateCruiseExists(input.cruise_id, tx);
-        await validateCreatorShiftWindow(createdBy, start, end, tx);
-        await validateStaffShiftWindows(input.staff_ids, input.start_time, input.end_time, tx);
-        await validateItemAvailability(input.item_requirements, input.cruise_id, input.start_time, input.end_time, tx);
+        await validateCreatorShiftWindow(creatorId, start, end, tx);
+        await validateStaffShiftWindows(assignedStaffIds, input.start_time, input.end_time, tx);
+        await validateItemAvailability(input.item_requirements, input.start_time, input.end_time, tx);
 
         const result = await tx`
             INSERT INTO package_events (cruise_id, name, description, capacity, start_time, end_time, created_by)
-            VALUES (${input.cruise_id}, ${input.name}, ${input.description}, ${input.capacity}, ${input.start_time}, ${input.end_time}, ${createdBy})
+            VALUES (${input.cruise_id}, ${input.name}, ${input.description}, ${input.capacity}, ${input.start_time}, ${input.end_time}, ${creatorId})
             RETURNING id
         `;
 
         const eventId = result[0].id;
 
-        await replaceEventStaff(eventId, input.staff_ids, tx);
+        await replaceEventStaff(eventId, assignedStaffIds, tx);
         await replaceEventItems(eventId, input.item_requirements, tx);
 
         return eventId;
@@ -346,7 +318,6 @@ export async function updatePackageEvent(eventId: number, input: PackageEventInp
         const start = new Date(input.start_time);
         const end = new Date(input.end_time);
         validateEventWindowRules(start, end);
-        await validateCruiseExists(input.cruise_id, tx);
 
         const eventRows = await tx`
             SELECT created_by
@@ -358,9 +329,12 @@ export async function updatePackageEvent(eventId: number, input: PackageEventInp
             throw new Error('This event could not be found.');
         }
 
-        await validateCreatorShiftWindow(eventRows[0].created_by, start, end, tx);
-        await validateStaffShiftWindows(input.staff_ids, input.start_time, input.end_time, tx);
-        await validateItemAvailability(input.item_requirements, input.cruise_id, input.start_time, input.end_time, tx, eventId);
+        const creatorId = Number(eventRows[0].created_by);
+        const assignedStaffIds = withRequiredStaffMember(input.staff_ids, creatorId);
+
+        await validateCreatorShiftWindow(creatorId, start, end, tx);
+        await validateStaffShiftWindows(assignedStaffIds, input.start_time, input.end_time, tx);
+        await validateItemAvailability(input.item_requirements, input.start_time, input.end_time, tx, eventId);
 
         await tx`
             UPDATE package_events
@@ -373,7 +347,7 @@ export async function updatePackageEvent(eventId: number, input: PackageEventInp
             WHERE id = ${eventId}
         `;
 
-        await replaceEventStaff(eventId, input.staff_ids, tx);
+        await replaceEventStaff(eventId, assignedStaffIds, tx);
         await replaceEventItems(eventId, input.item_requirements, tx);
     });
 }
@@ -391,7 +365,6 @@ export async function getPackageEventById(eventId: number) {
         SELECT
             e.id,
             e.cruise_id,
-            cr.cruise_name,
             e.name,
             e.description,
             e.capacity,
@@ -403,7 +376,6 @@ export async function getPackageEventById(eventId: number) {
             GREATEST(e.capacity - COALESCE(att.total_attendees, 0), 0) AS spots_left,
             (COALESCE(att.total_attendees, 0) >= e.capacity) AS is_full
         FROM package_events e
-        LEFT JOIN cruises cr ON cr.id = e.cruise_id
         LEFT JOIN (
             SELECT event_id, COUNT(*)::INT AS total_attendees
             FROM package_event_attendees
@@ -422,10 +394,17 @@ export async function getPackageEventById(eventId: number) {
             ${sql.unsafe(STAFF_DISPLAY_NAME_SQL)} AS name,
             s.role,
             s.shift
-        FROM package_event_staff pes
-        JOIN staff s ON s.staff_id = pes.staff_id
+        FROM (
+            SELECT pes.staff_id
+            FROM package_event_staff pes
+            WHERE pes.event_id = ${eventId}
+            UNION
+            SELECT e.created_by AS staff_id
+            FROM package_events e
+            WHERE e.id = ${eventId}
+        ) mapping
+        JOIN staff s ON s.staff_id = mapping.staff_id
         LEFT JOIN users u ON u.id = s.staff_id
-        WHERE pes.event_id = ${eventId}
         ORDER BY name
     `;
 
@@ -445,21 +424,10 @@ export async function getPackageEventById(eventId: number) {
 }
 
 export async function listActivePackageEvents(userId?: number, cruiseId?: number) {
-    if (userId && cruiseId != null) {
-        const canAccess = await sql.begin(async (tx) => {
-            return await hasUserCruiseRoomAccess(userId, cruiseId, tx);
-        });
-
-        if (!canAccess) {
-            return [];
-        }
-    }
-
     const rows = await sql`
         SELECT
             e.id,
             e.cruise_id,
-            cr.cruise_name,
             e.name,
             e.description,
             e.capacity,
@@ -475,9 +443,14 @@ export async function listActivePackageEvents(userId?: number, cruiseId?: number
                 FROM package_event_attendees pea
                 WHERE pea.event_id = e.id
                   AND pea.user_id = ${userId ?? null}
-            ) AS is_joined
+                        ) AS is_joined,
+                        EXISTS(
+                                SELECT 1
+                                FROM package_event_staff pes
+                                WHERE pes.event_id = e.id
+                                    AND pes.staff_id = ${userId ?? null}
+                        ) AS is_staffed
         FROM package_events e
-        LEFT JOIN cruises cr ON cr.id = e.cruise_id
         LEFT JOIN (
             SELECT event_id, COUNT(*)::INT AS total_attendees
             FROM package_event_attendees
@@ -487,7 +460,7 @@ export async function listActivePackageEvents(userId?: number, cruiseId?: number
             ${sql.unsafe(STAFF_NAME_AGGREGATE_BY_EVENT_SQL)}
         ) staff ON staff.event_id = e.id
         WHERE e.status <> 'Cancelled'
-                    AND (${cruiseId ?? null}::INT IS NULL OR e.cruise_id = ${cruiseId ?? null})
+          AND (${cruiseId ?? null}::INT IS NULL OR e.cruise_id = ${cruiseId ?? null})
         ORDER BY e.start_time
     `;
 
@@ -498,22 +471,61 @@ export async function listJoinedPackageEvents(userId: number) {
     const rows = await sql`
         SELECT
             e.id,
-            e.cruise_id,
-            cr.cruise_name,
             e.name,
             e.description,
+            e.capacity,
             e.start_time,
             e.end_time,
             e.status,
-            pea.joined_at,
+            e.created_by,
+            COALESCE(att.total_attendees, 0) AS total_attendees,
+            GREATEST(e.capacity - COALESCE(att.total_attendees, 0), 0) AS spots_left,
+            (COALESCE(att.total_attendees, 0) >= e.capacity) AS is_full,
+                        (
+                                SELECT pea.joined_at
+                                FROM package_event_attendees pea
+                                WHERE pea.event_id = e.id
+                                    AND pea.user_id = ${userId}
+                                LIMIT 1
+                        ) AS joined_at,
+            EXISTS (
+                SELECT 1
+                FROM package_event_attendees pea
+                WHERE pea.event_id = e.id
+                  AND pea.user_id = ${userId}
+            ) AS is_joined,
+            EXISTS (
+                SELECT 1
+                FROM package_event_staff pes
+                WHERE pes.event_id = e.id
+                  AND pes.staff_id = ${userId}
+            ) AS is_staffed,
             COALESCE(staff.staff_names, '') AS staff_names
-        FROM package_event_attendees pea
-        JOIN package_events e ON e.id = pea.event_id
-        LEFT JOIN cruises cr ON cr.id = e.cruise_id
+                FROM package_events e
+        LEFT JOIN (
+            SELECT event_id, COUNT(*)::INT AS total_attendees
+            FROM package_event_attendees
+            GROUP BY event_id
+        ) att ON att.event_id = e.id
         LEFT JOIN (
             ${sql.unsafe(STAFF_NAME_AGGREGATE_BY_EVENT_SQL)}
         ) staff ON staff.event_id = e.id
-        WHERE pea.user_id = ${userId}
+                WHERE e.status <> 'Cancelled'
+                    AND (
+                        EXISTS (
+                                SELECT 1
+                                FROM package_event_attendees pea
+                                WHERE pea.event_id = e.id
+                                    AND pea.user_id = ${userId}
+                        )
+                        OR EXISTS (
+                                SELECT 1
+                                FROM package_event_staff pes
+                                WHERE pes.event_id = e.id
+                                    AND pes.staff_id = ${userId}
+                        )
+                        OR e.created_by = ${userId}
+                    )
         ORDER BY e.start_time DESC
     `;
 
@@ -523,7 +535,7 @@ export async function listJoinedPackageEvents(userId: number) {
 export async function joinPackageEvent(eventId: number, userId: number) {
     return await sql.begin(async (tx) => {
         const eventRows = await tx`
-            SELECT id, capacity, status, cruise_id
+            SELECT id, capacity, status, start_time, end_time
             FROM package_events
             WHERE id = ${eventId}
             FOR UPDATE
@@ -538,13 +550,49 @@ export async function joinPackageEvent(eventId: number, userId: number) {
             throw new Error('This event is no longer available.');
         }
 
-        if (event.cruise_id == null) {
-            throw new Error('This event is not linked to a cruise and cannot be reserved.');
+        const staffedOnTargetEventRows = await tx`
+            SELECT 1
+            FROM package_event_staff pes
+            WHERE pes.event_id = ${eventId}
+              AND pes.staff_id = ${userId}
+            LIMIT 1
+        `;
+
+        if (staffedOnTargetEventRows.length > 0) {
+            throw new Error('You are assigned as staff for this event and cannot join as an attendee.');
         }
 
-        const canAccess = await hasUserCruiseRoomAccess(userId, event.cruise_id, tx);
-        if (!canAccess) {
-            throw new Error('You must have an active room reservation on this cruise to join this event.');
+        const staffRows = await tx`
+            SELECT shift
+            FROM staff
+            WHERE staff_id = ${userId}
+            LIMIT 1
+        `;
+
+        if (staffRows.length > 0) {
+            const shift = String(staffRows[0].shift ?? '');
+            const eventStart = new Date(event.start_time);
+            const eventEnd = new Date(event.end_time);
+
+            if (isWithinShiftWindow(shift, eventStart, eventEnd)) {
+                throw new Error('You cannot join this event because it overlaps with your staff shift.');
+            }
+
+            const staffedOverlapRows = await tx`
+                SELECT e.id
+                FROM package_event_staff pes
+                JOIN package_events e ON e.id = pes.event_id
+                WHERE pes.staff_id = ${userId}
+                  AND e.id <> ${eventId}
+                  AND e.status <> 'Cancelled'
+                  AND e.start_time < ${event.end_time}
+                  AND e.end_time > ${event.start_time}
+                LIMIT 1
+            `;
+
+            if (staffedOverlapRows.length > 0) {
+                throw new Error('You cannot join this event because you are assigned to another event during that time.');
+            }
         }
 
         const attendeeRows = await tx`
@@ -564,30 +612,5 @@ export async function joinPackageEvent(eventId: number, userId: number) {
             VALUES (${eventId}, ${userId})
             ON CONFLICT (event_id, user_id) DO NOTHING
         `;
-    });
-}
-
-export async function leavePackageEvent(eventId: number, userId: number) {
-    return await sql.begin(async (tx) => {
-        const eventRows = await tx`
-            SELECT id, status
-            FROM package_events
-            WHERE id = ${eventId}
-            FOR UPDATE
-        `;
-
-        if (eventRows.length === 0) {
-            throw new Error('This event could not be found.');
-        }
-
-        const result = await tx`
-            DELETE FROM package_event_attendees
-            WHERE event_id = ${eventId}
-              AND user_id = ${userId}
-        `;
-
-        if (result.count === 0) {
-            throw new Error('You do not currently have a reservation for this event.');
-        }
     });
 }
