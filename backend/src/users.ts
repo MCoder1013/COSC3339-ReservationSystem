@@ -80,7 +80,7 @@ export async function getStaffRoleByUserId(userId: number): Promise<string | nul
     return (result[0]?.role as string | undefined) ?? null;
 }
 
-export async function updateUserRole(userId: number, newRole: string): Promise<void> {
+export async function updateUserRole(userId: number, newRole: UserRole): Promise<void> {
     await sql`
         UPDATE users
         SET user_role = ${newRole}

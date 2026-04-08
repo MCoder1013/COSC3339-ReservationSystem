@@ -5,7 +5,8 @@ import jwt from 'jsonwebtoken';
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-import { authRequired } from './index.js';
+import { adminRequired, authRequired } from './index.js';
+import { sql } from '../database.js';
 
 
 const router = Router();
@@ -223,12 +224,9 @@ const upload = multer({
   },
 });
 
-router.post('/update-profile', upload.single('profilePicture'), async (req: Request, res: Response) => {
-  const token = req.cookies?.jwt;
-  if (!token) return res.status(401).json({ error: 'Not authenticated' });
-
+router.post('/update-profile', authRequired, upload.single('profilePicture'), async (req: Request, res: Response) => {
   try {
-    const decoded = jwt.verify(token, jwtSecret) as { id: number };
+    const userId = req.user!.id;
     const { biography } = req.body;
     let profilePicture: null | string = null
 
@@ -247,11 +245,11 @@ router.post('/update-profile', upload.single('profilePicture'), async (req: Requ
     }
 
     if (biography !== undefined && profilePicture) {
-      await database.updateUserProfile(decoded.id, biography, profilePicture);
+      await database.updateUserProfile(userId, biography, profilePicture);
     } else if (biography !== undefined) {
-      await database.updateUserBiography(decoded.id, biography);
+      await database.updateUserBiography(userId, biography);
     } else if (profilePicture) {
-      await database.updateUserProfilePicture(decoded.id, profilePicture);
+      await database.updateUserProfilePicture(userId, profilePicture);
     }
 
     res.json({ message: 'Profile updated successfully', profilePicture });
@@ -262,23 +260,11 @@ router.post('/update-profile', upload.single('profilePicture'), async (req: Requ
 });
 
 
-router.post('/update-user-role', async (req: Request, res: Response) => {
+router.post('/update-user-role', adminRequired, async (req: Request, res: Response) => {
   const token = req.cookies?.jwt;
   if (!token) return res.status(401).json({ error: 'Not authenticated' });
 
   try {
-    const decoded = jwt.verify(token, jwtSecret) as { id: number };
-    const currentUser = await database.getUserById(decoded.id);
-
-    if (!currentUser || currentUser.user_role !== 'staff') {
-      return res.status(403).json({ error: 'Forbidden: staff only' });
-    }
-
-    const isAdmin = await database.isUserStaffAdmin(decoded.id);
-    if (!isAdmin) {
-      return res.status(403).json({ error: 'Forbidden: admin only' });
-    }
-
     const { userId, newRole } = req.body;
 
     if (!userId || !newRole) {
@@ -299,7 +285,7 @@ router.post('/update-user-role', async (req: Request, res: Response) => {
       // Promote to admin: set user_role to 'staff' and add to staff table with role 'Admin'
       await database.updateUserRole(userId, 'staff');
       // Insert or update in staff table
-      await (database as any).sql`
+      await sql`
         INSERT INTO staff (staff_id, role, shift)
         VALUES (${userId}, 'Admin', 'Day')
         ON CONFLICT (staff_id)
@@ -309,14 +295,14 @@ router.post('/update-user-role', async (req: Request, res: Response) => {
       // Demote to staff: set user_role to 'staff' and remove from staff table
       await database.updateUserRole(userId, 'staff');
       // Delete from staff table if exists
-      await (database as any).sql`
+      await sql`
         DELETE FROM staff WHERE staff_id = ${userId}
       `;
     } else {
       // Downgrade to normal: set user_role to 'normal' and remove from staff table
       await database.updateUserRole(userId, 'normal');
       // Delete from staff table if exists
-      await (database as any).sql`
+      await sql`
         DELETE FROM staff WHERE staff_id = ${userId}
       `;
     }
