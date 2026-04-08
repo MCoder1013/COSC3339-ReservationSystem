@@ -223,6 +223,34 @@ button:hover,
   font-weight: bold;
 }
 
+.analyticsPanel {
+  text-align: left;
+}
+
+.analyticsFilterBar {
+  justify-content: flex-start;
+}
+
+.analyticsTable td:first-child {
+  width: 70%;
+}
+
+.analyticsTopSection {
+  margin-top: 24px;
+  display: grid;
+  gap: 18px;
+}
+
+.compactTable {
+  margin-top: 10px;
+}
+
+.analyticsFootnote {
+  margin-top: 16px;
+  font-size: 0.9rem;
+  color: #0d1b5e;
+}
+
 /*modal overlay */
 .modal {
   position: fixed;
