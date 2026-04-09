@@ -139,8 +139,8 @@ router.post('/login', async (req: Request, res: Response) => {
       .cookie('jwt', token, {
         httpOnly: true,
         sameSite: 'lax',
-        // expire after a year
-        maxAge: 31_536_000_000
+        // Expire after a year. This has to be set to fix sessions expiring when the browser is closed.
+        maxAge: 1000 * 60 * 60 * 24 * 365
       })
       .json({
         message: 'Login successful',
