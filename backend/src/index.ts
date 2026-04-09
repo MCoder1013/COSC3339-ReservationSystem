@@ -6,18 +6,24 @@ import reservationRoutes from "./routes/reservations.js";
 import packageRoutes from "./routes/packages.js";
 import cookieParser from 'cookie-parser';
 import './notifications.js';
+import { authRequiredMiddleware, userMiddleware } from './routes/index.js';
 
 
 const app = express();
 
 // MIDDLEWARE
 app.use(cors({
-  origin: true, // Allow requests from frontend
-  credentials: true // Allow cookies to be sent
-})); 
-app.use(express.json()); // allows the backend to read JSON sent byfrontend
+  // Allow requests from frontend
+  origin: true,
+  // Allow cookies to be sent
+  credentials: true
+}));
+// Allows the backend to read JSON sent by frontend
+app.use(express.json());
 app.use(cookieParser())
 app.use('/uploads', express.static('uploads'));
+// Ensures that the `req.userId` field is set
+app.use(userMiddleware);
 
 // ROUTES
 app.get('/', (_req, res) => {
@@ -32,11 +38,12 @@ app.get('/', (_req, res) => {
 //   });
 // });
 
+
+// AUTHENTICATION 
+app.use("/api/auth", authRoutes);
+
 // INVENTORY ROUTES
 app.use("/api", inventoryRoutes);
-
-//AUTHENTICATION 
-app.use("/api/auth", authRoutes);
 
 // RESERVATIONS
 app.use("/api", reservationRoutes);

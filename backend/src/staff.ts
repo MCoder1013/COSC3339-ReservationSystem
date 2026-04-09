@@ -1,11 +1,11 @@
 import { sql } from './database.js';
 
-type Role = 'Nurse' | 'Tour Guide' | 'Security' | 'Housekeeping' | 'Other';
+export type StaffRole = 'Nurse' | 'Tour Guide' | 'Security' | 'Housekeeping' | 'Other';
 type Shift = 'Morning' | 'Day' | 'Night';
 
 interface NewStaff {
     name: string
-    role: Role
+    role: StaffRole
     email: string
     shift: Shift
 }

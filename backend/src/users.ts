@@ -1,4 +1,5 @@
 import { sql } from './database.js';
+import { StaffRole } from './staff.js';
 
 export async function tryRegister(firstName: string, lastName: string, email: string, passwordHash: string, role: string) {
     const result = await sql`
@@ -12,8 +13,8 @@ export async function tryRegister(firstName: string, lastName: string, email: st
     return result[0].id;
 }
 
-export async function insertStaff(staff_id: number, role: string, shift: string) {
-  await sql`
+export async function insertStaff(staff_id: number, role: StaffRole, shift: string) {
+    await sql`
     INSERT INTO staff
       (staff_id, role, shift)
     VALUES
@@ -26,9 +27,22 @@ export async function getUserByEmail(email: string) {
     return result[0]; // first user or undefined
 }
 
-export async function getUserById(id: number) {
+export type UserRole = 'normal' | 'staff' | 'admin';
+
+export interface User {
+    id: number;
+    email: string;
+    first_name: string;
+    last_name: string;
+    password_hash: string;
+    created_at: Date;
+    profile_picture: string;
+    biography: string;
+    user_role: UserRole;
+}
+export async function getUserById(id: number): Promise<User | null> {
     const result = await sql`SELECT * FROM users WHERE id = ${id}`;
-    return result[0] ?? null;
+    return (result[0] as User) ?? null;
 }
 
 export async function updateUserProfile(id: number, biography: string, profilePicture: string) {
@@ -67,12 +81,7 @@ export async function getStaffRoleByUserId(userId: number): Promise<string | nul
     return (result[0]?.role as string | undefined) ?? null;
 }
 
-export async function isUserStaffAdmin(userId: number): Promise<boolean> {
-    const staffRole = await getStaffRoleByUserId(userId);
-    return staffRole?.trim().toLowerCase() === 'admin';
-}
-
-export async function updateUserRole(userId: number, newRole: string): Promise<void> {
+export async function updateUserRole(userId: number, newRole: UserRole): Promise<void> {
     await sql`
         UPDATE users
         SET user_role = ${newRole}
