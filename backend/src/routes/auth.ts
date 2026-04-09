@@ -29,15 +29,12 @@ router.post('/register', async (req, res) => {
   const confirmPassword = req.body.confirmPassword;
   const employeeCode = req.body.employeeCode;
 
-  let userRole = "normal";
-  let staffRole = null;
+  let userRole: database.UserRole = "normal";
 
   if (employeeCode === process.env.ADMIN_CODE) {
-    userRole = "staff";
-    staffRole = "admin";
+    userRole = "admin";
   } else if (employeeCode === process.env.CREW_CODE) {
     userRole = "staff";
-    staffRole = "crew";
   }
 
   email = email.toLowerCase();
@@ -84,9 +81,11 @@ router.post('/register', async (req, res) => {
     });
   }
 
-  if (userRole === "staff" && staffRole) {
+  if (userRole === "staff") {
     try {
-      await database.insertStaff(userId, staffRole, "Day");
+      // Their role is set to "Other" by default, but it can be changed by an
+      // admin.
+      await database.insertStaff(userId, "Other", "Day");
     } catch (err) {
       console.error('Error inserting staff:', err);
       return res.status(500).json({
@@ -103,7 +102,6 @@ router.post('/register', async (req, res) => {
 
 // Additional login information for authorization
 router.post('/login', async (req: Request, res: Response) => {
-
   // Extract email and password from the request body
   let { email, password } = req.body;
 

@@ -1,4 +1,5 @@
 import { sql } from './database.js';
+import { StaffRole } from './staff.js';
 
 export async function tryRegister(firstName: string, lastName: string, email: string, passwordHash: string, role: string) {
     const result = await sql`
@@ -12,7 +13,7 @@ export async function tryRegister(firstName: string, lastName: string, email: st
     return result[0].id;
 }
 
-export async function insertStaff(staff_id: number, role: string, shift: string) {
+export async function insertStaff(staff_id: number, role: StaffRole, shift: string) {
     await sql`
     INSERT INTO staff
       (staff_id, role, shift)
