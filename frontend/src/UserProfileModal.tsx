@@ -45,7 +45,7 @@ interface PackageReservation {
 
 export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const navigate = useNavigate();
-  const { logout } = useAuth();
+  const { user, logout, updateUser } = useAuth();
   const [activeTab, setActiveTab] = useState<"reservations" | "editinfo">("reservations");
   const [reservationCategory, setReservationCategory] = useState<"Items" | "Rooms" | "Packages">("Items");
   const [timePeriod, setTimePeriod] = useState<"Past" | "Current" | "Future">("Future");
@@ -179,6 +179,14 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
 
       const updatedUser = await response.json();
       setUserProfile(updatedUser);
+      const nextPicture = updatedUser.profilePicture ?? updatedUser.profile_picture ?? iconPreview ?? null;
+      setIconPreview(nextPicture || "");
+
+      updateUser({
+        firstName: updatedUser.firstName ?? updatedUser.first_name ?? user?.firstName,
+        profilePicture: nextPicture,
+      });
+
       setSaveMessage("Profile updated successfully!");
 
     } catch (err) {
