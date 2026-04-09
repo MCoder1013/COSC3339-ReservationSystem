@@ -5,7 +5,7 @@ import jwt from 'jsonwebtoken';
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-import { adminRequired, authRequired } from './index.js';
+import { adminRequired, authRequired, staffRequired } from './index.js';
 import { sql } from '../database.js';
 
 
@@ -185,18 +185,8 @@ router.get('/me', authRequired, async (req: Request, res: Response) => {
   }
 });
 
-router.get('/users', async (req: Request, res: Response) => {
-  const token = req.cookies?.jwt;
-  if (!token) return res.status(401).json({ error: 'Not authenticated' });
-
+router.get('/users', staffRequired, async (req: Request, res: Response) => {
   try {
-    const decoded = jwt.verify(token, jwtSecret) as { id: number };
-    const currentUser = await database.getUserById(decoded.id);
-
-    if (!currentUser || currentUser.user_role !== 'staff') {
-      return res.status(403).json({ error: 'Forbidden: staff only' });
-    }
-
     const users = await database.getAllUsers();
     res.json(users);
   } catch {
@@ -261,9 +251,6 @@ router.post('/update-profile', authRequired, upload.single('profilePicture'), as
 
 
 router.post('/update-user-role', adminRequired, async (req: Request, res: Response) => {
-  const token = req.cookies?.jwt;
-  if (!token) return res.status(401).json({ error: 'Not authenticated' });
-
   try {
     const { userId, newRole } = req.body;
 
