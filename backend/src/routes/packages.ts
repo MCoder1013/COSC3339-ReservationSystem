@@ -11,8 +11,8 @@ import {
     updatePackageEvent,
     type PackageEventInput,
 } from '../packages.js';
-import { getUserById, isUserStaffAdmin } from '../users.js';
-import { getAuthenticatedUserId } from './auth.js';
+import { getUserById, User } from '../users.js';
+import { authRequired, staffRequired } from './index.js';
 
 const router = Router();
 
@@ -80,34 +80,9 @@ function validateBasicInput(input: PackageEventInput): string | null {
     return null;
 }
 
-async function getRoleForRequest(req: Request) {
-    const userId = getAuthenticatedUserId(req);
-    if (!userId) return null;
-
-    const user = await getUserById(userId);
-    if (!user) return null;
-
-    let role = user.user_role as string;
-    if (role === 'staff') {
-        const staffAdmin = await isUserStaffAdmin(userId);
-        if (staffAdmin) {
-            role = 'admin';
-        }
-    }
-
-    return {
-        userId,
-        role,
-    };
-}
-
-function canCreateEvent(role: string) {
-    return role === 'staff' || role === 'admin';
-}
-
-function canManageEvent(role: string, creatorId: number, userId: number) {
-    if (role === 'admin') return true;
-    if (role === 'staff' && creatorId === userId) return true;
+function canManageEvent(user: User, creatorId: number) {
+    if (user.user_role === 'admin') return true;
+    if (user.user_role === 'staff' && creatorId === user.id) return true;
     return false;
 }
 
@@ -130,16 +105,10 @@ function validateCancellationReason(rawReason: unknown): string | null {
     return reason;
 }
 
-router.get('/packages/events', async (req: Request, res: Response) => {
-    const cruiseIdParam = req.query.cruise_id;
-    const cruiseId = cruiseIdParam == null ? undefined : Number(cruiseIdParam);
-    if (cruiseIdParam != null && Number.isNaN(cruiseId)) {
-        return res.status(400).json({ error: 'Please provide a valid cruise ID.' });
-    }
-
+router.get('/packages/events', authRequired, async (req: Request, res: Response) => {
     try {
-        const userId = getAuthenticatedUserId(req);
-        const events = await listActivePackageEvents(userId, cruiseId);
+        const userId = req.user!.id;
+        const events = await listActivePackageEvents(userId);
         res.json(events);
     } catch (error) {
         console.error('Failed to list package events:', error);
@@ -147,11 +116,8 @@ router.get('/packages/events', async (req: Request, res: Response) => {
     }
 });
 
-router.get('/packages/my-events', async (req: Request, res: Response) => {
-    const userId = getAuthenticatedUserId(req);
-    if (!userId) {
-        return res.status(401).json({ error: 'Please sign in to continue.' });
-    }
+router.get('/packages/my-events', authRequired, async (req: Request, res: Response) => {
+    const userId = req.user!.id;
 
     try {
         const events = await listJoinedPackageEvents(userId);
@@ -162,32 +128,20 @@ router.get('/packages/my-events', async (req: Request, res: Response) => {
     }
 });
 
-router.get('/packages/events/:id', async (req: Request, res: Response) => {
+router.get('/packages/events/:id', authRequired, async (req: Request, res: Response) => {
     const eventId = Number(req.params.id);
     if (Number.isNaN(eventId)) {
         return res.status(400).json({ error: 'Please provide a valid event ID.' });
     }
 
     try {
-        const auth = await getRoleForRequest(req);
-        const event: any = await getPackageEventById(eventId, auth?.userId);
+        const event: any = await getPackageEventById(eventId);
         if (!event) {
             return res.status(404).json({ error: 'This event could not be found.' });
         }
 
         if (event.status === 'Cancelled') {
             return res.status(404).json({ error: 'This event could not be found.' });
-        }
-
-        const isAssignedStaff = Boolean(auth && auth.role === 'staff' && Array.isArray(event.staff)
-            && event.staff.some((staffMember: any) => Number(staffMember.id) === Number(auth.userId)));
-        const canViewAttendees = Boolean(auth && (
-            auth.role === 'admin'
-            || (auth.role === 'staff' && (Number(event.created_by) === Number(auth.userId) || isAssignedStaff))
-        ));
-
-        if (canViewAttendees) {
-            event.attendees = await listPackageEventAttendees(eventId);
         }
 
         res.json(event);
@@ -197,16 +151,7 @@ router.get('/packages/events/:id', async (req: Request, res: Response) => {
     }
 });
 
-router.post('/packages/events', async (req: Request, res: Response) => {
-    const auth = await getRoleForRequest(req);
-    if (!auth) {
-        return res.status(401).json({ error: 'Please sign in to continue.' });
-    }
-
-    if (!canCreateEvent(auth.role)) {
-        return res.status(403).json({ error: 'Only staff and admins can create events.' });
-    }
-
+router.post('/packages/events', staffRequired, async (req: Request, res: Response) => {
     const input = parseEventInput(req.body);
     const inputError = validateBasicInput(input);
     if (inputError) {
@@ -214,7 +159,7 @@ router.post('/packages/events', async (req: Request, res: Response) => {
     }
 
     try {
-        const eventId = await createPackageEvent(auth.userId, input);
+        const eventId = await createPackageEvent(req.user!.id, input);
         res.status(201).json({ message: 'Event created successfully', eventId });
     } catch (error: any) {
         console.error('Failed to create package event:', error);
@@ -222,15 +167,10 @@ router.post('/packages/events', async (req: Request, res: Response) => {
     }
 });
 
-router.put('/packages/events/:id', async (req: Request, res: Response) => {
+router.put('/packages/events/:id', staffRequired, async (req: Request, res: Response) => {
     const eventId = Number(req.params.id);
     if (Number.isNaN(eventId)) {
         return res.status(400).json({ error: 'Please provide a valid event ID.' });
-    }
-
-    const auth = await getRoleForRequest(req);
-    if (!auth) {
-        return res.status(401).json({ error: 'Please sign in to continue.' });
     }
 
     try {
@@ -239,7 +179,7 @@ router.put('/packages/events/:id', async (req: Request, res: Response) => {
             return res.status(404).json({ error: 'This event could not be found.' });
         }
 
-        if (!canManageEvent(auth.role, existing.created_by, auth.userId)) {
+        if (!canManageEvent(req.user!, existing.created_by)) {
             return res.status(403).json({ error: 'You do not have permission to update this event.' });
         }
 
@@ -260,15 +200,10 @@ router.put('/packages/events/:id', async (req: Request, res: Response) => {
     }
 });
 
-router.post('/packages/events/:id/cancel', async (req: Request, res: Response) => {
+router.post('/packages/events/:id/cancel', staffRequired, async (req: Request, res: Response) => {
     const eventId = Number(req.params.id);
     if (Number.isNaN(eventId)) {
         return res.status(400).json({ error: 'Please provide a valid event ID.' });
-    }
-
-    const auth = await getRoleForRequest(req);
-    if (!auth) {
-        return res.status(401).json({ error: 'Please sign in to continue.' });
     }
 
     try {
@@ -277,41 +212,25 @@ router.post('/packages/events/:id/cancel', async (req: Request, res: Response) =
             return res.status(404).json({ error: 'This event could not be found.' });
         }
 
-        if (!canManageEvent(auth.role, existing.created_by, auth.userId)) {
+        if (!canManageEvent(req.user!, existing.created_by)) {
             return res.status(403).json({ error: 'You do not have permission to cancel this event.' });
         }
 
-        const cancellationReason = validateCancellationReason(req.body?.reason);
-        if (!cancellationReason) {
-            return res.status(400).json({
-                error: 'Please provide a valid cancellation reason (10-500 characters, plain text only).',
-            });
-        }
-
-        await cancelPackageEvent(eventId, auth.userId, auth.role, cancellationReason);
-        res.json({
-            message: 'Event cancelled successfully',
-            cancellation: {
-                cancelledBy: auth.role === 'admin' ? 'admin' : 'event creator',
-                reason: cancellationReason,
-            },
-        });
+        await cancelPackageEvent(eventId);
+        res.json({ message: 'Event cancelled successfully' });
     } catch (error: any) {
         console.error('Failed to cancel package event:', error);
         res.status(400).json({ error: error.message || 'Could not cancel the event. Please try again.' });
     }
 });
 
-router.post('/packages/events/:id/join', async (req: Request, res: Response) => {
+router.post('/packages/events/:id/join', staffRequired, async (req: Request, res: Response) => {
     const eventId = Number(req.params.id);
     if (Number.isNaN(eventId)) {
         return res.status(400).json({ error: 'Please provide a valid event ID.' });
     }
 
-    const userId = getAuthenticatedUserId(req);
-    if (!userId) {
-        return res.status(401).json({ error: 'Please sign in to continue.' });
-    }
+    const userId = req.user!.id;
 
     try {
         await joinPackageEvent(eventId, userId);
@@ -328,10 +247,7 @@ router.post('/packages/events/:id/leave', async (req: Request, res: Response) =>
         return res.status(400).json({ error: 'Please provide a valid event ID.' });
     }
 
-    const userId = getAuthenticatedUserId(req);
-    if (!userId) {
-        return res.status(401).json({ error: 'Please sign in to continue.' });
-    }
+    const userId = req.user!.id;
 
     try {
         await leavePackageEvent(eventId, userId);

@@ -5,6 +5,8 @@ import jwt from 'jsonwebtoken';
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import { adminRequired, authRequired, staffRequired } from './index.js';
+import { sql } from '../database.js';
 
 
 const router = Router();
@@ -13,13 +15,13 @@ const router = Router();
 const emailRegex = /(?:[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*|"(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21\x23-\x5b\x5d-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])*")@(?:(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?|\[(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?|[a-z0-9-]*[a-z0-9]:(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21-\x5a\x53-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])+)\])/
 
 // TODO: store user sessions in the database!
-let jwtSecret: string = process.env.JWT_SECRET ?? ''
+export let jwtSecret: string = process.env.JWT_SECRET ?? ''
 if (!jwtSecret) {
   console.warn('No JWT_SECRET environment variable is set, please set something if you\'re running in prod')
   jwtSecret = 'devsecret'
 }
 
-router.post('/register', async (req, res) => { 
+router.post('/register', async (req, res) => {
   const firstName = req.body.firstName;
   const lastName = req.body.lastName;
   let email = req.body.email;
@@ -27,15 +29,12 @@ router.post('/register', async (req, res) => {
   const confirmPassword = req.body.confirmPassword;
   const employeeCode = req.body.employeeCode;
 
-  let userRole = "normal";
-  let staffRole = null;
+  let userRole: database.UserRole = "normal";
 
   if (employeeCode === process.env.ADMIN_CODE) {
-    userRole = "staff";
-    staffRole = "admin";
+    userRole = "admin";
   } else if (employeeCode === process.env.CREW_CODE) {
     userRole = "staff";
-    staffRole = "crew";
   }
 
   email = email.toLowerCase();
@@ -82,9 +81,11 @@ router.post('/register', async (req, res) => {
     });
   }
 
-  if (userRole === "staff" && staffRole) {
+  if (userRole === "staff") {
     try {
-      await database.insertStaff(userId, staffRole, "Day");
+      // Their role is set to "Other" by default, but it can be changed by an
+      // admin.
+      await database.insertStaff(userId, "Other", "Day");
     } catch (err) {
       console.error('Error inserting staff:', err);
       return res.status(500).json({
@@ -101,7 +102,6 @@ router.post('/register', async (req, res) => {
 
 // Additional login information for authorization
 router.post('/login', async (req: Request, res: Response) => {
-
   // Extract email and password from the request body
   let { email, password } = req.body;
 
@@ -136,7 +136,9 @@ router.post('/login', async (req: Request, res: Response) => {
     res
       .cookie('jwt', token, {
         httpOnly: true,
-        sameSite: 'lax'
+        sameSite: 'lax',
+        // Expire after a year. This has to be set to fix sessions expiring when the browser is closed.
+        maxAge: 1000 * 60 * 60 * 24 * 365
       })
       .json({
         message: 'Login successful',
@@ -152,18 +154,13 @@ router.post('/login', async (req: Request, res: Response) => {
   }
 });
 
-router.post('/signout', (req: Request, res: Response) => {
+router.post('/signout', authRequired, (req: Request, res: Response) => {
   res.clearCookie('jwt').json({ message: 'Signed out successfully' });
 });
 
-router.get('/me', async (req: Request, res: Response) => {
-  const token = req.cookies?.jwt;
-  if (!token) return res.status(401).json({ error: 'Not authenticated' });
-
+router.get('/me', authRequired, async (req: Request, res: Response) => {
   try {
-    const decoded = jwt.verify(token, jwtSecret) as { id: number };
-    const user = await database.getUserById(decoded.id);
-    if (!user) return res.status(404).json({ error: 'User not found' });
+    const user = req.user!;
 
     const staffRole = user.user_role === 'staff'
       ? await database.getStaffRoleByUserId(user.id)
@@ -186,18 +183,8 @@ router.get('/me', async (req: Request, res: Response) => {
   }
 });
 
-router.get('/users', async (req: Request, res: Response) => {
-  const token = req.cookies?.jwt;
-  if (!token) return res.status(401).json({ error: 'Not authenticated' });
-
+router.get('/users', staffRequired, async (req: Request, res: Response) => {
   try {
-    const decoded = jwt.verify(token, jwtSecret) as { id: number };
-    const currentUser = await database.getUserById(decoded.id);
-
-    if (!currentUser || currentUser.user_role !== 'staff') {
-      return res.status(403).json({ error: 'Forbidden: staff only' });
-    }
-
     const users = await database.getAllUsers();
     res.json(users);
   } catch {
@@ -225,12 +212,9 @@ const upload = multer({
   },
 });
 
-router.post('/update-profile', upload.single('profilePicture'), async (req: Request, res: Response) => {
-  const token = req.cookies?.jwt;
-  if (!token) return res.status(401).json({ error: 'Not authenticated' });
-
+router.post('/update-profile', authRequired, upload.single('profilePicture'), async (req: Request, res: Response) => {
   try {
-    const decoded = jwt.verify(token, jwtSecret) as { id: number };
+    const userId = req.user!.id;
     const { biography } = req.body;
     let profilePicture: null | string = null
 
@@ -249,11 +233,11 @@ router.post('/update-profile', upload.single('profilePicture'), async (req: Requ
     }
 
     if (biography !== undefined && profilePicture) {
-      await database.updateUserProfile(decoded.id, biography, profilePicture);
+      await database.updateUserProfile(userId, biography, profilePicture);
     } else if (biography !== undefined) {
-      await database.updateUserBiography(decoded.id, biography);
+      await database.updateUserBiography(userId, biography);
     } else if (profilePicture) {
-      await database.updateUserProfilePicture(decoded.id, profilePicture);
+      await database.updateUserProfilePicture(userId, profilePicture);
     }
 
     res.json({ message: 'Profile updated successfully', profilePicture });
@@ -263,55 +247,9 @@ router.post('/update-profile', upload.single('profilePicture'), async (req: Requ
   }
 });
 
-export function getAuthenticatedUserId(req: Request): number | undefined {
-  const cookie = req.cookies['jwt']
-  if (!cookie) return undefined
-
+router.post('/update-user-role', adminRequired, async (req: Request, res: Response) => {
   try {
-    const decoded = jwt.verify(cookie, jwtSecret) as { id: number } | undefined;
-    return decoded?.id
-  } catch {
-    return undefined
-  }
-}
-
-async function requireAdminStaff(req: Request, res: Response): Promise<number | undefined> {
-  const token = req.cookies?.jwt;
-  if (!token) {
-    res.status(401).json({ error: 'Not authenticated' });
-    return undefined;
-  }
-
-  try {
-    const decoded = jwt.verify(token, jwtSecret) as { id: number };
-    const currentUser = await database.getUserById(decoded.id);
-
-    if (!currentUser || currentUser.user_role !== 'staff') {
-      res.status(403).json({ error: 'Forbidden: staff only' });
-      return undefined;
-    }
-
-    const isAdmin = await database.isUserStaffAdmin(decoded.id);
-    if (!isAdmin) {
-      res.status(403).json({ error: 'Forbidden: admin only' });
-      return undefined;
-    }
-
-    return decoded.id;
-  } catch {
-    res.status(401).json({ error: 'Invalid token' });
-    return undefined;
-  }
-}
-
-router.post('/update-user-role', async (req: Request, res: Response) => {
-  try {
-    const adminId = await requireAdminStaff(req, res);
-    if (!adminId) {
-      return;
-    }
-
-    const { userId, newRole, cruiseIds } = req.body;
+    const { userId, newRole } = req.body;
 
     if (!userId || !newRole) {
       return res.status(400).json({ error: 'Missing userId or newRole' });
@@ -326,30 +264,31 @@ router.post('/update-user-role', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    if (targetUser.id === adminId && newRole !== 'admin') {
-      return res.status(400).json({ error: 'You cannot remove your own admin privileges.' });
-    }
-
-    const normalizedCruiseIds = Array.isArray(cruiseIds)
-      ? cruiseIds.map((id: unknown) => Number(id)).filter((id) => Number.isInteger(id) && id > 0)
-      : [];
-
     // Update user role
     if (newRole === 'admin') {
       // Promote to admin: set user_role to 'staff' and add to staff table with role 'Admin'
       await database.updateUserRole(userId, 'staff');
-      await database.upsertStaffRecord(userId, 'admin', 'Day');
-      await database.replaceStaffCruiseAssignments(userId, normalizedCruiseIds);
+      // Insert or update in staff table
+      await sql`
+        INSERT INTO staff (staff_id, role, shift)
+        VALUES (${userId}, 'Admin', 'Day')
+        ON CONFLICT (staff_id)
+        DO UPDATE SET role = 'Admin'
+      `;
     } else if (newRole === 'staff') {
-      // Promote/demote to regular staff and keep staff record.
+      // Demote to staff: set user_role to 'staff' and remove from staff table
       await database.updateUserRole(userId, 'staff');
-      await database.upsertStaffRecord(userId, 'crew', 'Day');
-      await database.replaceStaffCruiseAssignments(userId, normalizedCruiseIds);
+      // Delete from staff table if exists
+      await sql`
+        DELETE FROM staff WHERE staff_id = ${userId}
+      `;
     } else {
-      // Downgrade to normal user and remove staff associations.
+      // Downgrade to normal: set user_role to 'normal' and remove from staff table
       await database.updateUserRole(userId, 'normal');
-      await database.replaceStaffCruiseAssignments(userId, []);
-      await database.removeStaffRecord(userId);
+      // Delete from staff table if exists
+      await sql`
+        DELETE FROM staff WHERE staff_id = ${userId}
+      `;
     }
 
     res.json({ message: 'User role updated successfully' });
@@ -359,14 +298,10 @@ router.post('/update-user-role', async (req: Request, res: Response) => {
   }
 });
 
-router.get('/staff/:userId/cruises', async (req: Request, res: Response) => {
+router.get('/staff/:userId/cruises', adminRequired, async (req: Request, res: Response) => {
   try {
-    const adminId = await requireAdminStaff(req, res);
-    if (!adminId) {
-      return;
-    }
-
     const userId = Number(req.params.userId);
+
     if (!Number.isInteger(userId) || userId < 1) {
       return res.status(400).json({ error: 'Invalid user ID' });
     }
@@ -379,17 +314,15 @@ router.get('/staff/:userId/cruises', async (req: Request, res: Response) => {
   }
 });
 
-router.post('/add-staff-cruise', async (req: Request, res: Response) => {
+router.post('/add-staff-cruise', adminRequired, async (req: Request, res: Response) => {
   try {
-    const adminId = await requireAdminStaff(req, res);
-    if (!adminId) {
-      return;
-    }
-
     const userId = Number(req.body.userId);
     const cruiseId = Number(req.body.cruiseId);
 
-    if (!Number.isInteger(userId) || userId < 1 || !Number.isInteger(cruiseId) || cruiseId < 1) {
+    if (
+      !Number.isInteger(userId) || userId < 1 ||
+      !Number.isInteger(cruiseId) || cruiseId < 1
+    ) {
       return res.status(400).json({ error: 'Invalid userId or cruiseId' });
     }
 
@@ -401,17 +334,15 @@ router.post('/add-staff-cruise', async (req: Request, res: Response) => {
   }
 });
 
-router.post('/remove-staff-cruise', async (req: Request, res: Response) => {
+router.post('/remove-staff-cruise', adminRequired, async (req: Request, res: Response) => {
   try {
-    const adminId = await requireAdminStaff(req, res);
-    if (!adminId) {
-      return;
-    }
-
     const userId = Number(req.body.userId);
     const cruiseId = Number(req.body.cruiseId);
 
-    if (!Number.isInteger(userId) || userId < 1 || !Number.isInteger(cruiseId) || cruiseId < 1) {
+    if (
+      !Number.isInteger(userId) || userId < 1 ||
+      !Number.isInteger(cruiseId) || cruiseId < 1
+    ) {
       return res.status(400).json({ error: 'Invalid userId or cruiseId' });
     }
 

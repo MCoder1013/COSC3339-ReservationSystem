@@ -110,7 +110,7 @@ export default function ReservationTable() {
     try {
       console.log("Deleting reservation:", reservationId);
       
-      const response = await fetch(`${API_URL}/api/admin/reservations/${reservationId}`, {
+      const response = await fetch(`${API_URL}/api/reservations/${reservationId}`, {
         method: "DELETE",
         credentials: "include",
       });

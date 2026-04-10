@@ -35,9 +35,17 @@ export default function NavBar({ shipName }: NavBarProps) {
                 onClick={() => setIsProfileOpen(true)}
                 title={user.firstName}
               >
-                <div className="userIconPlaceholder">
-                  {user.firstName.charAt(0).toUpperCase()}
-                </div>
+                {user.profilePicture ? (
+                  <img
+                    src={user.profilePicture}
+                    alt={`${user.firstName} profile`}
+                    className="userIconImg"
+                  />
+                ) : (
+                  <div className="userIconPlaceholder">
+                    {user.firstName.charAt(0).toUpperCase()}
+                  </div>
+                )}
               </button>
             ) : (
               <Link className="navButton" to="/signin">Sign In</Link>
