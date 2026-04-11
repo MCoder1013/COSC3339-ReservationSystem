@@ -12,10 +12,13 @@ export default function ReservationTable() {
 
   // tabs
   const categories = ["Items", "Rooms", "Packages"] as const;
+  const itemSubTabs = ["Individual", "Event"] as const;
 
   // current selected tab
   const [activeCategory, setActiveCategory] =
     useState<(typeof categories)[number]>("Items");
+  const [activeItemSubTab, setActiveItemSubTab] =
+    useState<(typeof itemSubTabs)[number]>("Individual");
 
   const [reservationData, setReservationData] = useState<{
     Items: any[];
@@ -74,6 +77,34 @@ export default function ReservationTable() {
   useEffect(() => {
     loadReservations();
   }, []);
+
+  useEffect(() => {
+    if (activeCategory !== "Items") {
+      setActiveItemSubTab("Individual");
+    }
+  }, [activeCategory]);
+
+  const isEventItemReservation = (reservation: any) => {
+    const reservationType = String(reservation?.reservation_type ?? "").toLowerCase();
+    if (reservationType === "package_event_item") return true;
+
+    // Package-event item rows use synthetic negative IDs in backend SQL.
+    return Number(reservation?.id) < 0;
+  };
+
+  const getDisplayedReservations = () => {
+    if (activeCategory !== "Items") {
+      return reservationData[activeCategory];
+    }
+
+    if (activeItemSubTab === "Event") {
+      return reservationData.Items.filter((reservation: any) => isEventItemReservation(reservation));
+    }
+
+    return reservationData.Items.filter((reservation: any) => !isEventItemReservation(reservation));
+  };
+
+  const displayedReservations = getDisplayedReservations();
 
   const handleDeleteReservation = async (reservationId: number) => {
     try {
@@ -134,7 +165,21 @@ export default function ReservationTable() {
           ))}
         </div>
 
-        <br />
+        {activeCategory === "Items" && (
+          <div style={{ display: "flex", justifyContent: "center", gap: "0", marginTop: "10px", marginBottom: "0" }}>
+            {itemSubTabs.map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveItemSubTab(tab)}
+                className={activeItemSubTab === tab ? "activeTab" : ""}
+              >
+                {tab}
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div style={{ height: "10px" }} />
 
         {formError && (
           <div className="errorMessage">{formError}</div>
@@ -144,21 +189,25 @@ export default function ReservationTable() {
           <PackageEventsList showManagement={true} />
         ) : loading ? (
           <p>Loading reservations...</p>
-        ) : reservationData[activeCategory].length === 0 ? (
-          <p>No {activeCategory.toLowerCase()} reservations found.</p>
+        ) : displayedReservations.length === 0 ? (
+          <p>
+            {activeCategory === "Items"
+              ? `No ${activeItemSubTab.toLowerCase()} item reservations found.`
+              : `No ${activeCategory.toLowerCase()} reservations found.`}
+          </p>
         ) : (
           /* Changes table dynamically */
           <table className="inventoryTable">
             <thead>
               {activeCategory === "Items" ? (
                 <tr>
-                  <th>Reservation ID</th>
+                  <th>{activeItemSubTab === "Event" ? "Event Item Ref" : "Reservation ID"}</th>
                   <th>Item Reserved</th>
                   <th>Quantity</th>
                   <th>User Email</th>
                   <th>Start Date</th>
                   <th>End Date</th>
-                  <th>Actions</th>
+                  <th>{activeItemSubTab === "Event" ? "Event Name" : "Actions"}</th>
                 </tr>
               ) : activeCategory === "Rooms" ? (
                 <tr>
@@ -182,22 +231,40 @@ export default function ReservationTable() {
             </thead>
 
             <tbody>
-              {reservationData[activeCategory].map((reservation) =>
+              {displayedReservations.map((reservation: any) =>
                 activeCategory === "Items" ? (
                   <tr key={reservation.id}>
-                    <td>{reservation.id}</td>
+                    <td>
+                      {activeItemSubTab === "Event"
+                        ? (reservation.event_id && reservation.resource_id
+                            ? `E${reservation.event_id}-R${reservation.resource_id}`
+                            : reservation.id)
+                        : reservation.id}
+                    </td>
                     <td>{reservation.resource_name}</td>
                     <td>{reservation.quantity_reserved}</td>
                     <td>{reservation.email}</td>
                     <td>{formatDateTime(reservation.start_time)}</td>
                     <td>{formatDateTime(reservation.end_time)}</td>
                     <td>
-                      <button 
-                        className="deleteButton"
-                        onClick={() => handleDeleteReservation(reservation.id)}
-                      >
-                        Delete
-                      </button>
+                      {activeItemSubTab === "Event" ? (
+                        <span>
+                          {reservation.event_name
+                            ? reservation.event_name
+                            : reservation.event_id
+                              ? `Event #${reservation.event_id}`
+                              : "Unknown Event"}
+                        </span>
+                      ) : isEventItemReservation(reservation) ? (
+                        <span>N/A</span>
+                      ) : (
+                        <button
+                          className="deleteButton"
+                          onClick={() => handleDeleteReservation(reservation.id)}
+                        >
+                          Delete
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ) : activeCategory === "Rooms" ? (

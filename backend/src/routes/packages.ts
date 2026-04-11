@@ -4,12 +4,14 @@ import {
     createPackageEvent,
     getPackageEventById,
     joinPackageEvent,
+    leavePackageEvent,
+    listPackageEventAttendees,
     listActivePackageEvents,
     listJoinedPackageEvents,
     updatePackageEvent,
     type PackageEventInput,
 } from '../packages.js';
-import { User } from '../users.js';
+import { getUserById, User } from '../users.js';
 import { authRequired, staffRequired } from './index.js';
 
 const router = Router();
@@ -27,6 +29,7 @@ function parseEventInput(body: any): PackageEventInput {
         : [];
 
     return {
+        cruise_id: Number(body.cruise_id),
         name: String(body.name ?? '').trim(),
         description: String(body.description ?? '').trim(),
         capacity: Number(body.capacity),
@@ -41,6 +44,7 @@ function parseEventInput(body: any): PackageEventInput {
 }
 
 function validateBasicInput(input: PackageEventInput): string | null {
+    if (!Number.isInteger(input.cruise_id) || input.cruise_id < 1) return 'A valid cruise must be selected.';
     if (!input.name) return 'Event name is required.';
     if (!input.description) return 'Event description is required.';
     if (!Number.isInteger(input.capacity) || input.capacity < 1) return 'Capacity must be at least 1.';
@@ -82,6 +86,25 @@ function canManageEvent(user: User, creatorId: number) {
     return false;
 }
 
+function validateCancellationReason(rawReason: unknown): string | null {
+    const reason = String(rawReason ?? '').trim();
+    if (reason.length < 10) {
+        return null;
+    }
+
+    if (reason.length > 500) {
+        return null;
+    }
+
+    // Allow plain language with common punctuation, disallow markup/code symbols.
+    const safeTextPattern = /^[A-Za-z0-9 ,.!?'"()\-:\n\r]+$/;
+    if (!safeTextPattern.test(reason)) {
+        return null;
+    }
+
+    return reason;
+}
+
 router.get('/packages/events', authRequired, async (req: Request, res: Response) => {
     try {
         const userId = req.user!.id;
@@ -112,7 +135,7 @@ router.get('/packages/events/:id', authRequired, async (req: Request, res: Respo
     }
 
     try {
-        const event: any = await getPackageEventById(eventId);
+        const event: any = await getPackageEventById(eventId, req.user!.id);
         if (!event) {
             return res.status(404).json({ error: 'This event could not be found.' });
         }
@@ -161,6 +184,9 @@ router.put('/packages/events/:id', staffRequired, async (req: Request, res: Resp
         }
 
         const input = parseEventInput(req.body);
+        if (!Number.isInteger(input.cruise_id) || input.cruise_id < 1) {
+            input.cruise_id = Number(existing.cruise_id);
+        }
         const inputError = validateBasicInput(input);
         if (inputError) {
             return res.status(400).json({ error: inputError });
@@ -198,7 +224,7 @@ router.post('/packages/events/:id/cancel', staffRequired, async (req: Request, r
     }
 });
 
-router.post('/packages/events/:id/join', staffRequired, async (req: Request, res: Response) => {
+router.post('/packages/events/:id/join', authRequired, async (req: Request, res: Response) => {
     const eventId = Number(req.params.id);
     if (Number.isNaN(eventId)) {
         return res.status(400).json({ error: 'Please provide a valid event ID.' });
@@ -212,6 +238,23 @@ router.post('/packages/events/:id/join', staffRequired, async (req: Request, res
     } catch (error: any) {
         console.error('Failed to join package event:', error);
         res.status(400).json({ error: error.message || 'Could not join this event right now.' });
+    }
+});
+
+router.post('/packages/events/:id/leave', authRequired, async (req: Request, res: Response) => {
+    const eventId = Number(req.params.id);
+    if (Number.isNaN(eventId)) {
+        return res.status(400).json({ error: 'Please provide a valid event ID.' });
+    }
+
+    const userId = req.user!.id;
+
+    try {
+        await leavePackageEvent(eventId, userId);
+        res.json({ message: 'Reservation cancelled successfully' });
+    } catch (error: any) {
+        console.error('Failed to leave package event:', error);
+        res.status(400).json({ error: error.message || 'Could not cancel this reservation right now.' });
     }
 });
 

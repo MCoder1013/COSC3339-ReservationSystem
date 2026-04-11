@@ -1,14 +1,16 @@
 import { Router, Request, Response } from 'express';
 import {
   addReservation, deleteReservation, getAllReservationsWithDetails, getReservationsByUser,
-  updateReservation, getUserRoomReservations, getUserItemReservations, addGuestsToReservation
+  updateReservation, getUserRoomReservations, getUserItemReservations, addGuestsToReservation,
+  getUserRoomCruises
 } from '../reservations.js';
-import { validateGuestEmails } from '../users.js';
-import { authRequired } from './index.js';
+import { getCurrentStaffAssignedCruises, getUserById, validateGuestEmails } from '../users.js';
+import { authRequired, } from './index.js';
+import { sql } from '../database.js';
+
 
 const router = Router();
 
-// RES-POST
 router.post("/reservations", authRequired, async (req: Request, res: Response) => {
   // Need a safe way to get the user id and add it in since we are not getting that from the frontend
   const { cabin_id, resource_id, staff_id, start_time, end_time, quantity_reserved, additional_guest_emails, cruise_id } = req.body;
@@ -183,8 +185,6 @@ router.get("/my-reservations", authRequired, async (req: Request, res: Response)
   }
 });
 
-
-
 // RES-GET-ITEMS - gets items for authenticated user
 router.get('/reservations/items', authRequired, async (req: Request, res: Response) => {
   try {
@@ -208,6 +208,53 @@ router.get('/reservations/rooms', authRequired, async (req: Request, res: Respon
   } catch (error) {
     console.error('Error fetching user room reservations:', error);
     res.status(500).json({ error: 'Failed to load room reservations' });
+  }
+});
+
+router.get('/reservations/eligible-cruises', authRequired, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user!.id;
+
+    const user = await getUserById(userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    if (user.user_role === 'staff') {
+      const cruises = await sql`
+        SELECT role
+        FROM staff
+        WHERE staff_id = ${userId}
+        LIMIT 1
+      `;
+
+      const isAdmin = cruises[0]?.role?.trim().toLowerCase() === 'admin';
+
+      if (isAdmin) {
+        const allCruises = await sql`
+          SELECT
+            id,
+            cruise_name,
+            ship_name,
+            departure_date,
+            return_date,
+            max_passengers
+          FROM cruises
+          WHERE return_date >= CURRENT_DATE
+          ORDER BY departure_date ASC
+        `;
+        return res.json(allCruises);
+      }
+
+      const assignedCruises = await getCurrentStaffAssignedCruises(userId);
+      return res.json(assignedCruises);
+    }
+
+    const cruises = await getUserRoomCruises(userId);
+    res.json(cruises);
+  } catch (error) {
+    console.error('Error fetching eligible cruises:', error);
+    res.status(500).json({ error: 'Failed to load eligible cruises' });
   }
 });
 

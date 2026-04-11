@@ -2,6 +2,7 @@ import postgres from 'postgres';
 import { sql } from './database.js';
 
 export type PackageEventInput = {
+    cruise_id: number;
     name: string;
     description: string;
     capacity: number;
@@ -17,16 +18,22 @@ const SHIFT_TIME_ZONE = process.env.SHIFT_TIME_ZONE || 'America/Chicago';
 const STAFF_DISPLAY_NAME_SQL = "COALESCE(NULLIF(CONCAT_WS(' ', u.first_name, u.last_name), ''), u.email, CAST(s.staff_id AS TEXT))";
 const STAFF_NAME_AGGREGATE_BY_EVENT_SQL = `
     SELECT
-        pes.event_id,
+        mapping.event_id,
         STRING_AGG(
             ${STAFF_DISPLAY_NAME_SQL},
             ', '
             ORDER BY ${STAFF_DISPLAY_NAME_SQL}
         ) AS staff_names
-    FROM package_event_staff pes
-    JOIN staff s ON s.staff_id = pes.staff_id
+    FROM (
+        SELECT pes.event_id, pes.staff_id
+        FROM package_event_staff pes
+        UNION
+        SELECT e.id AS event_id, e.created_by AS staff_id
+        FROM package_events e
+    ) mapping
+    JOIN staff s ON s.staff_id = mapping.staff_id
     LEFT JOIN users u ON u.id = s.staff_id
-    GROUP BY pes.event_id
+    GROUP BY mapping.event_id
 `;
 
 const shiftTimeFormatter = new Intl.DateTimeFormat('en-US', {
@@ -267,25 +274,39 @@ async function replaceEventItems(
     }
 }
 
+function withRequiredStaffMember(staffIds: number[], requiredStaffId: number) {
+    const unique = new Set(staffIds.filter((id) => Number.isInteger(id) && id > 0));
+    if (Number.isInteger(requiredStaffId) && requiredStaffId > 0) {
+        unique.add(requiredStaffId);
+    }
+    return Array.from(unique);
+}
+
 export async function createPackageEvent(createdBy: number, input: PackageEventInput) {
     return await sql.begin(async (tx) => {
+        const creatorId = Number(createdBy);
+        if (!Number.isInteger(creatorId) || creatorId < 1) {
+            throw new Error('Could not verify the authenticated user for this request.');
+        }
+
         const start = new Date(input.start_time);
         const end = new Date(input.end_time);
+        const assignedStaffIds = withRequiredStaffMember(input.staff_ids, creatorId);
 
         validateEventWindowRules(start, end);
-        await validateCreatorShiftWindow(createdBy, start, end, tx);
-        await validateStaffShiftWindows(input.staff_ids, input.start_time, input.end_time, tx);
+        await validateCreatorShiftWindow(creatorId, start, end, tx);
+        await validateStaffShiftWindows(assignedStaffIds, input.start_time, input.end_time, tx);
         await validateItemAvailability(input.item_requirements, input.start_time, input.end_time, tx);
 
         const result = await tx`
-            INSERT INTO package_events (name, description, capacity, start_time, end_time, created_by)
-            VALUES (${input.name}, ${input.description}, ${input.capacity}, ${input.start_time}, ${input.end_time}, ${createdBy})
+            INSERT INTO package_events (cruise_id, name, description, capacity, start_time, end_time, created_by)
+            VALUES (${input.cruise_id}, ${input.name}, ${input.description}, ${input.capacity}, ${input.start_time}, ${input.end_time}, ${creatorId})
             RETURNING id
         `;
 
         const eventId = result[0].id;
 
-        await replaceEventStaff(eventId, input.staff_ids, tx);
+        await replaceEventStaff(eventId, assignedStaffIds, tx);
         await replaceEventItems(eventId, input.item_requirements, tx);
 
         return eventId;
@@ -308,13 +329,17 @@ export async function updatePackageEvent(eventId: number, input: PackageEventInp
             throw new Error('This event could not be found.');
         }
 
-        await validateCreatorShiftWindow(eventRows[0].created_by, start, end, tx);
-        await validateStaffShiftWindows(input.staff_ids, input.start_time, input.end_time, tx);
+        const creatorId = Number(eventRows[0].created_by);
+        const assignedStaffIds = withRequiredStaffMember(input.staff_ids, creatorId);
+
+        await validateCreatorShiftWindow(creatorId, start, end, tx);
+        await validateStaffShiftWindows(assignedStaffIds, input.start_time, input.end_time, tx);
         await validateItemAvailability(input.item_requirements, input.start_time, input.end_time, tx, eventId);
 
         await tx`
             UPDATE package_events
-            SET name = ${input.name},
+            SET cruise_id = ${input.cruise_id},
+                name = ${input.name},
                 description = ${input.description},
                 capacity = ${input.capacity},
                 start_time = ${input.start_time},
@@ -322,7 +347,7 @@ export async function updatePackageEvent(eventId: number, input: PackageEventInp
             WHERE id = ${eventId}
         `;
 
-        await replaceEventStaff(eventId, input.staff_ids, tx);
+        await replaceEventStaff(eventId, assignedStaffIds, tx);
         await replaceEventItems(eventId, input.item_requirements, tx);
     });
 }
@@ -335,10 +360,11 @@ export async function cancelPackageEvent(eventId: number) {
     `;
 }
 
-export async function getPackageEventById(eventId: number) {
+export async function getPackageEventById(eventId: number, viewerUserId?: number) {
     const eventRows = await sql`
         SELECT
             e.id,
+            e.cruise_id,
             e.name,
             e.description,
             e.capacity,
@@ -348,7 +374,19 @@ export async function getPackageEventById(eventId: number) {
             e.created_by,
             COALESCE(att.total_attendees, 0) AS total_attendees,
             GREATEST(e.capacity - COALESCE(att.total_attendees, 0), 0) AS spots_left,
-            (COALESCE(att.total_attendees, 0) >= e.capacity) AS is_full
+                        (COALESCE(att.total_attendees, 0) >= e.capacity) AS is_full,
+                        EXISTS(
+                                SELECT 1
+                                FROM package_event_attendees pea
+                                WHERE pea.event_id = e.id
+                                    AND pea.user_id = ${viewerUserId ?? null}
+                        ) AS is_joined,
+                        EXISTS(
+                                SELECT 1
+                                FROM package_event_staff pes
+                                WHERE pes.event_id = e.id
+                                    AND pes.staff_id = ${viewerUserId ?? null}
+                        ) AS is_staffed
         FROM package_events e
         LEFT JOIN (
             SELECT event_id, COUNT(*)::INT AS total_attendees
@@ -368,10 +406,17 @@ export async function getPackageEventById(eventId: number) {
             ${sql.unsafe(STAFF_DISPLAY_NAME_SQL)} AS name,
             s.role,
             s.shift
-        FROM package_event_staff pes
-        JOIN staff s ON s.staff_id = pes.staff_id
+        FROM (
+            SELECT pes.staff_id
+            FROM package_event_staff pes
+            WHERE pes.event_id = ${eventId}
+            UNION
+            SELECT e.created_by AS staff_id
+            FROM package_events e
+            WHERE e.id = ${eventId}
+        ) mapping
+        JOIN staff s ON s.staff_id = mapping.staff_id
         LEFT JOIN users u ON u.id = s.staff_id
-        WHERE pes.event_id = ${eventId}
         ORDER BY name
     `;
 
@@ -390,10 +435,27 @@ export async function getPackageEventById(eventId: number) {
     };
 }
 
-export async function listActivePackageEvents(userId?: number) {
+export async function listPackageEventAttendees(eventId: number) {
+    const rows = await sql`
+        SELECT
+            u.id,
+            COALESCE(NULLIF(CONCAT_WS(' ', u.first_name, u.last_name), ''), u.email, CAST(u.id AS TEXT)) AS name,
+            u.email,
+            pea.joined_at
+        FROM package_event_attendees pea
+        JOIN users u ON u.id = pea.user_id
+        WHERE pea.event_id = ${eventId}
+        ORDER BY pea.joined_at ASC
+    `;
+
+    return rows;
+}
+
+export async function listActivePackageEvents(userId?: number, cruiseId?: number) {
     const rows = await sql`
         SELECT
             e.id,
+            e.cruise_id,
             e.name,
             e.description,
             e.capacity,
@@ -409,7 +471,13 @@ export async function listActivePackageEvents(userId?: number) {
                 FROM package_event_attendees pea
                 WHERE pea.event_id = e.id
                   AND pea.user_id = ${userId ?? null}
-            ) AS is_joined
+                        ) AS is_joined,
+                        EXISTS(
+                                SELECT 1
+                                FROM package_event_staff pes
+                                WHERE pes.event_id = e.id
+                                    AND pes.staff_id = ${userId ?? null}
+                        ) AS is_staffed
         FROM package_events e
         LEFT JOIN (
             SELECT event_id, COUNT(*)::INT AS total_attendees
@@ -420,6 +488,7 @@ export async function listActivePackageEvents(userId?: number) {
             ${sql.unsafe(STAFF_NAME_AGGREGATE_BY_EVENT_SQL)}
         ) staff ON staff.event_id = e.id
         WHERE e.status <> 'Cancelled'
+          AND (${cruiseId ?? null}::INT IS NULL OR e.cruise_id = ${cruiseId ?? null})
         ORDER BY e.start_time
     `;
 
@@ -432,17 +501,59 @@ export async function listJoinedPackageEvents(userId: number) {
             e.id,
             e.name,
             e.description,
+            e.capacity,
             e.start_time,
             e.end_time,
             e.status,
-            pea.joined_at,
+            e.created_by,
+            COALESCE(att.total_attendees, 0) AS total_attendees,
+            GREATEST(e.capacity - COALESCE(att.total_attendees, 0), 0) AS spots_left,
+            (COALESCE(att.total_attendees, 0) >= e.capacity) AS is_full,
+                        (
+                                SELECT pea.joined_at
+                                FROM package_event_attendees pea
+                                WHERE pea.event_id = e.id
+                                    AND pea.user_id = ${userId}
+                                LIMIT 1
+                        ) AS joined_at,
+            EXISTS (
+                SELECT 1
+                FROM package_event_attendees pea
+                WHERE pea.event_id = e.id
+                  AND pea.user_id = ${userId}
+            ) AS is_joined,
+            EXISTS (
+                SELECT 1
+                FROM package_event_staff pes
+                WHERE pes.event_id = e.id
+                  AND pes.staff_id = ${userId}
+            ) AS is_staffed,
             COALESCE(staff.staff_names, '') AS staff_names
-        FROM package_event_attendees pea
-        JOIN package_events e ON e.id = pea.event_id
+                FROM package_events e
+        LEFT JOIN (
+            SELECT event_id, COUNT(*)::INT AS total_attendees
+            FROM package_event_attendees
+            GROUP BY event_id
+        ) att ON att.event_id = e.id
         LEFT JOIN (
             ${sql.unsafe(STAFF_NAME_AGGREGATE_BY_EVENT_SQL)}
         ) staff ON staff.event_id = e.id
-        WHERE pea.user_id = ${userId}
+                WHERE e.status <> 'Cancelled'
+                    AND (
+                        EXISTS (
+                                SELECT 1
+                                FROM package_event_attendees pea
+                                WHERE pea.event_id = e.id
+                                    AND pea.user_id = ${userId}
+                        )
+                        OR EXISTS (
+                                SELECT 1
+                                FROM package_event_staff pes
+                                WHERE pes.event_id = e.id
+                                    AND pes.staff_id = ${userId}
+                        )
+                        OR e.created_by = ${userId}
+                    )
         ORDER BY e.start_time DESC
     `;
 
@@ -452,7 +563,7 @@ export async function listJoinedPackageEvents(userId: number) {
 export async function joinPackageEvent(eventId: number, userId: number) {
     return await sql.begin(async (tx) => {
         const eventRows = await tx`
-            SELECT id, capacity, status
+            SELECT id, capacity, status, start_time, end_time
             FROM package_events
             WHERE id = ${eventId}
             FOR UPDATE
@@ -465,6 +576,51 @@ export async function joinPackageEvent(eventId: number, userId: number) {
         const event = eventRows[0];
         if (event.status === 'Cancelled') {
             throw new Error('This event is no longer available.');
+        }
+
+        const staffedOnTargetEventRows = await tx`
+            SELECT 1
+            FROM package_event_staff pes
+            WHERE pes.event_id = ${eventId}
+              AND pes.staff_id = ${userId}
+            LIMIT 1
+        `;
+
+        if (staffedOnTargetEventRows.length > 0) {
+            throw new Error('You are assigned as staff for this event and cannot join as an attendee.');
+        }
+
+        const staffRows = await tx`
+            SELECT shift
+            FROM staff
+            WHERE staff_id = ${userId}
+            LIMIT 1
+        `;
+
+        if (staffRows.length > 0) {
+            const shift = String(staffRows[0].shift ?? '');
+            const eventStart = new Date(event.start_time);
+            const eventEnd = new Date(event.end_time);
+
+            if (isWithinShiftWindow(shift, eventStart, eventEnd)) {
+                throw new Error('You cannot join this event because it overlaps with your staff shift.');
+            }
+
+            const staffedOverlapRows = await tx`
+                SELECT e.id
+                FROM package_event_staff pes
+                JOIN package_events e ON e.id = pes.event_id
+                WHERE pes.staff_id = ${userId}
+                  AND e.id <> ${eventId}
+                  AND e.status <> 'Cancelled'
+                  AND e.start_time < ${event.end_time}
+                  AND e.end_time > ${event.start_time}
+                LIMIT 1
+            `;
+
+            if (staffedOverlapRows.length > 0) {
+                throw new Error('You cannot join this event because you are assigned to another event during that time.');
+            }
         }
 
         const attendeeRows = await tx`
@@ -484,5 +640,30 @@ export async function joinPackageEvent(eventId: number, userId: number) {
             VALUES (${eventId}, ${userId})
             ON CONFLICT (event_id, user_id) DO NOTHING
         `;
+    });
+}
+
+export async function leavePackageEvent(eventId: number, userId: number) {
+    return await sql.begin(async (tx) => {
+        const eventRows = await tx`
+            SELECT id, status
+            FROM package_events
+            WHERE id = ${eventId}
+            FOR UPDATE
+        `;
+
+        if (eventRows.length === 0) {
+            throw new Error('This event could not be found.');
+        }
+
+        const result = await tx`
+            DELETE FROM package_event_attendees
+            WHERE event_id = ${eventId}
+              AND user_id = ${userId}
+        `;
+
+        if (result.count === 0) {
+            throw new Error('You do not currently have a reservation for this event.');
+        }
     });
 }
