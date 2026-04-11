@@ -135,7 +135,7 @@ router.get('/packages/events/:id', authRequired, async (req: Request, res: Respo
     }
 
     try {
-        const event: any = await getPackageEventById(eventId);
+        const event: any = await getPackageEventById(eventId, req.user!.id);
         if (!event) {
             return res.status(404).json({ error: 'This event could not be found.' });
         }
@@ -224,7 +224,7 @@ router.post('/packages/events/:id/cancel', staffRequired, async (req: Request, r
     }
 });
 
-router.post('/packages/events/:id/join', staffRequired, async (req: Request, res: Response) => {
+router.post('/packages/events/:id/join', authRequired, async (req: Request, res: Response) => {
     const eventId = Number(req.params.id);
     if (Number.isNaN(eventId)) {
         return res.status(400).json({ error: 'Please provide a valid event ID.' });
@@ -241,7 +241,7 @@ router.post('/packages/events/:id/join', staffRequired, async (req: Request, res
     }
 });
 
-router.post('/packages/events/:id/leave', async (req: Request, res: Response) => {
+router.post('/packages/events/:id/leave', authRequired, async (req: Request, res: Response) => {
     const eventId = Number(req.params.id);
     if (Number.isNaN(eventId)) {
         return res.status(400).json({ error: 'Please provide a valid event ID.' });
