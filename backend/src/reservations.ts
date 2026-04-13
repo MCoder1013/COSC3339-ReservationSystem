@@ -310,6 +310,7 @@ export async function pullReservations(): Promise<Reservation[]> {
         WHERE
             r.user_id = u.id AND
             r.end_time > NOW()
+            AND r.status != 'Cancelled'
         `;
 
     return rows as any[] as Reservation[];
@@ -345,6 +346,7 @@ export async function getAllReservationsWithDetails() {
             LEFT JOIN cabins c ON r.cabin_id = c.id
             LEFT JOIN cruises cr ON r.cruise_id = cr.id
             LEFT JOIN resources res ON r.resource_id = res.id
+            WHERE r.status != 'Cancelled'
             ORDER BY r.start_time DESC
         `;
         return rows;
@@ -373,7 +375,7 @@ export async function getReservationsByUser(userId: number): Promise<RowList<Row
         LEFT JOIN resources res ON r.resource_id = res.id
         LEFT JOIN cabins c ON r.cabin_id = c.id
         LEFT JOIN cruises cr ON r.cruise_id = cr.id
-        WHERE r.user_id = ${userId}
+        WHERE r.user_id = ${userId} AND r.status != 'Cancelled'
         ORDER BY r.start_time DESC
     `;
 
@@ -409,7 +411,7 @@ export async function getUserItemReservations(userId: number) {
             JOIN users u ON r.user_id = u.id
             JOIN resources res ON r.resource_id = res.id
             LEFT JOIN cruises cr ON r.cruise_id = cr.id
-            WHERE r.user_id = ${userId} AND r.resource_id IS NOT NULL
+            WHERE r.user_id = ${userId} AND r.resource_id IS NOT NULL AND r.status != 'Cancelled'
             ORDER BY r.start_time DESC
         `;
         return rows;
@@ -438,6 +440,7 @@ export async function getUserRoomReservations(userId: number) {
             LEFT JOIN cruises cr ON r.cruise_id = cr.id
             WHERE r.user_id = ${userId}
                 AND r.cabin_id IS NOT NULL
+                AND r.status != 'Cancelled'
             ORDER BY r.start_time DESC
         `;
 

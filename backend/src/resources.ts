@@ -62,7 +62,7 @@ export async function checkResourceCount(
     sql: TransactionSql<{}>
 ) {
     const resourceRows = await sql`
-        SELECT quantity FROM resources WHERE id = ${r.resource_id} FOR UPDATE
+        SELECT quantity FROM resources WHERE id = ${r.resource_id} AND deleted_at IS NULL FOR UPDATE
     `;
 
     if (resourceRows.length === 0) {
@@ -82,6 +82,7 @@ export async function checkResourceCount(
             AND cruise_id IS NOT DISTINCT FROM ${r.cruise_id}
             AND start_time < ${r.end_time}
             AND end_time > ${r.start_time}
+            AND status != 'Cancelled'
     `;
 
     const totalOverlaps = sameTimeReservations.reduce(
