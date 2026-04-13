@@ -1,0 +1,2 @@
+ALTER TABLE package_events
+ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
