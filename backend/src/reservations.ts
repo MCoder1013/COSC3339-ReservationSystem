@@ -213,30 +213,54 @@ export async function addReservationWithTransaction(
     }
 
     if (r.resource_id != null && r.cruise_id != null) {
-        const roomRows = await sql`
-            SELECT 1
-            FROM reservations existing
-            JOIN cruises cr ON cr.id = existing.cruise_id
-            WHERE
-                existing.cabin_id IS NOT NULL
-                AND existing.cruise_id = ${r.cruise_id}
-                AND existing.status <> 'Cancelled'
-                AND existing.end_time > NOW()
-                AND cr.return_date >= CURRENT_DATE
-                AND (
-                    existing.user_id = ${r.user_id}
-                    OR EXISTS (
-                        SELECT 1
-                        FROM reservation_groups rg
-                        WHERE rg.reservation_id = existing.id
-                            AND rg.user_id = ${r.user_id}
-                    )
-                )
+        const user = await sql`
+            SELECT user_role
+            FROM users
+            WHERE id = ${r.user_id}
             LIMIT 1
         `;
 
-        if (roomRows.length === 0) {
-            throw new Error('You must have a room reservation on this cruise before reserving items.');
+        const isStaff = user[0]?.user_role === 'staff';
+
+        if (isStaff) {
+            const staffAssignment = await sql`
+                SELECT 1
+                FROM staff_cruises
+                WHERE staff_id = ${r.user_id}
+                AND cruise_id = ${r.cruise_id}
+                LIMIT 1
+            `;
+
+            if (staffAssignment.length === 0) {
+                throw new Error('You are not assigned to this cruise.');
+            }
+
+        } else {
+            const roomRows = await sql`
+                SELECT 1
+                FROM reservations existing
+                JOIN cruises cr ON cr.id = existing.cruise_id
+                WHERE
+                    existing.cabin_id IS NOT NULL
+                    AND existing.cruise_id = ${r.cruise_id}
+                    AND existing.status <> 'Cancelled'
+                    AND existing.end_time > NOW()
+                    AND cr.return_date >= CURRENT_DATE
+                    AND (
+                        existing.user_id = ${r.user_id}
+                        OR EXISTS (
+                            SELECT 1
+                            FROM reservation_groups rg
+                            WHERE rg.reservation_id = existing.id
+                            AND rg.user_id = ${r.user_id}
+                        )
+                    )
+                LIMIT 1
+            `;
+
+            if (roomRows.length === 0) {
+                throw new Error('You must have a room reservation on this cruise before reserving items.');
+            }
         }
     }
 

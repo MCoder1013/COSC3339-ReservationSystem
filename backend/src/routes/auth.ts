@@ -11,6 +11,187 @@ import { sql } from '../database.js';
 
 const router = Router();
 
+const SHIFT_TIME_ZONE = process.env.SHIFT_TIME_ZONE || 'America/Chicago';
+const VALID_SHIFTS = ['Morning', 'Day', 'Night'] as const;
+
+const shiftTimeFormatter = new Intl.DateTimeFormat('en-US', {
+  timeZone: SHIFT_TIME_ZONE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23',
+});
+
+type ShiftName = typeof VALID_SHIFTS[number];
+
+function getShiftTimeParts(date: Date) {
+  const parts = shiftTimeFormatter.formatToParts(date);
+  const map = Object.fromEntries(parts.map((p) => [p.type, p.value]));
+
+  return {
+    year: Number(map.year),
+    month: Number(map.month),
+    day: Number(map.day),
+    hour: Number(map.hour),
+    minute: Number(map.minute),
+  };
+}
+
+function minutesSinceMidnightShiftTime(d: Date) {
+  const parts = getShiftTimeParts(d);
+  return parts.hour * 60 + parts.minute;
+}
+
+function isSameShiftDay(a: Date, b: Date) {
+  const left = getShiftTimeParts(a);
+  const right = getShiftTimeParts(b);
+  return left.year === right.year && left.month === right.month && left.day === right.day;
+}
+
+function isNextShiftDay(a: Date, b: Date) {
+  const left = getShiftTimeParts(a);
+  const right = getShiftTimeParts(b);
+  const leftIndex = Math.floor(Date.UTC(left.year, left.month - 1, left.day) / 86400000);
+  const rightIndex = Math.floor(Date.UTC(right.year, right.month - 1, right.day) / 86400000);
+  return rightIndex === leftIndex + 1;
+}
+
+function isWithinShiftWindow(shift: string, start: Date, end: Date): boolean {
+  const normalized = shift.charAt(0).toUpperCase() + shift.slice(1).toLowerCase();
+
+  const startMinutes = minutesSinceMidnightShiftTime(start);
+  const endMinutes = minutesSinceMidnightShiftTime(end);
+
+  const sameShiftDay = isSameShiftDay(start, end);
+  const nextShiftDay = isNextShiftDay(start, end);
+
+  if (normalized === 'Morning') {
+    return sameShiftDay && startMinutes >= 360 && endMinutes <= 720;
+  }
+
+  if (normalized === 'Day') {
+    return sameShiftDay && startMinutes >= 720 && endMinutes <= 1080;
+  }
+
+  if (normalized === 'Night') {
+    const sameDayNight = sameShiftDay && startMinutes >= 1080 && endMinutes <= 1439;
+    const midnightBoundary = nextShiftDay && startMinutes >= 1080 && endMinutes === 0;
+    return sameDayNight || midnightBoundary;
+  }
+
+  return false;
+}
+
+function deriveShiftFromWindow(start: Date, end: Date): ShiftName | null {
+  if (isWithinShiftWindow('Morning', start, end)) return 'Morning';
+  if (isWithinShiftWindow('Day', start, end)) return 'Day';
+  if (isWithinShiftWindow('Night', start, end)) return 'Night';
+  return null;
+}
+
+function toShiftDayKey(d: Date): string {
+  const parts = getShiftTimeParts(d);
+  const month = String(parts.month).padStart(2, '0');
+  const day = String(parts.day).padStart(2, '0');
+  return `${parts.year}-${month}-${day}`;
+}
+
+function normalizeShiftInput(raw: unknown): ShiftName | null {
+  const value = String(raw ?? '').trim().toLowerCase();
+  if (value === 'morning') return 'Morning';
+  if (value === 'day') return 'Day';
+  if (value === 'night') return 'Night';
+  return null;
+}
+
+async function listStaffedEvents(userId: number) {
+  return await sql`
+    SELECT DISTINCT
+      e.id,
+      e.name,
+      e.start_time,
+      e.end_time
+    FROM package_events e
+    LEFT JOIN package_event_staff pes
+      ON pes.event_id = e.id
+    WHERE e.status <> 'Cancelled'
+      AND (e.created_by = ${userId} OR pes.staff_id = ${userId})
+      AND e.end_time >= NOW() - INTERVAL '1 day'
+      AND e.start_time < NOW() + INTERVAL '2 day'
+    ORDER BY e.start_time ASC
+  `;
+}
+
+async function syncStaffShiftForToday(userId: number) {
+  const currentShift = await database.getStaffShiftByUserId(userId);
+  if (!currentShift) {
+    return currentShift;
+  }
+
+  const todayKey = toShiftDayKey(new Date());
+  const events = await listStaffedEvents(userId);
+  const todayShifts = new Set<ShiftName>();
+
+  for (const event of events) {
+    const eventStart = new Date(event.start_time);
+    const eventEnd = new Date(event.end_time);
+    if (toShiftDayKey(eventStart) !== todayKey) {
+      continue;
+    }
+
+    const derivedShift = deriveShiftFromWindow(eventStart, eventEnd);
+    if (derivedShift) {
+      todayShifts.add(derivedShift);
+    }
+  }
+
+  if (todayShifts.size === 1) {
+    const [requiredShift] = Array.from(todayShifts);
+    if (requiredShift !== currentShift) {
+      await database.updateStaffShiftByUserId(userId, requiredShift);
+      return requiredShift;
+    }
+  }
+
+  return currentShift;
+}
+
+async function getShiftChangeConflictsForToday(userId: number, targetShift: ShiftName) {
+  const todayKey = toShiftDayKey(new Date());
+  const events = await listStaffedEvents(userId);
+
+  return events
+    .map((event) => {
+      const eventStart = new Date(event.start_time);
+      const eventEnd = new Date(event.end_time);
+      if (toShiftDayKey(eventStart) !== todayKey) {
+        return null;
+      }
+
+      const derivedShift = deriveShiftFromWindow(eventStart, eventEnd);
+      if (!derivedShift || derivedShift === targetShift) {
+        return null;
+      }
+
+      return {
+        id: Number(event.id),
+        name: String(event.name ?? `Event #${event.id}`),
+        start_time: event.start_time,
+        end_time: event.end_time,
+        required_shift: derivedShift,
+      };
+    })
+    .filter((value): value is {
+      id: number;
+      name: string;
+      start_time: string;
+      end_time: string;
+      required_shift: ShiftName;
+    } => value !== null);
+}
+
 // from https://emailregex.com
 const emailRegex = /(?:[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*|"(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21\x23-\x5b\x5d-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])*")@(?:(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?|\[(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?|[a-z0-9-]*[a-z0-9]:(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21-\x5a\x53-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])+)\])/
 
@@ -130,6 +311,9 @@ router.post('/login', async (req: Request, res: Response) => {
     const staffRole = user.user_role === 'staff'
       ? await database.getStaffRoleByUserId(user.id)
       : null;
+    const shift = user.user_role === 'staff'
+      ? await database.getStaffShiftByUserId(user.id)
+      : null;
     const isStaffAdmin = user.user_role === 'staff' && staffRole?.trim().toLowerCase() === 'admin';
 
     const token = jwt.sign({ id: user.id }, jwtSecret);
@@ -146,6 +330,7 @@ router.post('/login', async (req: Request, res: Response) => {
         firstName: user.first_name,
         role: user.user_role,
         staffRole,
+        shift,
         isStaffAdmin
       });
   } catch (err) {
@@ -162,8 +347,16 @@ router.get('/me', authRequired, async (req: Request, res: Response) => {
   try {
     const user = req.user!;
 
+    let syncedShift: string | null = null;
+    if (user.user_role === 'staff') {
+      syncedShift = await syncStaffShiftForToday(user.id);
+    }
+
     const staffRole = user.user_role === 'staff'
       ? await database.getStaffRoleByUserId(user.id)
+      : null;
+    const shift = user.user_role === 'staff'
+      ? (syncedShift ?? await database.getStaffShiftByUserId(user.id))
       : null;
     const isStaffAdmin = user.user_role === 'staff' && staffRole?.trim().toLowerCase() === 'admin';
 
@@ -176,6 +369,7 @@ router.get('/me', authRequired, async (req: Request, res: Response) => {
       profilePicture: user.profile_picture,
       role: user.user_role,
       staffRole,
+      shift,
       isStaffAdmin
     });
   } catch {
@@ -215,7 +409,9 @@ const upload = multer({
 router.post('/update-profile', authRequired, upload.single('profilePicture'), async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
+    const role = req.user!.user_role;
     const { biography } = req.body;
+    const requestedShift = normalizeShiftInput(req.body.shift);
     let profilePicture: null | string = null
 
     if (req.file) {
@@ -240,7 +436,38 @@ router.post('/update-profile', authRequired, upload.single('profilePicture'), as
       await database.updateUserProfilePicture(userId, profilePicture);
     }
 
-    res.json({ message: 'Profile updated successfully', profilePicture });
+    let nextShift: string | null = null;
+
+    if (req.body.shift !== undefined) {
+      if (role !== 'staff') {
+        return res.status(400).json({ error: 'Only staff members can change shifts.' });
+      }
+
+      if (!requestedShift) {
+        return res.status(400).json({ error: 'Shift must be Morning, Day, or Night.' });
+      }
+
+      const currentShift = await syncStaffShiftForToday(userId);
+      if (!currentShift) {
+        return res.status(400).json({ error: 'Unable to locate your staff shift record.' });
+      }
+
+      if (requestedShift !== currentShift) {
+        const conflicts = await getShiftChangeConflictsForToday(userId, requestedShift);
+        if (conflicts.length > 0) {
+          return res.status(400).json({
+            error: 'You cannot change shifts today because you are staffing event(s) in a different shift window.',
+            shiftConflicts: conflicts,
+          });
+        }
+
+        await database.updateStaffShiftByUserId(userId, requestedShift);
+      }
+
+      nextShift = await database.getStaffShiftByUserId(userId);
+    }
+
+    res.json({ message: 'Profile updated successfully', profilePicture, shift: nextShift });
   } catch (err) {
     console.error("Update profile error:", err);
     res.status(500).json({ error: 'Failed to update profile' });
