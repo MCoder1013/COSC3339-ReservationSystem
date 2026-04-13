@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import {
   addReservation, deleteReservation, getAllReservationsWithDetails, getReservationsByUser,
   updateReservation, getUserRoomReservations, getUserItemReservations, addGuestsToReservation,
-  getUserRoomCruises
+  getUserRoomCruises, getUserIdGivenReservationId
 } from '../reservations.js';
 import { getCurrentStaffAssignedCruises, getUserById, validateGuestEmails } from '../users.js';
 import { authRequired, } from './index.js';
@@ -143,16 +143,20 @@ router.post("/reservations/:id", authRequired, async (req: Request, res: Respons
 router.delete('/reservations/:id', authRequired, async (req: Request, res: Response) => {
   const id = Number(req.params.id);
   const user_id = req.user!.id;
+  const cancelleation_reason = req.body.cancelleation_reason;
+  const cancelled_by_role = req.body.cancelled_by_role;
 
   if (isNaN(id)) {
     return res.status(400).json({ message: "Invalid ID format" });
   }
-  try {
-    await deleteReservation(id, user_id);
+  if(user_id == await getUserIdGivenReservationId(id)) {
+    try {
+    await deleteReservation(id, user_id, cancelleation_reason, cancelled_by_role);
 
     res.json({ message: "reservation deleted successfully" });
   } catch (error) {
     res.status(500).json({ error: "failed to delete reservation" });
+  }  
   }
 });
 

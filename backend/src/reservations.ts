@@ -377,7 +377,7 @@ export async function getReservationsByUser(userId: number): Promise<RowList<Row
 }
 
 // updated for soft deletion now will update the resrevations status and cancelled at time
-export async function deleteReservation(id:number, user_id: number): Promise<void> {
+export async function deleteReservation(id:number, user_id: number, cancelleation_reason:string, cancelled_by_role:string): Promise<void> {
     const newStatus: ReservationStatus = 'Cancelled';
 
     return await sql.begin(async sql => {
@@ -475,5 +475,13 @@ export async function updateReservation(
 }
 
 export async function getUserIdGivenReservationId(id: number) {
-    return await sql`SELECT user_id FROM reservations WHERE id = ${id}`;
+
+    const rows = await sql`SELECT user_id FROM reservations WHERE id = ${id}`;
+
+    if(rows.length < 0) {
+        throw new Error("There is no reservation with that ID"); 
+    }
+
+    return rows[0].user_id;
+
 }
