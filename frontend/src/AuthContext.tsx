@@ -6,8 +6,18 @@ export interface User {
   firstName: string;
   role: string;
   staffRole?: string | null;
+  shift?: string | null;
   canEditInventory?: boolean;
   profilePicture?: string | null;
+}
+
+export function isAdminUser(user: User | null | undefined): boolean {
+  if (!user) return false;
+
+  const normalizedRole = String(user.role ?? "").trim().toLowerCase();
+  const normalizedStaffRole = String(user.staffRole ?? "").trim().toLowerCase();
+
+  return normalizedRole === "admin" || (normalizedRole === "staff" && normalizedStaffRole === "admin");
 }
 
 interface AuthContextType {
@@ -30,18 +40,67 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Load user from localStorage on mount
   useEffect(() => {
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-      try {
-        setUser(JSON.parse(storedUser));
-      } catch (e) {
-        console.error('Failed to parse stored user:', e);
-        localStorage.removeItem('user');
+    let cancelled = false;
+
+    const initializeAuth = async () => {
+      const storedUser = localStorage.getItem('user');
+      let parsedUser: User | null = null;
+
+      if (storedUser) {
+        try {
+          parsedUser = JSON.parse(storedUser) as User;
+          if (!cancelled) {
+            setUser(parsedUser);
+          }
+        } catch (e) {
+          console.error('Failed to parse stored user:', e);
+          localStorage.removeItem('user');
+        }
       }
-    }
-    setLoading(false);
+
+      try {
+        const response = await fetch('/api/auth/me', {
+          credentials: 'include'
+        });
+
+        if (response.ok) {
+          const profile = await response.json();
+          const refreshedUser: User = {
+            userId: Number(profile.id ?? parsedUser?.userId ?? 0),
+            firstName: String(profile.firstName ?? parsedUser?.firstName ?? ''),
+            role: String(profile.role ?? parsedUser?.role ?? 'normal'),
+            staffRole: profile.staffRole ?? null,
+            shift: profile.shift ?? parsedUser?.shift ?? null,
+            canEditInventory: Boolean(profile.isStaffAdmin),
+            profilePicture: profile.profilePicture ?? profile.profile_picture ?? parsedUser?.profilePicture ?? null,
+          };
+
+          if (!cancelled) {
+            setUser(refreshedUser);
+          }
+          localStorage.setItem('user', JSON.stringify(refreshedUser));
+        } else if (response.status === 401) {
+          localStorage.removeItem('user');
+          if (!cancelled) {
+            setUser(null);
+          }
+        }
+      } catch {
+        // Keep local cached user when profile refresh fails (e.g. backend down).
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+
+    };
+
+    initializeAuth();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const login = (userData: User) => {
