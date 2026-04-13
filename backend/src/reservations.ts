@@ -478,7 +478,7 @@ export async function getUserIdGivenReservationId(id: number) {
 
     const rows = await sql`SELECT user_id FROM reservations WHERE id = ${id}`;
 
-    if(rows.length < 0) {
+    if(rows.length == 0) {
         throw new Error("There is no reservation with that ID"); 
     }
 
