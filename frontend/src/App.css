@@ -396,6 +396,19 @@ input {
   color: white;
 }
 
+.deleteButton {
+  padding: 10px 18px;
+  border-radius: 8px;
+  border: 1px solid #b42318;
+  cursor: pointer;
+  font-weight: bold;
+  margin-top: 8px;
+  font-family: inherit;
+  font-size: inherit;
+  background: #d92d20;
+  color: #fff;
+}
+
 .submitButton {
   background: navy;
   color: white;
@@ -414,6 +427,25 @@ input {
 
 .cancelButton:hover {
   background: #999;
+}
+
+/* Keep action buttons readable on white modal backgrounds. */
+.modalContent .primaryBtn {
+  background: #1d2abf;
+  color: #fff;
+  border: 1px solid #1d2abf;
+}
+
+.modalContent .primaryBtn:hover {
+  background: #15208f;
+  color: #fff;
+  border-color: #15208f;
+}
+
+.modalContent .deleteButton:hover {
+  background: #b42318;
+  border-color: #b42318;
+  color: #fff;
 }
 
 .reservationForm label {

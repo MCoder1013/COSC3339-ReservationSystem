@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from './AuthContext';
 import { fetchData } from './api';
+import PackageEventsList from './PackageEventsList';
 import DatePicker from 'react-date-picker';
 import 'react-date-picker/dist/DatePicker.css';
 import 'react-calendar/dist/Calendar.css';
@@ -19,6 +20,10 @@ type ShiftWindow = {
 type ItemRequirement = {
   resource_id: string;
   quantity_required: string;
+};
+
+type Props = {
+  cruiseId?: string;
 };
 
 type EventFormState = {
@@ -130,19 +135,15 @@ function combineEndDateAndTime(startDate: Date, endTime: string) {
   return result;
 }
 
-export default function PackageEventsTab() {
+export default function PackageEventsTab({ cruiseId }: Props) {
   const { user } = useAuth();
+  const [activePackageTab, setActivePackageTab] = useState<'available' | 'create'>('available');
 
   const [resources, setResources] = useState<any[]>([]);
   const [staffMembers, setStaffMembers] = useState<any[]>([]);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [formState, setFormState] = useState<EventFormState>(emptyForm);
-
-  const [events, setEvents] = useState<any[]>([]);
-  const [eventsLoading, setEventsLoading] = useState(false);
-  const [joinError, setJoinError] = useState('');
-  const [joinSuccess, setJoinSuccess] = useState('');
 
   const canCreate = user?.role === 'staff' || user?.role === 'admin';
 
@@ -245,6 +246,12 @@ export default function PackageEventsTab() {
   useEffect(() => {
     loadCreateFormData();
   }, []);
+
+  useEffect(() => {
+    if (!canCreate && activePackageTab === 'create') {
+      setActivePackageTab('available');
+    }
+  }, [activePackageTab, canCreate]);
 
   useEffect(() => {
     if (formState.start_time && !startTimeOptions.includes(formState.start_time)) {
@@ -383,6 +390,7 @@ export default function PackageEventsTab() {
     const end = combineEndDateAndTime(formState.start_date as Date, formState.end_time);
 
     const payload = {
+      cruise_id: cruiseId ? Number(cruiseId) : null,
       name: formState.name.trim(),
       description: formState.description.trim(),
       capacity: Number(formState.capacity),
@@ -429,49 +437,33 @@ export default function PackageEventsTab() {
     }
   };
 
-  const loadEvents = async () => {
-    setEventsLoading(true);
-    try {
-      const data = await fetchData('/api/packages/events');
-      setEvents(Array.isArray(data) ? data : []);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setEventsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadEvents();
-    window.addEventListener('package-events-updated', loadEvents);
-    return () => window.removeEventListener('package-events-updated', loadEvents);
-  }, []);
-
-  const handleJoin = async (eventId: number) => {
-    setJoinError('');
-    setJoinSuccess('');
-    try {
-      const response = await fetch(`${API_URL}/api/packages/events/${eventId}/join`, {
-        method: 'POST',
-        credentials: 'include',
-      });
-      const body = await response.json().catch(() => null);
-      if (!response.ok) throw new Error(body?.error || 'Could not join event.');
-      setJoinSuccess(`Successfully joined event!`);
-      loadEvents();
-    } catch (err: any) {
-      setJoinError(err.message || 'Could not join event.');
-    }
-  };
-
   return (
     <div>
-      {canCreate && (
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+        <button
+          type="button"
+          className={activePackageTab === 'available' ? 'activeCategoryButton' : 'inactiveCategoryButton'}
+          onClick={() => setActivePackageTab('available')}
+        >
+          Available Events
+        </button>
+        {canCreate && (
+          <button
+            type="button"
+            className={activePackageTab === 'create' ? 'activeCategoryButton' : 'inactiveCategoryButton'}
+            onClick={() => setActivePackageTab('create')}
+          >
+            Create Event
+          </button>
+        )}
+      </div>
+
+      {canCreate && activePackageTab === 'create' && (
         <div style={{ marginBottom: '24px', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '8px', padding: '16px' }}>
           <h3 style={{ marginTop: 0 }}>Create Event</h3>
           {error && <div className="errorMessage" style={{ marginBottom: '10px' }}>{error}</div>}
           {success && <div style={{ color: '#0f7b0f', marginBottom: '10px' }}>{success}</div>}
-          <form onSubmit={submitForm}>
+          <form>
             <label>
               Event Name:
               <input
@@ -631,7 +623,7 @@ export default function PackageEventsTab() {
             )}
 
             <div style={{ display: 'flex', gap: '8px' }}>
-              <button type="submit" onClick={submitForm} className="submitButton">
+              <button type="button" onClick={submitForm} className="submitButton">
                 Create Event
               </button>
               <button type="button" className="primaryButton" onClick={resetForm}>
@@ -642,41 +634,7 @@ export default function PackageEventsTab() {
         </div>
       )}
 
-      {!canCreate && <p>Only staff and admins can create events.</p>}
-
-      <div>
-        <h3>Available Events</h3>
-        {joinError && <div className="errorMessage">{joinError}</div>}
-        {joinSuccess && <div style={{ color: '#0f7b0f', marginBottom: '10px' }}>{joinSuccess}</div>}
-        {eventsLoading ? (
-          <p>Loading events...</p>
-        ) : events.length === 0 ? (
-          <p>No events available.</p>
-        ) : (
-          events.map((event) => (
-            <div key={event.id} style={{ border: '1px solid rgba(255,255,255,0.2)', borderRadius: '8px', padding: '16px', marginBottom: '12px' }}>
-              <h4 style={{ margin: '0 0 8px 0' }}>{event.name}</h4>
-              <p style={{ margin: '0 0 4px 0' }}>{event.description}</p>
-              <p style={{ margin: '0 0 4px 0' }}>Staff: {event.staff_names}</p>
-              <p style={{ margin: '0 0 4px 0' }}>
-                {new Date(event.start_time).toLocaleString()} – {new Date(event.end_time).toLocaleString()}
-              </p>
-              <p style={{ margin: '0 0 8px 0' }}>
-                Spots left: {event.spots_left} / {event.capacity}
-              </p>
-              {event.is_joined ? (
-                <p style={{ color: '#0f7b0f' }}>✓ Already joined</p>
-              ) : event.is_full ? (
-                <p style={{ color: '#999' }}>Event is full</p>
-              ) : (
-                <button className="submitButton" onClick={() => handleJoin(event.id)}>
-                  Join Event
-                </button>
-              )}
-            </div>
-          ))
-        )}
-      </div>
+      {activePackageTab === 'available' && <PackageEventsList cruiseId={cruiseId} />}
     </div>
   );
 }

@@ -7,12 +7,14 @@ export interface User {
   role: string;
   staffRole?: string | null;
   canEditInventory?: boolean;
+  profilePicture?: string | null;
 }
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
   login: (userData: User) => void;
+  updateUser: (updates: Partial<User>) => void;
   logout: () => void;
 }
 
@@ -20,6 +22,7 @@ const AuthContext = createContext<AuthContextType>({
   user: null, 
   loading: true,
   login: () => {},
+  updateUser: () => {},
   logout: () => {}
 });
 
@@ -46,13 +49,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(userData);
   };
 
+  const updateUser = (updates: Partial<User>) => {
+    setUser((currentUser) => {
+      if (!currentUser) {
+        return currentUser;
+      }
+
+      const mergedUser = { ...currentUser, ...updates };
+      localStorage.setItem('user', JSON.stringify(mergedUser));
+      return mergedUser;
+    });
+  };
+
   const logout = () => {
     localStorage.removeItem('user');
     setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, updateUser, logout }}>
       {children}
     </AuthContext.Provider>
   );
