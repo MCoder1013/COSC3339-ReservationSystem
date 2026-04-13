@@ -34,6 +34,7 @@ interface Reservation {
     status: ReservationStatus
     created_at: string
     quantity_reserved: number
+    cancelled_at: string
 }
 
 // checks for reservations to make sure the timeslots are not currently already being used for: staff members, resources, and cabins
@@ -375,9 +376,12 @@ export async function getReservationsByUser(userId: number): Promise<RowList<Row
     return rows;
 }
 
-export async function deleteReservation(id: number): Promise<void> {
+// updated for soft deletion now will update the resrevations status and cancelled at time
+export async function deleteReservation(id:number, user_id: number): Promise<void> {
+    const newStatus: ReservationStatus = 'Cancelled';
+
     return await sql.begin(async sql => {
-        await sql`DELETE FROM reservations WHERE id = ${id}`;
+    await sql`UPDATE reservations SET cancelled_at = NOW(), status = ${newStatus}, cancelleation_reason = "", cancelled_by_role "", cancelled_by_user_id = ${user_id} WHERE id = ${id}`;
     })
 }
 
@@ -468,4 +472,8 @@ export async function updateReservation(
         const newReservationData = newReservationRows[0] as NewReservation
         return newReservationData
     })
+}
+
+export async function getUserIdGivenReservationId(id: number) {
+    return await sql`SELECT user_id FROM reservations WHERE id = ${id}`;
 }
