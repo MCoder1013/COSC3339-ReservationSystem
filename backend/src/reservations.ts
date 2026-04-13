@@ -1,6 +1,7 @@
 import postgres, { Row, RowList, TransactionSql } from 'postgres';
 import { sql } from './database.js';
 import { checkResourceCount } from './resources.js';
+import { User } from './users.js';
 
 type ReservationStatus = 'Pending' | 'Confirmed' | 'Cancelled';
 
@@ -213,7 +214,7 @@ export async function addReservationWithTransaction(
     }
 
     if (r.resource_id != null && r.cruise_id != null) {
-        const user = await sql`
+        const user: User[] = await sql`
             SELECT user_role
             FROM users
             WHERE id = ${r.user_id}
@@ -234,7 +235,6 @@ export async function addReservationWithTransaction(
             if (staffAssignment.length === 0) {
                 throw new Error('You are not assigned to this cruise.');
             }
-
         } else {
             const roomRows = await sql`
                 SELECT 1

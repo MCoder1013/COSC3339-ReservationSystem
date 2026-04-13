@@ -7,7 +7,7 @@ export interface User {
   role: string;
   staffRole?: string | null;
   shift?: string | null;
-  canEditInventory?: boolean;
+  canEditInventory: boolean;
   profilePicture?: string | null;
 }
 

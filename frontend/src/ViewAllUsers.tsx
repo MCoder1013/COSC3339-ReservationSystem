@@ -18,7 +18,7 @@ type UserRow = {
   firstName: string;
   lastName: string;
   email: string;
-  role: string;
+  role: 'normal' | 'admin' | 'staff';
   staffRole?: string | null;
   daysRegistered: number;
   totalReservations: number;
@@ -40,15 +40,8 @@ export default function ViewAllUsers() {
 
   const isAdminView = Boolean(user?.canEditInventory);
 
-  const getEffectiveRole = (baseRole: string, staffRole?: string | null) => {
-    const normalizedBaseRole = String(baseRole ?? "").trim().toLowerCase();
-    const normalizedStaffRole = String(staffRole ?? "").trim().toLowerCase();
-
-    if (normalizedBaseRole === "staff" && normalizedStaffRole === "admin") {
-      return "admin";
-    }
-
-    return normalizedBaseRole || "normal";
+  const getEffectiveRole = (baseRole: UserRow['role'], _staffRole?: string | null): UserRow['role'] => {
+    return baseRole;
   };
 
   const loadUsers = async () => {

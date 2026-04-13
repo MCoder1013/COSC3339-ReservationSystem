@@ -236,11 +236,7 @@ export default function PackageEventsList({ showManagement = false, onlyJoined =
   }, [editActiveWindow, editFormState.start_time, editingEventId]);
 
   const isAdminUser = Boolean(
-    user && (
-      user.role === 'admin'
-      || user.canEditInventory === true
-      || String(user.staffRole ?? '').trim().toLowerCase() === 'admin'
-    )
+    user && (user.role === 'admin' || user.canEditInventory)
   );
 
   const canManageEvent = (event: any) => {
@@ -442,9 +438,9 @@ export default function PackageEventsList({ showManagement = false, onlyJoined =
         staff_ids: detail.staff?.length ? detail.staff.map((staff: any) => String(staff.id)) : [''],
         item_requirements: detail.items?.length
           ? detail.items.map((item: any) => ({
-              resource_id: String(item.resource_id),
-              quantity_required: String(item.quantity_required),
-            }))
+            resource_id: String(item.resource_id),
+            quantity_required: String(item.quantity_required),
+          }))
           : [{ resource_id: '', quantity_required: '' }],
       });
     } catch (err) {
