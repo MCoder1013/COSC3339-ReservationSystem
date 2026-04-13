@@ -61,6 +61,9 @@ export async function addRoom(r: NewRoom): Promise<number> {
 // Delete room by name instead of id since users won't know id
 export async function deleteRoom(cabinNumber: string) {
     try {
+        const id = await getIdFromName(cabinNumber);
+
+        
         const rows = await sql`
             UPDATE cabins
             SET deleted_at = NOW()
@@ -71,8 +74,21 @@ export async function deleteRoom(cabinNumber: string) {
             throw new Error("cabin wasnt found");
         }
 
+        await sql `UPDATE reservations SET status = 'Cancelled', cancelled_at = NOW() WHERE  cabin_id = ${id} AND status != 'Cancelled'`;
+
     } catch (error) {
         console.error("Error deleting room: ", error);
+        throw error;
+    }
+}
+
+async function getIdFromName(cabinNumber: string) {
+    try {
+        const rows = await sql`SELECT id FROM cabins WHERE cabin_number = ${cabinNumber}`
+
+        return rows[0].id;
+    } catch(error) {
+        console.log(error); 
         throw error;
     }
 }

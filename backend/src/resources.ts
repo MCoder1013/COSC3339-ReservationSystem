@@ -100,11 +100,16 @@ export async function checkResourceCount(
 // Delete resource by name instead of id since users won't know id
 export async function deleteResource(name: string): Promise<number> {
     try {
+        const id = await getIdFromName(name);
+
         const rows = await sql`UPDATE resources SET deleted_at = NOW() WHERE name = ${name} RETURNING id`;
 
         if(rows.count === 0) {
             throw new Error("no resource exists with this name")
         }
+
+        await sql `UPDATE reservations SET status = 'Cancelled', cancelled_at = NOW() WHERE resource_id = ${id} AND status != 'Cancelled'`;
+
         return rows[0]?.id;
     } catch (error) {
         console.error("Error deleting resource: ", error);
@@ -139,6 +144,7 @@ export async function countRemaining(
         AND cruise_id IS NOT DISTINCT FROM ${r.cruise_id}
         AND start_time < ${r.end_time}
         AND end_time > ${r.start_time}
+        AND status != 'Cancelled'
     `;
 
     const totalReserved = overlapRows[0].total_reserved;
@@ -159,4 +165,15 @@ export async function getItemFromID (id : number) {
 
     return resourceID;
 
+}
+
+async function getIdFromName(resourceName: string) {
+    try {
+        const rows = await sql`SELECT id FROM resources WHERE name = ${resourceName}`
+
+        return rows[0].id;
+    } catch(error) {
+        console.log(error); 
+        throw error;
+    }
 }
