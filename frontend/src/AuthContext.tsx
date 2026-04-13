@@ -15,9 +15,7 @@ export function isAdminUser(user: User | null | undefined): boolean {
   if (!user) return false;
 
   const normalizedRole = String(user.role ?? "").trim().toLowerCase();
-  const normalizedStaffRole = String(user.staffRole ?? "").trim().toLowerCase();
-
-  return normalizedRole === "admin" || (normalizedRole === "staff" && normalizedStaffRole === "admin");
+  return normalizedRole === "admin";
 }
 
 interface AuthContextType {
@@ -72,7 +70,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             role: String(profile.role ?? parsedUser?.role ?? 'normal'),
             staffRole: profile.staffRole ?? null,
             shift: profile.shift ?? parsedUser?.shift ?? null,
-            canEditInventory: Boolean(profile.isStaffAdmin),
+            canEditInventory: String(profile.role ?? parsedUser?.role ?? '').trim().toLowerCase() === 'admin',
             profilePicture: profile.profilePicture ?? profile.profile_picture ?? parsedUser?.profilePicture ?? null,
           };
 

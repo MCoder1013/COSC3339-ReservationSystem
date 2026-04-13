@@ -51,7 +51,7 @@ export default function App() {
                   </button>
                 </div>
                 
-                {user.role === "staff" && (
+                {(user.role === "staff" || user.role === "admin") && (
                   <div className="dashboardCard">
                     <h3>Browse Inventory</h3>
                     <p>Explore available items and amenities</p>

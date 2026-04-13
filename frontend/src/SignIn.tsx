@@ -35,7 +35,7 @@ export default function SignIn() {
         firstName: data.firstName,
         role: data.role,
         staffRole: data.staffRole ?? null,
-        canEditInventory: Boolean(data.isStaffAdmin),
+        canEditInventory: String(data.role ?? "").trim().toLowerCase() === "admin",
         profilePicture: data.profilePicture ?? data.profile_picture ?? null
       });
 

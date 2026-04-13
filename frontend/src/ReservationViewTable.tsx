@@ -107,6 +107,10 @@ export default function ReservationTable() {
   const displayedReservations = getDisplayedReservations();
 
   const handleDeleteReservation = async (reservationId: number) => {
+    if (!window.confirm("Are you sure you want to delete this reservation?")) {
+      return;
+    }
+
     try {
       console.log("Deleting reservation:", reservationId);
       

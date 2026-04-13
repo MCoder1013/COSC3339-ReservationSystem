@@ -70,8 +70,7 @@ function topThree(entries: Map<string, number>): TopEntry[] {
 
 function inferUserCategory(
   userId: number,
-  usersById: Map<number, UserRecord>,
-  staffById: Map<number, StaffRecord>
+  usersById: Map<number, UserRecord>
 ): "User" | "Staff" | "Admin" {
   const user = usersById.get(userId);
   const normalizedRole = String(user?.user_role ?? "").toLowerCase();
@@ -81,9 +80,7 @@ function inferUserCategory(
   }
 
   if (normalizedRole === "staff") {
-    const staff = staffById.get(userId);
-    const normalizedStaffRole = String(staff?.role ?? "").toLowerCase();
-    return normalizedStaffRole.includes("admin") ? "Admin" : "Staff";
+    return "Staff";
   }
 
   return "User";
@@ -229,7 +226,7 @@ export default function Analytics() {
     };
 
     for (const cancelled of cancelledReservationsMonthly) {
-      const category = inferUserCategory(cancelled.user_id, usersById, staffById);
+      const category = inferUserCategory(cancelled.user_id, usersById);
       cancellationsByCategory[category] += 1;
     }
 

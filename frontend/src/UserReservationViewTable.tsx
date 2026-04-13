@@ -144,6 +144,10 @@ export default function ReservationTable() {
   }, []);
 
   const handleDeleteReservation = async (reservationId: number) => {
+    if (!window.confirm("Are you sure you want to delete this reservation?")) {
+      return;
+    }
+
     try {
       const response = await fetch(
         `${API_URL}/api/reservations/${reservationId}`,
@@ -358,8 +362,10 @@ export default function ReservationTable() {
 
                           <button
                             onClick={() => {
-                              setSelectedReservationId(null);
-                              setActionMode(null);
+                              if (window.confirm("Are you sure you want to cancel this selection?")) {
+                                setSelectedReservationId(null);
+                                setActionMode(null);
+                              }
                             }}
                           >
                             Cancel
@@ -369,8 +375,10 @@ export default function ReservationTable() {
                         actionMode === "edit" ? (
                         <button
                           onClick={() => {
-                            setSelectedReservationId(null);
-                            setActionMode(null);
+                            if (window.confirm("Are you sure you want to close without saving?")) {
+                              setSelectedReservationId(null);
+                              setActionMode(null);
+                            }
                           }}
                         >
                           Close

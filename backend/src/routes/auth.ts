@@ -262,11 +262,14 @@ router.post('/register', async (req, res) => {
     });
   }
 
-  if (userRole === "staff") {
+  if (userRole === "staff" || userRole === "admin") {
     try {
-      // Their role is set to "Other" by default, but it can be changed by an
-      // admin.
-      await database.insertStaff(userId, "Other", "Day");
+      await sql`
+        INSERT INTO staff (staff_id, role, shift)
+        VALUES (${userId}, 'Other', 'Day')
+        ON CONFLICT (staff_id)
+        DO NOTHING
+      `;
     } catch (err) {
       console.error('Error inserting staff:', err);
       return res.status(500).json({
@@ -308,10 +311,10 @@ router.post('/login', async (req: Request, res: Response) => {
     }
     // If email exists and password matches, login is successful
 
-    const staffRole = user.user_role === 'staff'
+    const staffRole = (user.user_role === 'staff' || user.user_role === 'admin')
       ? await database.getStaffRoleByUserId(user.id)
       : null;
-    const shift = user.user_role === 'staff'
+    const shift = (user.user_role === 'staff' || user.user_role === 'admin')
       ? await database.getStaffShiftByUserId(user.id)
       : null;
     const isStaffAdmin = user.user_role === 'admin';
@@ -348,14 +351,14 @@ router.get('/me', authRequired, async (req: Request, res: Response) => {
     const user = req.user!;
 
     let syncedShift: string | null = null;
-    if (user.user_role === 'staff') {
+    if (user.user_role === 'staff' || user.user_role === 'admin') {
       syncedShift = await syncStaffShiftForToday(user.id);
     }
 
-    const staffRole = user.user_role === 'staff'
+    const staffRole = (user.user_role === 'staff' || user.user_role === 'admin')
       ? await database.getStaffRoleByUserId(user.id)
       : null;
-    const shift = user.user_role === 'staff'
+    const shift = (user.user_role === 'staff' || user.user_role === 'admin')
       ? (syncedShift ?? await database.getStaffShiftByUserId(user.id))
       : null;
     const isStaffAdmin = user.user_role === 'admin';
@@ -439,8 +442,8 @@ router.post('/update-profile', authRequired, upload.single('profilePicture'), as
     let nextShift: string | null = null;
 
     if (req.body.shift !== undefined) {
-      if (role !== 'staff') {
-        return res.status(400).json({ error: 'Only staff members can change shifts.' });
+      if (role !== 'staff' && role !== 'admin') {
+        return res.status(400).json({ error: 'Only staff or admin members can change shifts.' });
       }
 
       if (!requestedShift) {
@@ -499,16 +502,24 @@ router.post('/update-user-role', adminRequired, async (req: Request, res: Respon
 
     // Update user role
     if (newRole === 'admin') {
-      // Promote to admin: set user_role to 'staff' and add to staff table with role 'Admin'
-      await database.updateUserRole(userId, 'staff');
-      // Insert or update in staff table
-      await database.upsertStaffRecord(userId, 'Admin', 'Day');
+      // Promote to admin: set user_role to 'admin' and ensure a staff record exists for staff features.
+      await database.updateUserRole(userId, 'admin');
+      await sql`
+        INSERT INTO staff (staff_id, role, shift)
+        VALUES (${userId}, 'Other', 'Day')
+        ON CONFLICT (staff_id)
+        DO NOTHING
+      `;
       await database.replaceStaffCruiseAssignments(userId, normalizedCruiseIds);
     } else if (newRole === 'staff') {
-      // Demote to staff: set user_role to 'staff' and remove from staff table
+      // Promote to staff: set user_role to 'staff' and ensure a staff record exists.
       await database.updateUserRole(userId, 'staff');
-      // Keep a staff record so cruise assignments and staff-specific details remain available.
-      await database.upsertStaffRecord(userId, 'Other', 'Day');
+      await sql`
+        INSERT INTO staff (staff_id, role, shift)
+        VALUES (${userId}, 'Other', 'Day')
+        ON CONFLICT (staff_id)
+        DO NOTHING
+      `;
       await database.replaceStaffCruiseAssignments(userId, normalizedCruiseIds);
     } else {
       // Downgrade to normal: set user_role to 'normal' and remove from staff table

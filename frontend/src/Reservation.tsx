@@ -51,7 +51,7 @@ export default function Reservation() {
   const [reservationCruiseMap, setReservationCruiseMap] = useState<Record<string, string>>({});
   const isCruiseSelected = selectedCruiseId !== "";
   const normalizedRole = String(user?.role ?? "").toLowerCase();
-  const hideRoomsTab = normalizedRole === "staff" || normalizedRole === "admin" || String(user?.staffRole ?? "").toLowerCase() === "admin";
+  const hideRoomsTab = normalizedRole === "staff" || normalizedRole === "admin";
 
   // current selected tab/category
   const [activeCategory, setActiveCategory] =

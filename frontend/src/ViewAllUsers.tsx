@@ -19,7 +19,6 @@ type UserRow = {
   lastName: string;
   email: string;
   role: string;
-  staffRole?: string | null;
   daysRegistered: number;
   totalReservations: number;
   pastReservations: number;
@@ -39,17 +38,6 @@ export default function ViewAllUsers() {
   const [selectedCruiseIds, setSelectedCruiseIds] = useState<number[]>([]);
 
   const isAdminView = Boolean(user?.canEditInventory);
-
-  const getEffectiveRole = (baseRole: string, staffRole?: string | null) => {
-    const normalizedBaseRole = String(baseRole ?? "").trim().toLowerCase();
-    const normalizedStaffRole = String(staffRole ?? "").trim().toLowerCase();
-
-    if (normalizedBaseRole === "staff" && normalizedStaffRole === "admin") {
-      return "admin";
-    }
-
-    return normalizedBaseRole || "normal";
-  };
 
   const loadUsers = async () => {
     setLoading(true);
@@ -84,8 +72,7 @@ export default function ViewAllUsers() {
           firstName: user.first_name,
           lastName: user.last_name,
           email: user.email,
-          role: getEffectiveRole(user.user_role, user.staff_role),
-          staffRole: user.staff_role,
+          role: String(user.user_role ?? "normal"),
           daysRegistered,
           totalReservations: userReservations.length,
           pastReservations: past,
@@ -124,13 +111,12 @@ export default function ViewAllUsers() {
 
   const handleEditRole = async (userRow: UserRow) => {
     setSelectedUser(userRow);
-    const modalRole = getEffectiveRole(userRow.role, userRow.staffRole);
-    setNewRole(modalRole);
+    setNewRole(userRow.role);
     setSelectedCruiseIds([]);
     setFormError("");
     setShowRoleModal(true);
 
-    if (modalRole === "staff" || modalRole === "admin") {
+    if (userRow.role === "staff" || userRow.role === "admin") {
       try {
         const assignedCruises = await fetchData(`/api/auth/staff/${userRow.id}/cruises`);
         const ids = Array.isArray(assignedCruises)

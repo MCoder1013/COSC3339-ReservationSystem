@@ -183,6 +183,10 @@ export default function Inventory() {
       setFormError("View-only access: only admin staff can edit inventory.");
       return;
     }
+    
+    if (!window.confirm(`Are you sure you want to delete this ${activeCategory.slice(0, -1).toLowerCase()}?`)) {
+      return;
+    }
 
     try {
       const endpoint =
@@ -473,7 +477,18 @@ export default function Inventory() {
               )}
 
               <button type="submit" onClick={() => { setFormError(""); }} className="submitButton">Submit</button>
-              <button type="button" onClick={() => { setShowModal(false); setFormError(""); }} className="cancelButton">Cancel</button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (window.confirm("Are you sure you want to cancel this form?")) {
+                    setShowModal(false);
+                    setFormError("");
+                  }
+                }}
+                className="cancelButton"
+              >
+                Cancel
+              </button>
             </form>
           </div>
         </div>
@@ -498,7 +513,17 @@ export default function Inventory() {
               </label>
 
               <button type="submit" className="submitButton">Delete</button>
-              <button type="button" onClick={() => setShowDeleteModal(false)} className="cancelButton">Cancel</button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (window.confirm(`Are you sure you want to cancel deleting this ${activeCategory.slice(0, -1).toLowerCase()}?`)) {
+                    setShowDeleteModal(false);
+                  }
+                }}
+                className="cancelButton"
+              >
+                Cancel
+              </button>
             </form>
           </div>
         </div>

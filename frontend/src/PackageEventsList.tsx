@@ -239,7 +239,6 @@ export default function PackageEventsList({ showManagement = false, onlyJoined =
     user && (
       user.role === 'admin'
       || user.canEditInventory === true
-      || String(user.staffRole ?? '').trim().toLowerCase() === 'admin'
     )
   );
 
@@ -467,6 +466,10 @@ export default function PackageEventsList({ showManagement = false, onlyJoined =
   }, [editEndTimeOptions, editFormState.end_time, editFormState.start_time, editStartTimeOptions, editingEventId]);
 
   const openCancelModal = (eventId: number) => {
+    if (!window.confirm('Are you sure you want to cancel this event?')) {
+      return;
+    }
+
     setCancelEventId(eventId);
     setCancelReason('');
     setShowCancelModal(true);
@@ -922,7 +925,15 @@ export default function PackageEventsList({ showManagement = false, onlyJoined =
                   <button className="submitButton" onClick={() => saveEdit(selectedEvent.id)}>
                     Save Changes
                   </button>
-                  <button type="button" className="cancelButton" onClick={() => setEditingEventId(null)}>
+                  <button
+                    type="button"
+                    className="cancelButton"
+                    onClick={() => {
+                      if (window.confirm('Are you sure you want to cancel editing this event?')) {
+                        setEditingEventId(null);
+                      }
+                    }}
+                  >
                     Cancel Editing
                   </button>
                 </div>
@@ -938,7 +949,15 @@ export default function PackageEventsList({ showManagement = false, onlyJoined =
               {selectedEvent.is_joined && (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
                   <span>Spot Reserved</span>
-                  <button type="button" className="cancelButton" onClick={() => handleLeaveEvent(selectedEvent.id)}>
+                  <button
+                    type="button"
+                    className="cancelButton"
+                    onClick={() => {
+                      if (window.confirm('Are you sure you want to cancel this reservation?')) {
+                        handleLeaveEvent(selectedEvent.id);
+                      }
+                    }}
+                  >
                     Cancel Reservation
                   </button>
                 </div>
