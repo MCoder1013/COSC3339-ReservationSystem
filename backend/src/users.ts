@@ -69,9 +69,17 @@ export async function updateUserProfilePicture(id: number, profilePicture: strin
 
 export async function getAllUsers() {
     const result = await sql`
-        SELECT id, first_name, last_name, email, user_role, created_at
-        FROM users
-        ORDER BY id ASC
+        SELECT
+            u.id,
+            u.first_name,
+            u.last_name,
+            u.email,
+            u.user_role,
+            u.created_at,
+            s.role AS staff_role
+        FROM users u
+        LEFT JOIN staff s ON s.staff_id = u.id
+        ORDER BY u.id ASC
     `;
     return result;
 }
