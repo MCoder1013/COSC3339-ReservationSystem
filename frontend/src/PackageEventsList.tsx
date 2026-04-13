@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useMemo, useState } from 'react';
-import { useAuth } from './AuthContext';
+import { isAdmin, isStaff, useAuth } from './AuthContext';
 import { fetchData } from './api';
 import DatePicker from 'react-date-picker';
 import 'react-date-picker/dist/DatePicker.css';
@@ -235,14 +235,10 @@ export default function PackageEventsList({ showManagement = false, onlyJoined =
     return options;
   }, [editActiveWindow, editFormState.start_time, editingEventId]);
 
-  const isAdminUser = Boolean(
-    user && (user.role === 'admin' || user.canEditInventory)
-  );
-
   const canManageEvent = (event: any) => {
     if (!showManagement || !user) return false;
-    if (isAdminUser) return true;
-    return user.role === 'staff' && Number(event.created_by) === Number(user.userId);
+    if (isAdmin(user)) return true;
+    return isStaff(user) && Number(event.created_by) === Number(user.userId);
   };
 
   const validateCancellationReason = (value: string) => {

@@ -1,7 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
-import { AuthProvider, isAdminUser, useAuth } from "./AuthContext";
+import { AuthProvider, isAdmin, useAuth } from "./AuthContext";
 import App from "./App";
 import SignIn from "./SignIn";
 import Register from "./Register";
@@ -17,7 +17,7 @@ function AdminRoute({ children }: { children: React.ReactElement }) {
   const { user, loading } = useAuth();
 
   if (loading) return null;
-  if (!isAdminUser(user)) return <Navigate to="/" replace />;
+  if (!isAdmin(user)) return <Navigate to="/" replace />;
 
   return children;
 }

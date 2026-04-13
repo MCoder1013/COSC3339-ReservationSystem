@@ -5,7 +5,7 @@ import { fetchData } from "./api";
 import { useAuth } from "./AuthContext";
 import NavBar from "./NavBar";
 
-type Cruise = {
+interface Cruise {
   id: number;
   cruise_name: string;
   ship_name: string;
@@ -13,7 +13,7 @@ type Cruise = {
   return_date: string;
 };
 
-type UserRow = {
+interface UserRow {
   id: number;
   firstName: string;
   lastName: string;
@@ -35,14 +35,10 @@ export default function ViewAllUsers() {
   const [formError, setFormError] = useState<string>("");
   const [showRoleModal, setShowRoleModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserRow | null>(null);
-  const [newRole, setNewRole] = useState<string>("normal");
+  const [newRole, setNewRole] = useState<UserRow['role']>("normal");
   const [selectedCruiseIds, setSelectedCruiseIds] = useState<number[]>([]);
 
   const isAdminView = Boolean(user?.canEditInventory);
-
-  const getEffectiveRole = (baseRole: UserRow['role'], _staffRole?: string | null): UserRow['role'] => {
-    return baseRole;
-  };
 
   const loadUsers = async () => {
     setLoading(true);
@@ -69,7 +65,7 @@ export default function ViewAllUsers() {
 
         const daysRegistered = Math.floor(
           (now.getTime() - new Date(user.created_at).getTime()) /
-            (1000 * 60 * 60 * 24)
+          (1000 * 60 * 60 * 24)
         );
 
         return {
@@ -77,7 +73,7 @@ export default function ViewAllUsers() {
           firstName: user.first_name,
           lastName: user.last_name,
           email: user.email,
-          role: getEffectiveRole(user.user_role, user.staff_role),
+          role: user.user_role,
           staffRole: user.staff_role,
           daysRegistered,
           totalReservations: userReservations.length,
@@ -117,7 +113,7 @@ export default function ViewAllUsers() {
 
   const handleEditRole = async (userRow: UserRow) => {
     setSelectedUser(userRow);
-    const modalRole = getEffectiveRole(userRow.role, userRow.staffRole);
+    const modalRole = userRow.role;
     setNewRole(modalRole);
     setSelectedCruiseIds([]);
     setFormError("");
@@ -142,12 +138,6 @@ export default function ViewAllUsers() {
     );
   };
 
-  // const handleEditRole = (userRow: any) => {
-  //   setSelectedUser(userRow);
-  //   setNewRole("normal");
-  //   setShowRoleModal(true);
-  // };
-
   const handleRoleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedUser) return;
@@ -159,7 +149,7 @@ export default function ViewAllUsers() {
         body: JSON.stringify({
           userId: selectedUser.id,
           newRole: newRole,
-          cruiseIds: newRole === "staff" || newRole === "admin" ? selectedCruiseIds : [],
+          cruiseIds: (newRole === "staff" || newRole === "admin") ? selectedCruiseIds : [],
         }),
       });
 
@@ -249,7 +239,7 @@ export default function ViewAllUsers() {
                   New Role:
                   <select
                     value={newRole}
-                    onChange={(e) => setNewRole(e.target.value)}
+                    onChange={(e) => setNewRole(e.target.value as 'normal' | 'staff' | 'admin')}
                   >
                     <option value="normal">Normal User</option>
                     <option value="staff">Staff</option>
