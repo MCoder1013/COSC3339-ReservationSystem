@@ -7,10 +7,10 @@ import { useAuth } from "./AuthContext";
 const API_URL = import.meta.env.VITE_API_URL;
 
 export default function Inventory() {
-const shipName = "Starlight Pearl Cruises";
-const { user } = useAuth();
+  const shipName = "Starlight Pearl Cruises";
+  const { user } = useAuth();
 
-const canEditInventory = user?.role === "staff" && Boolean(user.canEditInventory);
+  const canEditInventory = user?.role === "admin";
 
   const [formError, setFormError] = useState<string>("");
 
@@ -34,7 +34,7 @@ const canEditInventory = user?.role === "staff" && Boolean(user.canEditInventory
   //modal state
   const [showModal, setShowModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  
+
   //form data for rooms
   const [roomForm, setRoomForm] = useState({
     cabin_number: "",
@@ -43,7 +43,7 @@ const canEditInventory = user?.role === "staff" && Boolean(user.canEditInventory
     capacity: "",
     status: "Available"
   });
-  
+
   //form data for items
   const [itemForm, setItemForm] = useState({
     name: "",
@@ -120,7 +120,7 @@ const canEditInventory = user?.role === "staff" && Boolean(user.canEditInventory
       const body =
         activeCategory === "Rooms" ? roomForm : itemForm;
 
-      const response = await fetch(`${API_URL}${endpoint}`, {
+      const response = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -131,7 +131,7 @@ const canEditInventory = user?.role === "staff" && Boolean(user.canEditInventory
       if (!response.ok) {
         // Parse error message and provide specific feedback
         const errorMessage = data.error || data.message || "Failed to add item";
-        
+
         if (activeCategory === "Rooms") {
           if (errorMessage.includes("Cabin number already exists")) {
             setFormError(`Cabin number "${roomForm.cabin_number}" already exists. Please use a different cabin number.`);
@@ -216,7 +216,7 @@ const canEditInventory = user?.role === "staff" && Boolean(user.canEditInventory
 
       <NavBar shipName={shipName} />
 
-        <main className="container section inventoryDisplay">
+      <main className="container section inventoryDisplay">
         <h2>Inventory</h2>
 
         {/*Buttons to switch categories */}
@@ -224,17 +224,19 @@ const canEditInventory = user?.role === "staff" && Boolean(user.canEditInventory
           {categories.map((category) => (
             <button
               key={category}
-              onClick={() => {setActiveCategory(category);
-                   setSearchTerm("");
-                  setStatusFilter("All");
-                  setSecondaryFilter("All");}}
+              onClick={() => {
+                setActiveCategory(category);
+                setSearchTerm("");
+                setStatusFilter("All");
+                setSecondaryFilter("All");
+              }}
               className={activeCategory === category ? "activeTab" : ""}
             >
               {category}
             </button>
           ))}
         </div>
-        
+
         {/*Add/Delete buttons */}
         {canEditInventory ? (
           <>
@@ -270,7 +272,7 @@ const canEditInventory = user?.role === "staff" && Boolean(user.canEditInventory
             <option value="Maintenance">Maintenance</option>
             {activeCategory === "Items" && <option value="Out">Out</option>}
           </select>
-          
+
           <select
             value={secondaryFilter}
             onChange={(e) => setSecondaryFilter(e.target.value)}
@@ -348,7 +350,7 @@ const canEditInventory = user?.role === "staff" && Boolean(user.canEditInventory
         <div className="modal" onClick={() => setShowModal(false)}>
           <div className="modalContent" onClick={(e) => e.stopPropagation()}>
             <h3>Add {activeCategory.slice(0, -1)}</h3>
-            
+
             <form onSubmit={handleSubmit}>
               {activeCategory === "Rooms" ? (
                 // Room form
@@ -359,7 +361,7 @@ const canEditInventory = user?.role === "staff" && Boolean(user.canEditInventory
                       type="text"
                       placeholder="e.g., C101, B202"
                       value={roomForm.cabin_number}
-                      onChange={(e) => setRoomForm({...roomForm, cabin_number: e.target.value})}
+                      onChange={(e) => setRoomForm({ ...roomForm, cabin_number: e.target.value })}
                       required
                     />
                   </label>
@@ -370,7 +372,7 @@ const canEditInventory = user?.role === "staff" && Boolean(user.canEditInventory
                       type="number"
                       placeholder="Deck number"
                       value={roomForm.deck}
-                      onChange={(e) => setRoomForm({...roomForm, deck: e.target.value})}
+                      onChange={(e) => setRoomForm({ ...roomForm, deck: e.target.value })}
                       required
                     />
                   </label>
@@ -379,7 +381,7 @@ const canEditInventory = user?.role === "staff" && Boolean(user.canEditInventory
                     Type:
                     <select
                       value={roomForm.type}
-                      onChange={(e) => setRoomForm({...roomForm, type: e.target.value})}
+                      onChange={(e) => setRoomForm({ ...roomForm, type: e.target.value })}
                     >
                       <option value="Economy">Economy</option>
                       <option value="Oceanview">Oceanview</option>
@@ -394,7 +396,7 @@ const canEditInventory = user?.role === "staff" && Boolean(user.canEditInventory
                       type="number"
                       placeholder="Number of guests"
                       value={roomForm.capacity}
-                      onChange={(e) => setRoomForm({...roomForm, capacity: e.target.value})}
+                      onChange={(e) => setRoomForm({ ...roomForm, capacity: e.target.value })}
                       required
                     />
                   </label>
@@ -403,7 +405,7 @@ const canEditInventory = user?.role === "staff" && Boolean(user.canEditInventory
                     Status:
                     <select
                       value={roomForm.status}
-                      onChange={(e) => setRoomForm({...roomForm, status: e.target.value})}
+                      onChange={(e) => setRoomForm({ ...roomForm, status: e.target.value })}
                     >
                       <option value="Available">Available</option>
                       <option value="Unavailable">Unavailable</option>
@@ -420,7 +422,7 @@ const canEditInventory = user?.role === "staff" && Boolean(user.canEditInventory
                       type="text"
                       placeholder="Item name"
                       value={itemForm.name}
-                      onChange={(e) => setItemForm({...itemForm, name: e.target.value})}
+                      onChange={(e) => setItemForm({ ...itemForm, name: e.target.value })}
                       required
                     />
                   </label>
@@ -429,7 +431,7 @@ const canEditInventory = user?.role === "staff" && Boolean(user.canEditInventory
                     Category:
                     <select
                       value={itemForm.category}
-                      onChange={(e) => setItemForm({...itemForm, category: e.target.value})}
+                      onChange={(e) => setItemForm({ ...itemForm, category: e.target.value })}
                     >
                       <option value="Gear">Gear</option>
                       <option value="Medical">Medical</option>
@@ -445,7 +447,7 @@ const canEditInventory = user?.role === "staff" && Boolean(user.canEditInventory
                       type="number"
                       placeholder="Quantity"
                       value={itemForm.quantity}
-                      onChange={(e) => setItemForm({...itemForm, quantity: e.target.value})}
+                      onChange={(e) => setItemForm({ ...itemForm, quantity: e.target.value })}
                       required
                     />
                   </label>
@@ -454,7 +456,7 @@ const canEditInventory = user?.role === "staff" && Boolean(user.canEditInventory
                     Status:
                     <select
                       value={itemForm.status}
-                      onChange={(e) => setItemForm({...itemForm, status: e.target.value})}
+                      onChange={(e) => setItemForm({ ...itemForm, status: e.target.value })}
                     >
                       <option value="Available">Available</option>
                       <option value="Out">Out</option>
@@ -470,8 +472,8 @@ const canEditInventory = user?.role === "staff" && Boolean(user.canEditInventory
                 </div>
               )}
 
-              <button type="submit" onClick={() => {setFormError("");}} className="submitButton">Submit</button>
-              <button type="button" onClick={() => { setShowModal(false); setFormError("");}} className="cancelButton">Cancel</button>
+              <button type="submit" onClick={() => { setFormError(""); }} className="submitButton">Submit</button>
+              <button type="button" onClick={() => { setShowModal(false); setFormError(""); }} className="cancelButton">Cancel</button>
             </form>
           </div>
         </div>
@@ -482,7 +484,7 @@ const canEditInventory = user?.role === "staff" && Boolean(user.canEditInventory
         <div className="modal" onClick={() => setShowDeleteModal(false)}>
           <div className="modalContent" onClick={(e) => e.stopPropagation()}>
             <h3>Delete {activeCategory.slice(0, -1)}</h3>
-            
+
             <form onSubmit={handleDeleteSubmit}>
               <label>
                 {activeCategory === "Rooms" ? "Cabin Number:" : "Resource Name:"}

@@ -120,6 +120,20 @@ function isWithinShiftWindow(shift: string, start: Date, end: Date): boolean {
     return false;
 }
 
+function deriveShiftFromWindow(start: Date, end: Date): 'Morning' | 'Day' | 'Night' | null {
+    if (isWithinShiftWindow('Morning', start, end)) return 'Morning';
+    if (isWithinShiftWindow('Day', start, end)) return 'Day';
+    if (isWithinShiftWindow('Night', start, end)) return 'Night';
+    return null;
+}
+
+function toShiftDateKey(d: Date): string {
+    const parts = getShiftTimeParts(d);
+    const month = String(parts.month).padStart(2, '0');
+    const day = String(parts.day).padStart(2, '0');
+    return `${parts.year}-${month}-${day}`;
+}
+
 function validateEventWindowRules(start: Date, end: Date) {
     if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) {
         throw new Error('Please choose a valid start and end time.');
@@ -174,6 +188,62 @@ async function validateStaffShiftWindows(staffIds: number[], startTime: string, 
         if (!isWithinShiftWindow(staffMember.shift, start, end)) {
             throw new Error(`This time is outside ${staffMember.name}'s shift (${staffMember.shift}).`);
         }
+    }
+}
+
+async function validateSingleShiftPerDayAssignments(
+    staffIds: number[],
+    startTime: string,
+    endTime: string,
+    tx: postgres.TransactionSql<{}>,
+    excludeEventId?: number
+) {
+    const targetStart = new Date(startTime);
+    const targetEnd = new Date(endTime);
+    const targetShift = deriveShiftFromWindow(targetStart, targetEnd);
+
+    if (!targetShift) {
+        throw new Error('This event does not fit a valid shift window.');
+    }
+
+    const targetDayKey = toShiftDateKey(targetStart);
+
+    const existingAssignments = await tx`
+        SELECT
+            pes.staff_id,
+            e.id AS event_id,
+            e.name AS event_name,
+            e.start_time,
+            e.end_time
+        FROM package_event_staff pes
+        JOIN package_events e ON e.id = pes.event_id
+        WHERE pes.staff_id IN ${tx(staffIds)}
+          AND e.status <> 'Cancelled'
+          AND (${excludeEventId ?? null}::INT IS NULL OR e.id <> ${excludeEventId ?? null})
+        ORDER BY e.start_time ASC
+    `;
+
+    const conflicts: string[] = [];
+
+    for (const row of existingAssignments) {
+        const existingStart = new Date(row.start_time);
+        const existingEnd = new Date(row.end_time);
+        if (toShiftDateKey(existingStart) !== targetDayKey) {
+            continue;
+        }
+
+        const existingShift = deriveShiftFromWindow(existingStart, existingEnd);
+        if (!existingShift || existingShift === targetShift) {
+            continue;
+        }
+
+        const displayName = String(row.event_name ?? `Event #${row.event_id}`);
+        conflicts.push(`${displayName} (${existingShift})`);
+    }
+
+    if (conflicts.length > 0) {
+        const summary = conflicts.slice(0, 3).join(', ');
+        throw new Error(`Staff cannot be assigned to multiple shifts on the same day. Conflicts: ${summary}.`);
     }
 }
 
@@ -296,6 +366,7 @@ export async function createPackageEvent(createdBy: number, input: PackageEventI
         validateEventWindowRules(start, end);
         await validateCreatorShiftWindow(creatorId, start, end, tx);
         await validateStaffShiftWindows(assignedStaffIds, input.start_time, input.end_time, tx);
+        await validateSingleShiftPerDayAssignments(assignedStaffIds, input.start_time, input.end_time, tx);
         await validateItemAvailability(input.item_requirements, input.start_time, input.end_time, tx);
 
         const result = await tx`
@@ -334,6 +405,7 @@ export async function updatePackageEvent(eventId: number, input: PackageEventInp
 
         await validateCreatorShiftWindow(creatorId, start, end, tx);
         await validateStaffShiftWindows(assignedStaffIds, input.start_time, input.end_time, tx);
+        await validateSingleShiftPerDayAssignments(assignedStaffIds, input.start_time, input.end_time, tx, eventId);
         await validateItemAvailability(input.item_requirements, input.start_time, input.end_time, tx, eventId);
 
         await tx`

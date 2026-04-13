@@ -69,9 +69,17 @@ export async function updateUserProfilePicture(id: number, profilePicture: strin
 
 export async function getAllUsers() {
     const result = await sql`
-        SELECT id, first_name, last_name, email, user_role, created_at
-        FROM users
-        ORDER BY id ASC
+        SELECT
+            u.id,
+            u.first_name,
+            u.last_name,
+            u.email,
+            u.user_role,
+            u.created_at,
+            s.role AS staff_role
+        FROM users u
+        LEFT JOIN staff s ON s.staff_id = u.id
+        ORDER BY u.id ASC
     `;
     return result;
 }
@@ -85,6 +93,25 @@ export async function getStaffRoleByUserId(userId: number): Promise<string | nul
     `;
 
     return (result[0]?.role as string | undefined) ?? null;
+}
+
+export async function getStaffShiftByUserId(userId: number): Promise<string | null> {
+    const result = await sql`
+        SELECT shift
+        FROM staff
+        WHERE staff_id = ${userId}
+        LIMIT 1
+    `;
+
+    return (result[0]?.shift as string | undefined) ?? null;
+}
+
+export async function updateStaffShiftByUserId(userId: number, shift: string): Promise<void> {
+    await sql`
+        UPDATE staff
+        SET shift = ${shift}
+        WHERE staff_id = ${userId}
+    `;
 }
 
 export async function updateUserRole(userId: number, newRole: UserRole): Promise<void> {

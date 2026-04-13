@@ -1,6 +1,6 @@
 import { RequestHandler, Request } from "express";
 import jwt from 'jsonwebtoken';
-import { getUserById, User } from "../users.js";
+import { getStaffRoleByUserId, getUserById, User } from "../users.js";
 
 declare global {
     namespace Express {
@@ -57,14 +57,22 @@ export const staffRequired: RequestHandler = (req, res, next) => {
 
     next()
 }
-export const adminRequired: RequestHandler = (req, res, next) => {
+export const adminRequired: RequestHandler = async (req, res, next) => {
     if (!req.user) {
         throw res.status(401).json({ error: 'Not authenticated' });
     }
-    const role = req.user.user_role
-    if (role !== 'admin') {
-        throw res.status(401).json({ error: 'This route is only accessible to admins' });
+
+    const role = req.user.user_role;
+    if (role === 'admin') {
+        return next();
     }
 
-    next()
+    if (role === 'staff') {
+        const staffRole = await getStaffRoleByUserId(req.user.id);
+        if (staffRole?.trim().toLowerCase() === 'admin') {
+            return next();
+        }
+    }
+
+    throw res.status(401).json({ error: 'This route is only accessible to admins' });
 }

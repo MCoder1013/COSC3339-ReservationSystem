@@ -218,18 +218,13 @@ router.get('/reservations/rooms', authRequired, async (req: Request, res: Respon
 
 router.get('/reservations/eligible-cruises', authRequired, async (req: Request, res: Response) => {
   try {
-    const userId = req.user!.id;
+    const user = req.user!;
 
-    const user = await getUserById(userId);
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    if (user.user_role === 'staff') {
+    if (user.user_role === 'staff' || user.user_role === 'admin') {
       const cruises = await sql`
         SELECT role
         FROM staff
-        WHERE staff_id = ${userId}
+        WHERE staff_id = ${user.id}
         LIMIT 1
       `;
 
@@ -251,11 +246,11 @@ router.get('/reservations/eligible-cruises', authRequired, async (req: Request, 
         return res.json(allCruises);
       }
 
-      const assignedCruises = await getCurrentStaffAssignedCruises(userId);
+      const assignedCruises = await getCurrentStaffAssignedCruises(user.id);
       return res.json(assignedCruises);
     }
 
-    const cruises = await getUserRoomCruises(userId);
+    const cruises = await getUserRoomCruises(user.id);
     res.json(cruises);
   } catch (error) {
     console.error('Error fetching eligible cruises:', error);
