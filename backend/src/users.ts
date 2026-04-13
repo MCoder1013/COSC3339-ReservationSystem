@@ -87,6 +87,25 @@ export async function getStaffRoleByUserId(userId: number): Promise<string | nul
     return (result[0]?.role as string | undefined) ?? null;
 }
 
+export async function getStaffShiftByUserId(userId: number): Promise<string | null> {
+    const result = await sql`
+        SELECT shift
+        FROM staff
+        WHERE staff_id = ${userId}
+        LIMIT 1
+    `;
+
+    return (result[0]?.shift as string | undefined) ?? null;
+}
+
+export async function updateStaffShiftByUserId(userId: number, shift: string): Promise<void> {
+    await sql`
+        UPDATE staff
+        SET shift = ${shift}
+        WHERE staff_id = ${userId}
+    `;
+}
+
 export async function updateUserRole(userId: number, newRole: UserRole): Promise<void> {
     await sql`
         UPDATE users

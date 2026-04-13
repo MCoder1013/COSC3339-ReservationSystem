@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { useAuth } from "./AuthContext";
+import { isAdminUser, useAuth } from "./AuthContext";
 import { useState } from "react";
 import UserProfileModal from "./UserProfileModal";
 import "./NavBar.css";
@@ -13,6 +13,7 @@ export default function NavBar({ shipName }: NavBarProps) {
   const location = useLocation();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const isHomePage = location.pathname === "/";
+  const canAccessAnalytics = isAdminUser(user);
 
   return (
     <>
@@ -27,7 +28,7 @@ export default function NavBar({ shipName }: NavBarProps) {
             {!isHomePage && <Link className="navButton" to="/">Home</Link>}
             {user?.role === "staff" && <Link className="navButton" to="/inventory">Inventory</Link>}
             {user?.role === "staff" && <Link className="navButton" to="/reservations">Reservations</Link>}
-            {user?.role === "staff" && user?.canEditInventory && <Link className="navButton" to="/analytics">Analytics</Link>}
+            {canAccessAnalytics && <Link className="navButton" to="/analytics">Analytics</Link>}
             {user?.role === "staff" && <Link className="navButton" to="/view-users">Users</Link>}
             {user ? (
               <button

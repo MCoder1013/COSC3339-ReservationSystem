@@ -1,7 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { AuthProvider } from "./AuthContext";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { AuthProvider, isAdminUser, useAuth } from "./AuthContext";
 import App from "./App";
 import SignIn from "./SignIn";
 import Register from "./Register";
@@ -12,6 +12,15 @@ import Reservation from "./Reservation";
 import ViewUsers from "./ViewAllUsers"
 import Analytics from "./Analytics";
 import "./index.css";
+
+function AdminRoute({ children }: { children: React.ReactElement }) {
+  const { user, loading } = useAuth();
+
+  if (loading) return null;
+  if (!isAdminUser(user)) return <Navigate to="/" replace />;
+
+  return children;
+}
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
@@ -26,7 +35,14 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           <Route path="/user-reservations" element={<UserReservationTable />} />
           <Route path="/reservation" element={<Reservation />} />
           <Route path="/view-users" element={<ViewUsers />} />
-          <Route path="/analytics" element={<Analytics />} />
+          <Route
+            path="/analytics"
+            element={
+              <AdminRoute>
+                <Analytics />
+              </AdminRoute>
+            }
+          />
         </Routes>
       </AuthProvider>
     </BrowserRouter>

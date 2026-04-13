@@ -11,7 +11,16 @@ interface UserProfile {
   biography: string | null;
   profilePicture: string | null;
   role: string;
+  shift?: string | null;
 }
+
+type ShiftConflict = {
+  id: number;
+  name: string;
+  required_shift: string;
+  start_time: string;
+  end_time: string;
+};
 
 interface ItemReservation {
   id: number;
@@ -56,7 +65,9 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
   const [bio, setBio] = useState("");
   const [iconFile, setIconFile] = useState<File | null>(null);
   const [iconPreview, setIconPreview] = useState("");
+  const [selectedShift, setSelectedShift] = useState("Day");
   const [saveMessage, setSaveMessage] = useState("");
+  const [shiftConflicts, setShiftConflicts] = useState<ShiftConflict[]>([]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -77,6 +88,8 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
         setUserProfile(profileData);
         setBio(profileData.biography || "");
         setIconPreview(profileData.profilePicture || "");
+        setSelectedShift(profileData.shift || "Day");
+        setShiftConflicts([]);
 
         const itemsRes = await fetch("api/reservations/items", {
           headers: {
@@ -159,9 +172,14 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
   const handleSaveProfile = async () => {
     try {
       const token = localStorage.getItem("token");
+      setShiftConflicts([]);
 
       const formData = new FormData();
       formData.append("biography", bio);
+
+      if (userProfile?.role === "staff") {
+        formData.append("shift", selectedShift);
+      }
 
       if (iconFile) {
         formData.append("profilePicture", iconFile);
@@ -175,16 +193,32 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
         body: formData,
       });
 
-      if (!response.ok) throw new Error("Failed to update profile");
+      const responseData = await response.json().catch(() => ({}));
 
-      const updatedUser = await response.json();
-      setUserProfile(updatedUser);
+      if (!response.ok) {
+        const conflicts = Array.isArray(responseData.shiftConflicts)
+          ? (responseData.shiftConflicts as ShiftConflict[])
+          : [];
+        setShiftConflicts(conflicts);
+        throw new Error(responseData.error || "Failed to update profile");
+      }
+
+      const updatedUser = responseData;
+      const updatedShift = updatedUser.shift ?? currentUserShiftFromProfile(updatedUser, selectedShift);
+      setUserProfile((current) => current ? {
+        ...current,
+        biography: bio,
+        profilePicture: updatedUser.profilePicture ?? current.profilePicture,
+        shift: updatedShift,
+      } : current);
       const nextPicture = updatedUser.profilePicture ?? updatedUser.profile_picture ?? iconPreview ?? null;
       setIconPreview(nextPicture || "");
+      setSelectedShift(updatedShift);
 
       updateUser({
         firstName: updatedUser.firstName ?? updatedUser.first_name ?? user?.firstName,
         profilePicture: nextPicture,
+        shift: updatedShift,
       });
 
       setSaveMessage("Profile updated successfully!");
@@ -196,6 +230,10 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
 
     setTimeout(() => setSaveMessage(""), 3000);
   };
+
+  function currentUserShiftFromProfile(updatedUser: any, fallbackShift: string) {
+    return updatedUser.shift ?? updatedUser.staffShift ?? fallbackShift;
+  }
 
   const handleLogout = () => {
     logout();
@@ -404,6 +442,21 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
                     />
                   </div>
 
+                  {userProfile.role === "staff" && (
+                    <div className="formGroup">
+                      <label>Shift:</label>
+                      <select
+                        value={selectedShift}
+                        onChange={(e) => setSelectedShift(e.target.value)}
+                        className="input"
+                      >
+                        <option value="Morning">Morning</option>
+                        <option value="Day">Day</option>
+                        <option value="Night">Night</option>
+                      </select>
+                    </div>
+                  )}
+
                   <div className="formGroup">
                     <label>User Icon:</label>
                     <div className="iconUpload">
@@ -425,6 +478,16 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
                     <p className={saveMessage.includes("Error") || saveMessage.includes("error") ? "errorMsg" : "successMsg"}>
                       {saveMessage}
                     </p>
+                  )}
+
+                  {shiftConflicts.length > 0 && (
+                    <div className="errorMsg">
+                      {shiftConflicts.map((conflict) => (
+                        <div key={conflict.id}>
+                          Conflict: {conflict.name} requires {conflict.required_shift} shift on {formatDateTime(conflict.start_time)}.
+                        </div>
+                      ))}
+                    </div>
                   )}
 
                   <button onClick={handleSaveProfile} className="saveBtn">
