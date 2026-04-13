@@ -14,7 +14,7 @@ interface NewRoom {
 // pull all rooms from room table
 export async function pullRooms() {
     try {
-        const result = await sql`SELECT * FROM cabins`;
+        const result = await sql`SELECT * FROM cabins WHERE deleted_at IS NULL`;
         return result;
     } catch (error) {
         console.error("Error getting cabins: ", error);
@@ -59,14 +59,18 @@ export async function addRoom(r: NewRoom): Promise<number> {
 }
 
 // Delete room by name instead of id since users won't know id
-export async function deleteRoom(cabinNumber: string): Promise<number | undefined> {
+export async function deleteRoom(cabinNumber: string) {
     try {
         const rows = await sql`
-            DELETE FROM cabins
+            UPDATE cabins
+            SET deleted_at = NOW()
             WHERE cabin_number = ${cabinNumber}
-            RETURNING id
         `;
-        return rows[0]?.id;
+
+        if(rows.count === 0) {
+            throw new Error("cabin wasnt found");
+        }
+
     } catch (error) {
         console.error("Error deleting room: ", error);
         throw error;
