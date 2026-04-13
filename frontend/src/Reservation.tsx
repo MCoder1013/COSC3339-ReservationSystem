@@ -57,7 +57,7 @@ export default function Reservation() {
   const [activeCategory, setActiveCategory] =
     useState<(typeof categories)[number]>("Rooms");
   const cruiseOptions = activeCategory === "Rooms" ? cruises : accessibleCruises;
-
+  
   //available items from database
   const [availableItems, setAvailableItems] = useState<any[]>([]);
 
@@ -1004,7 +1004,6 @@ export default function Reservation() {
         }
 
         setFormSuccess("Room reservation submitted successfully.");
-
         // Reset form
         setRoomReservationForm({ cabinId: "" });
         setRoomStartDate(new Date());
