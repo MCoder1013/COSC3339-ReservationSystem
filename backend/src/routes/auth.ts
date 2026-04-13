@@ -130,7 +130,7 @@ router.post('/login', async (req: Request, res: Response) => {
     const staffRole = user.user_role === 'staff'
       ? await database.getStaffRoleByUserId(user.id)
       : null;
-    const isStaffAdmin = user.user_role === 'staff' && staffRole?.trim().toLowerCase() === 'admin';
+    const isStaffAdmin = user.user_role === 'admin';
 
     const token = jwt.sign({ id: user.id }, jwtSecret);
     res
@@ -165,7 +165,7 @@ router.get('/me', authRequired, async (req: Request, res: Response) => {
     const staffRole = user.user_role === 'staff'
       ? await database.getStaffRoleByUserId(user.id)
       : null;
-    const isStaffAdmin = user.user_role === 'staff' && staffRole?.trim().toLowerCase() === 'admin';
+    const isStaffAdmin = user.user_role === 'admin';
 
     res.json({
       id: user.id,
@@ -247,7 +247,6 @@ router.post('/update-profile', authRequired, upload.single('profilePicture'), as
   }
 });
 
-
 router.post('/update-user-role', adminRequired, async (req: Request, res: Response) => {
   try {
     const { userId, newRole } = req.body;
@@ -296,6 +295,62 @@ router.post('/update-user-role', adminRequired, async (req: Request, res: Respon
   } catch (err) {
     console.error('Update role error:', err);
     res.status(500).json({ error: 'Failed to update user role' });
+  }
+});
+
+router.get('/staff/:userId/cruises', adminRequired, async (req: Request, res: Response) => {
+  try {
+    const userId = Number(req.params.userId);
+
+    if (!Number.isInteger(userId) || userId < 1) {
+      return res.status(400).json({ error: 'Invalid user ID' });
+    }
+
+    const cruises = await database.getStaffAssignedCruises(userId);
+    res.json(cruises);
+  } catch (err) {
+    console.error('Failed to fetch staff cruises:', err);
+    res.status(500).json({ error: 'Failed to fetch staff cruises' });
+  }
+});
+
+router.post('/add-staff-cruise', adminRequired, async (req: Request, res: Response) => {
+  try {
+    const userId = Number(req.body.userId);
+    const cruiseId = Number(req.body.cruiseId);
+
+    if (
+      !Number.isInteger(userId) || userId < 1 ||
+      !Number.isInteger(cruiseId) || cruiseId < 1
+    ) {
+      return res.status(400).json({ error: 'Invalid userId or cruiseId' });
+    }
+
+    await database.addStaffCruiseAssignment(userId, cruiseId);
+    res.json({ message: 'Cruise assigned successfully' });
+  } catch (err) {
+    console.error('Failed to assign staff cruise:', err);
+    res.status(400).json({ error: (err as Error).message || 'Failed to assign cruise' });
+  }
+});
+
+router.post('/remove-staff-cruise', adminRequired, async (req: Request, res: Response) => {
+  try {
+    const userId = Number(req.body.userId);
+    const cruiseId = Number(req.body.cruiseId);
+
+    if (
+      !Number.isInteger(userId) || userId < 1 ||
+      !Number.isInteger(cruiseId) || cruiseId < 1
+    ) {
+      return res.status(400).json({ error: 'Invalid userId or cruiseId' });
+    }
+
+    await database.removeStaffCruiseAssignment(userId, cruiseId);
+    res.json({ message: 'Cruise assignment removed successfully' });
+  } catch (err) {
+    console.error('Failed to remove staff cruise assignment:', err);
+    res.status(500).json({ error: 'Failed to remove cruise assignment' });
   }
 });
 

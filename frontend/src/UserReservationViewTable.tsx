@@ -281,7 +281,7 @@ export default function ReservationTable() {
         )}
 
         {activeCategory === "Packages" ? (
-          <PackageEventsList />
+          <PackageEventsList onlyJoined />
         ) : loading ? (
           <p>Loading...</p>
         ) : reservationData[activeCategory].length === 0 ? (

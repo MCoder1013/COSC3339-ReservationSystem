@@ -13,9 +13,9 @@ interface ReservationCheck {
 
 interface NewReservation {
     user_id: number
-    cabin_id: number
-    resource_id: number
-    staff_id: number
+    cabin_id: number | null
+    resource_id: number | null
+    staff_id: number | null
     cruise_id: number | null
     start_time: string
     end_time: string
@@ -25,9 +25,9 @@ interface NewReservation {
 interface Reservation {
     id: number
     user_id: number
-    cabin_id: number
-    resource_id: number
-    staff_id: number
+    cabin_id: number | null
+    resource_id: number | null
+    staff_id: number | null
     cruise_id: number | null
     start_time: string
     end_time: string
@@ -82,13 +82,164 @@ async function checkStaffTime(r: ReservationCheck, sql: TransactionSql<{}>) {
     }
 }
 
-export async function addReservation(r: NewReservation): Promise<number> {
+async function checkUserCruiseOverlap(userId: number, r: NewReservation, sql: TransactionSql<{}>) {
+    if (r.cruise_id == null) {
+        return;
+    }
+
+    const rows = await sql`
+        SELECT existing.id
+        FROM reservations existing
+        JOIN cruises existing_cruise ON existing_cruise.id = existing.cruise_id
+        JOIN cruises requested_cruise ON requested_cruise.id = ${r.cruise_id}
+        WHERE
+            (
+                existing.user_id = ${userId}
+                OR EXISTS (
+                    SELECT 1
+                    FROM reservation_groups rg
+                    WHERE rg.reservation_id = existing.id
+                        AND rg.user_id = ${userId}
+                )
+            )
+            AND existing.cruise_id IS NOT NULL
+            AND existing.status <> 'Cancelled'
+            AND existing.cruise_id <> ${r.cruise_id}
+            AND daterange(existing_cruise.departure_date, existing_cruise.return_date, '[]')
+                && daterange(requested_cruise.departure_date, requested_cruise.return_date, '[]')
+        LIMIT 1
+    `;
+
+    if (rows.length > 0) {
+        throw new Error('You already have a reservation on another cruise with overlapping dates.');
+    }
+}
+
+async function checkUserRoomOnCruise(userId: number, r: NewReservation, sql: TransactionSql<{}>) {
+    if (r.cabin_id == null || r.cruise_id == null) {
+        return;
+    }
+
+    const rows = await sql`
+        SELECT existing.id
+        FROM reservations existing
+        WHERE
+            (
+                existing.user_id = ${userId}
+                OR EXISTS (
+                    SELECT 1
+                    FROM reservation_groups rg
+                    WHERE rg.reservation_id = existing.id
+                        AND rg.user_id = ${userId}
+                )
+            )
+            AND existing.cabin_id IS NOT NULL
+            AND existing.cruise_id = ${r.cruise_id}
+            AND existing.status <> 'Cancelled'
+        LIMIT 1
+    `;
+
+    if (rows.length > 0) {
+        throw new Error('A selected guest already has a room reservation on this cruise.');
+    }
+}
+
+async function checkCruiseIsUpcoming(cruiseId: number, sql: TransactionSql<{}>) {
+    const rows = await sql`
+        SELECT id
+        FROM cruises
+        WHERE id = ${cruiseId}
+            AND return_date >= CURRENT_DATE
+        LIMIT 1
+    `;
+
+    if (rows.length === 0) {
+        throw new Error('You cannot make a reservation for a cruise that already ended.');
+    }
+}
+
+export async function getUserRoomCruises(userId: number) {
+    const rows = await sql`
+        SELECT DISTINCT
+            cr.id,
+            cr.cruise_name,
+            cr.ship_name,
+            cr.departure_date,
+            cr.return_date
+        FROM reservations r
+        JOIN cruises cr ON cr.id = r.cruise_id
+        WHERE
+            r.cabin_id IS NOT NULL
+            AND r.status <> 'Cancelled'
+            AND r.end_time > NOW()
+            AND cr.return_date >= CURRENT_DATE
+            AND (
+                r.user_id = ${userId}
+                OR EXISTS (
+                    SELECT 1
+                    FROM reservation_groups rg
+                    WHERE rg.reservation_id = r.id
+                        AND rg.user_id = ${userId}
+                )
+            )
+        ORDER BY cr.departure_date ASC
+    `;
+
+    return rows;
+}
+
+export async function addReservation(r: NewReservation, participantUserIds?: number[]): Promise<number> {
     return await sql.begin(async sql => {
-        return await addReservationWithTransaction(sql, r)
+        return await addReservationWithTransaction(sql, r, participantUserIds)
     });
 }
 
-export async function addReservationWithTransaction(sql: postgres.TransactionSql<{}>, r: NewReservation): Promise<number> {
+export async function addReservationWithTransaction(
+    sql: postgres.TransactionSql<{}>,
+    r: NewReservation,
+    participantUserIds?: number[]
+): Promise<number> {
+    const effectiveParticipants = participantUserIds && participantUserIds.length > 0
+        ? Array.from(new Set(participantUserIds))
+        : [r.user_id];
+
+    for (const participantId of effectiveParticipants) {
+        await checkUserCruiseOverlap(participantId, r, sql);
+        await checkUserRoomOnCruise(participantId, r, sql);
+    }
+
+    if (r.cruise_id != null) {
+        await checkCruiseIsUpcoming(r.cruise_id, sql);
+    }
+
+    if (r.resource_id != null && r.cruise_id != null) {
+        const roomRows = await sql`
+            SELECT 1
+            FROM reservations existing
+            JOIN cruises cr ON cr.id = existing.cruise_id
+            WHERE
+                existing.cabin_id IS NOT NULL
+                AND existing.cruise_id = ${r.cruise_id}
+                AND existing.status <> 'Cancelled'
+                AND existing.end_time > NOW()
+                AND cr.return_date >= CURRENT_DATE
+                AND (
+                    existing.user_id = ${r.user_id}
+                    OR EXISTS (
+                        SELECT 1
+                        FROM reservation_groups rg
+                        WHERE rg.reservation_id = existing.id
+                            AND rg.user_id = ${r.user_id}
+                    )
+                )
+            LIMIT 1
+        `;
+
+        if (roomRows.length === 0) {
+            throw new Error('You must have a room reservation on this cruise before reserving items.');
+        }
+    }
+
     if (r.staff_id != null) {
         await checkStaffTime({
             start_time: r.start_time,
@@ -108,7 +259,13 @@ export async function addReservationWithTransaction(sql: postgres.TransactionSql
     }
 
     if (r.resource_id != null) {
-        await checkResourceCount(r, sql);
+        await checkResourceCount({
+            resource_id: r.resource_id,
+            quantity_reserved: r.quantity_reserved,
+            start_time: r.start_time,
+            end_time: r.end_time,
+            cruise_id: r.cruise_id
+        }, sql);
     }
 
     const result = await sql`
