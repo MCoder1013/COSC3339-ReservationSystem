@@ -476,7 +476,7 @@ router.post('/update-profile', authRequired, upload.single('profilePicture'), as
 
 router.post('/update-user-role', adminRequired, async (req: Request, res: Response) => {
   try {
-    const { userId, newRole } = req.body;
+    const { userId, newRole, cruiseIds } = req.body;
 
     if (!userId || !newRole) {
       return res.status(400).json({ error: 'Missing userId or newRole' });
@@ -485,6 +485,12 @@ router.post('/update-user-role', adminRequired, async (req: Request, res: Respon
     if (!['normal', 'staff', 'admin'].includes(newRole)) {
       return res.status(400).json({ error: 'Invalid role' });
     }
+
+    const normalizedCruiseIds = Array.isArray(cruiseIds)
+      ? cruiseIds
+          .map((id) => Number(id))
+          .filter((id) => Number.isInteger(id) && id > 0)
+      : [];
 
     const targetUser = await database.getUserById(userId);
     if (!targetUser) {
@@ -496,25 +502,21 @@ router.post('/update-user-role', adminRequired, async (req: Request, res: Respon
       // Promote to admin: set user_role to 'staff' and add to staff table with role 'Admin'
       await database.updateUserRole(userId, 'staff');
       // Insert or update in staff table
-      await sql`
-        INSERT INTO staff (staff_id, role, shift)
-        VALUES (${userId}, 'Admin', 'Day')
-        ON CONFLICT (staff_id)
-        DO UPDATE SET role = 'Admin'
-      `;
+      await database.upsertStaffRecord(userId, 'Admin', 'Day');
+      await database.replaceStaffCruiseAssignments(userId, normalizedCruiseIds);
     } else if (newRole === 'staff') {
       // Demote to staff: set user_role to 'staff' and remove from staff table
       await database.updateUserRole(userId, 'staff');
-      // Delete from staff table if exists
-      await sql`
-        DELETE FROM staff WHERE staff_id = ${userId}
-      `;
+      // Keep a staff record so cruise assignments and staff-specific details remain available.
+      await database.upsertStaffRecord(userId, 'Other', 'Day');
+      await database.replaceStaffCruiseAssignments(userId, normalizedCruiseIds);
     } else {
       // Downgrade to normal: set user_role to 'normal' and remove from staff table
       await database.updateUserRole(userId, 'normal');
       // Delete from staff table if exists
+      await database.removeStaffRecord(userId);
       await sql`
-        DELETE FROM staff WHERE staff_id = ${userId}
+        DELETE FROM staff_cruises WHERE staff_id = ${userId}
       `;
     }
 
