@@ -17,7 +17,7 @@ interface ResourceCountCheck {
 // throws error otherwise
 export async function pullResources() {
     try {
-        const result = await sql`SELECT * FROM resources`;
+        const result = await sql`SELECT * FROM resources WHERE deleted_at IS NULL`;
         return result;
     } catch (error) {
         console.error("Error pulling inventory: ", error);
@@ -99,7 +99,11 @@ export async function checkResourceCount(
 // Delete resource by name instead of id since users won't know id
 export async function deleteResource(name: string): Promise<number> {
     try {
-        const rows = await sql`DELETE FROM resources WHERE name = ${name} RETURNING id`;
+        const rows = await sql`UPDATE resources SET deleted_at = NOW() WHERE name = ${name} RETURNING id`;
+
+        if(rows.count === 0) {
+            throw new Error("no resource exists with this name")
+        }
         return rows[0]?.id;
     } catch (error) {
         console.error("Error deleting resource: ", error);
