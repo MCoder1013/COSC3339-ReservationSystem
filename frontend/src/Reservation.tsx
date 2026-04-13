@@ -53,14 +53,14 @@ export default function Reservation() {
   const normalizedRole = String(user?.role ?? "").toLowerCase();
   const hideRoomsTab = normalizedRole === "staff" || normalizedRole === "admin" || String(user?.staffRole ?? "").toLowerCase() === "admin";
 
-  //current selected tab/category
+  // current selected tab/category
   const [activeCategory, setActiveCategory] =
     useState<(typeof categories)[number]>("Rooms");
   const cruiseOptions = activeCategory === "Rooms" ? cruises : accessibleCruises;
   
   //available items from database
   const [availableItems, setAvailableItems] = useState<any[]>([]);
-  
+
   //available rooms from database
   const [availableRooms, setAvailableRooms] = useState<any[]>([]);
 
@@ -69,7 +69,7 @@ export default function Reservation() {
     itemId: "",
     quantity: "",
   });
-  
+
   //reservation form state for Rooms tab
   const [roomReservationForm, setRoomReservationForm] = useState({
     cabinId: "",
@@ -85,10 +85,10 @@ export default function Reservation() {
 
 
   const timeSelected =
-  itemStartDate &&
-  itemStartTime &&
-  itemEndDate &&
-  itemEndTime;
+    itemStartDate &&
+    itemStartTime &&
+    itemEndDate &&
+    itemEndTime;
 
   useEffect(() => {
     try {
@@ -159,32 +159,25 @@ export default function Reservation() {
     setIsCruiseLoading(true);
     try {
       const [cruiseData, eligibleCruiseData] = await Promise.all([
-        fetchData("/api/cruises?scope=all"),
+        fetchData("/api/cruises"),
         fetchData("/api/reservations/eligible-cruises"),
       ]);
 
-      const normalized = Array.isArray(cruiseData)
-        ? cruiseData
-            .filter(isUpcomingCruise)
-            .map((cruise: any) => ({
-              id: String(cruise?.id ?? ""),
-              name: String(cruise?.name ?? cruise?.cruise_name ?? cruise?.title ?? ""),
-            }))
-            .filter((cruise: CruiseOption) => cruise.id && cruise.name)
-        : [];
+      function normalizeCruise(cruise: any) {
+        return {
+          id: cruise.id,
+          name: `${cruise.ship_name} - ${cruise.cruise_name}`
+        };
+      }
 
-      const normalizedEligible = Array.isArray(eligibleCruiseData)
-        ? eligibleCruiseData
-            .filter(isUpcomingCruise)
-            .map((cruise: any) => ({
-              id: String(cruise?.id ?? ""),
-              name: String(cruise?.name ?? cruise?.cruise_name ?? cruise?.title ?? ""),
-            }))
-            .filter((cruise: CruiseOption) => cruise.id && cruise.name)
-        : [];
+      const normalized = cruiseData
+        .filter(isUpcomingCruise)
+        .map(normalizeCruise);
+      const normalizedEligible = eligibleCruiseData
+        .filter(isUpcomingCruise)
+        .map(normalizeCruise);
 
       setCruises(normalized);
-
       setAccessibleCruises(normalizedEligible);
     } catch (error) {
       console.log(error);
@@ -213,9 +206,10 @@ export default function Reservation() {
   }, [accessibleCruises.length, activeCategory, hideRoomsTab]);
 
   useEffect(() => {
-    const allowedIds = new Set(cruiseOptions.map((cruise) => cruise.id));
+    const allowedIds = new Set(cruiseOptions.map((cruise) => cruise.id.toString()));
     if (selectedCruiseId && !allowedIds.has(selectedCruiseId)) {
       setSelectedCruiseId("");
+      console.log('Unset cruise id', selectedCruiseId, "because it's not in allowedIds:", allowedIds)
     }
   }, [cruiseOptions, selectedCruiseId]);
 
@@ -234,7 +228,7 @@ export default function Reservation() {
   // Handler functions for managing additional guest emails
   const handleAddGuestEmail = () => {
     setGuestEmailError("");
-    
+
     if (!roomReservationForm.cabinId) {
       setGuestEmailError("Please select a room first.");
       return;
@@ -280,65 +274,65 @@ export default function Reservation() {
     }
     return slots;
   };
-  
+
 
   // 
   const fetchCurrentAvailability = async (
-  resourceId: string,
-  startDate: Date,
-  startTime: string,
-  endDate: Date,
-  endTime: string
-) => {
-  if (!selectedCruiseId || !resourceId || !startDate || !startTime || !endDate || !endTime) {
-    setCurrentAvailability(null);
-    return;
-  }
+    resourceId: string,
+    startDate: Date,
+    startTime: string,
+    endDate: Date,
+    endTime: string
+  ) => {
+    if (!selectedCruiseId || !resourceId || !startDate || !startTime || !endDate || !endTime) {
+      setCurrentAvailability(null);
+      return;
+    }
 
-  try {
-    const startDateTime = combineDateAndTime(startDate, startTime);
-    const endDateTime = combineDateAndTime(endDate, endTime);
-    const selectedItem = availableItems.find((item) => String(item.id) === String(resourceId));
-    const totalQuantity = selectedItem ? Number(selectedItem.quantity) : 0;
+    try {
+      const startDateTime = combineDateAndTime(startDate, startTime);
+      const endDateTime = combineDateAndTime(endDate, endTime);
+      const selectedItem = availableItems.find((item) => String(item.id) === String(resourceId));
+      const totalQuantity = selectedItem ? Number(selectedItem.quantity) : 0;
 
-    const scopedReservations = await getItemReservations(resourceId);
-    const reservedQty = scopedReservations
-      .filter((res) => intervalsOverlap(startDateTime, endDateTime, res.start, res.end))
-      .reduce((sum, res) => sum + res.quantityReserved, 0);
+      const scopedReservations = await getItemReservations(resourceId);
+      const reservedQty = scopedReservations
+        .filter((res) => intervalsOverlap(startDateTime, endDateTime, res.start, res.end))
+        .reduce((sum, res) => sum + res.quantityReserved, 0);
 
-    setCurrentAvailability(Math.max(totalQuantity - reservedQty, 0));
-  } catch (error) {
-    console.error("Error fetching availability:", error);
-    setCurrentAvailability(null);
-  }
-};
+      setCurrentAvailability(Math.max(totalQuantity - reservedQty, 0));
+    } catch (error) {
+      console.error("Error fetching availability:", error);
+      setCurrentAvailability(null);
+    }
+  };
 
-useEffect(() => {
-  if (
-    activeCategory === "Items" &&
-    itemReservationForm.itemId &&
-    itemStartDate &&
-    itemStartTime &&
-    itemEndDate &&
-    itemEndTime
-  ) {
-    fetchCurrentAvailability(
-      itemReservationForm.itemId,
-      itemStartDate,
-      itemStartTime,
-      itemEndDate,
+  useEffect(() => {
+    if (
+      activeCategory === "Items" &&
+      itemReservationForm.itemId &&
+      itemStartDate &&
+      itemStartTime &&
+      itemEndDate &&
       itemEndTime
-    );
-  }
-}, [
-  selectedCruiseId,
-  itemReservationForm.itemId,
-  itemStartDate,
-  itemStartTime,
-  itemEndDate,
-  itemEndTime,
-  availableItems,
-]);
+    ) {
+      fetchCurrentAvailability(
+        itemReservationForm.itemId,
+        itemStartDate,
+        itemStartTime,
+        itemEndDate,
+        itemEndTime
+      );
+    }
+  }, [
+    selectedCruiseId,
+    itemReservationForm.itemId,
+    itemStartDate,
+    itemStartTime,
+    itemEndDate,
+    itemEndTime,
+    availableItems,
+  ]);
 
 
   // Convert time string (HH:mm) to minutes for comparison
@@ -373,16 +367,16 @@ useEffect(() => {
   const combineDateAndTime = (date: Date, timeStr: string): Date => {
     let hours: number;
     let minutes: number;
-    
+
     // Handle both 24-hour format (HH:mm) and 12-hour format (H:mm AM/PM)
     const timeRegex = /^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i;
     const match = timeStr.match(timeRegex);
-    
+
     if (match) {
       hours = parseInt(match[1]);
       minutes = parseInt(match[2]);
       const period = match[3]?.toUpperCase();
-      
+
       // Convert 12-hour to 24-hour format if AM/PM is present
       if (period) {
         if (period === 'PM' && hours !== 12) {
@@ -397,7 +391,7 @@ useEffect(() => {
       hours = parts[0] || 0;
       minutes = parts[1] || 0;
     }
-    
+
     const combined = new Date(date);
     combined.setHours(hours, minutes, 0, 0);
     return combined;
@@ -726,7 +720,7 @@ useEffect(() => {
   // Real-time validation: check if quantity entered exceeds available amount for selected item
   useEffect(() => {
     let errorMessage = "";
-    
+
     if (itemReservationForm.itemId && itemReservationForm.quantity) {
       const selectedItem = availableItems.find((item) => String(item.id) === String(itemReservationForm.itemId));
       if (selectedItem) {
@@ -736,7 +730,7 @@ useEffect(() => {
         }
       }
     }
-    
+
     setFormError(errorMessage);
   }, [itemReservationForm, availableItems]);
 
@@ -889,7 +883,7 @@ useEffect(() => {
           quantity_reserved: quantity,
         };
         console.log(reservationData)
-        
+
         const response = await fetch(`${API_URL}/api/reservations`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -900,8 +894,8 @@ useEffect(() => {
         const responseData = await response.json().catch(() => null);
 
         if (!response.ok) {
-           console.error("Backend error:", responseData);
-           throw new Error(`Failed to create reservation: ${response.status}`);
+          console.error("Backend error:", responseData);
+          throw new Error(`Failed to create reservation: ${response.status}`);
         }
 
         if (responseData?.reservationId) {
@@ -916,10 +910,10 @@ useEffect(() => {
         setItemStartTime("");
         setItemEndDate(new Date());
         setItemEndTime("");
-        
+
         // Refresh available items to show updated quantities
         await loadAvailableItems();
-      } 
+      }
       catch (error) {
         console.error("Failed to create reservation:", error);
         setFormError("An error occurred. Please try again.");
@@ -990,7 +984,7 @@ useEffect(() => {
         };
 
         console.log(reservationData);
-        
+
         const response = await fetch(`${API_URL}/api/reservations`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -1010,7 +1004,6 @@ useEffect(() => {
         }
 
         setFormSuccess("Room reservation submitted successfully.");
-        
         // Reset form
         setRoomReservationForm({ cabinId: "" });
         setRoomStartDate(new Date());
@@ -1019,11 +1012,11 @@ useEffect(() => {
         setRoomEndTime("");
         setAdditionalGuestEmails([]);
         setGuestEmailError("");
-        
+
         // Refresh available rooms to show updated availability
         await loadAvailableRooms();
         await loadCruises();
-      } 
+      }
       catch (error: any) {
         console.error("Failed to create reservation:", error);
         setFormError(error.message);
@@ -1124,248 +1117,248 @@ useEffect(() => {
               disabled={!isCruiseSelected}
               style={{ border: "none", padding: 0, margin: 0, minInlineSize: "auto" }}
             >
-            {activeCategory === "Packages" ? (
-              isCruiseSelected ? (
-                <PackageEventsTab cruiseId={selectedCruiseId} />
-              ) : (
-                <div className="errorMessage" style={{ marginTop: "10px" }}>
-                  Select a cruise to view available package events.
-                </div>
-              )
-            ) : activeCategory === "Items" ? (
-              <>
-                <label>
-                  Select Item:
-                  <select
-                    className="itemInput"
-                    value={itemReservationForm.itemId}
-                    onChange={(e) => setItemReservationForm({...itemReservationForm, itemId: e.target.value})}
-                    required
-                  >
-                    <option value="">-- Choose an item --</option>
-                    {availableItems.map((item) => (
-                      <option key={item.id} value={item.id}>
-                      {item.name} ({item.category}) - Available:{" "}
-                      {item.id === Number(itemReservationForm.itemId) &&
-                      timeSelected &&
-                        currentAvailability !== null
-                        ? currentAvailability
-                        : item.quantity}
-                      </option>
+              {activeCategory === "Packages" ? (
+                isCruiseSelected ? (
+                  <PackageEventsTab cruiseId={selectedCruiseId} />
+                ) : (
+                  <div className="errorMessage" style={{ marginTop: "10px" }}>
+                    Select a cruise to view available package events.
+                  </div>
+                )
+              ) : activeCategory === "Items" ? (
+                <>
+                  <label>
+                    Select Item:
+                    <select
+                      className="itemInput"
+                      value={itemReservationForm.itemId}
+                      onChange={(e) => setItemReservationForm({ ...itemReservationForm, itemId: e.target.value })}
+                      required
+                    >
+                      <option value="">-- Choose an item --</option>
+                      {availableItems.map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {item.name} ({item.category}) - Available:{" "}
+                          {item.id === Number(itemReservationForm.itemId) &&
+                            timeSelected &&
+                            currentAvailability !== null
+                            ? currentAvailability
+                            : item.quantity}
+                        </option>
                       ))}
-                  </select>
-                </label>
+                    </select>
+                  </label>
 
-                <br />
-                
-                <label>
-                  Quantity:
-                  <input
-                    className="quantityInput"
-                    type="number"
-                    min="1"
-                    placeholder="Enter quantity"
-                    value={itemReservationForm.quantity}
-                    onChange={(e) => setItemReservationForm({...itemReservationForm, quantity: e.target.value})}
-                    required
-                  />
-                </label>
+                  <br />
 
-                <br />
+                  <label>
+                    Quantity:
+                    <input
+                      className="quantityInput"
+                      type="number"
+                      min="1"
+                      placeholder="Enter quantity"
+                      value={itemReservationForm.quantity}
+                      onChange={(e) => setItemReservationForm({ ...itemReservationForm, quantity: e.target.value })}
+                      required
+                    />
+                  </label>
 
-                <label>
-                  Start Date:
-                  <DatePicker
-                    onChange={(value: Value) => setItemStartDate(Array.isArray(value) ? value[0] : value)}
-                    value={itemStartDate}
-                    minDate={new Date()}
-                    required
-                  />
-                </label>
+                  <br />
 
-                <br />
+                  <label>
+                    Start Date:
+                    <DatePicker
+                      onChange={(value: Value) => setItemStartDate(Array.isArray(value) ? value[0] : value)}
+                      value={itemStartDate}
+                      minDate={new Date()}
+                      required
+                    />
+                  </label>
 
-                <label>
-                  Start Time:
-                  <select
-                    className="timeInput"
-                    value={itemStartTime}
-                    onChange={(e) => setItemStartTime(e.target.value)}
-                    required
-                    disabled={availableItemStartTimes.length === 0}
-                  >
-                    <option value="">-- Select start time --</option>
-                    {availableItemStartTimes.map((time) => (
-                      <option key={time} value={time}>
-                        {formatTimeLabel(time)}
-                      </option>
+                  <br />
+
+                  <label>
+                    Start Time:
+                    <select
+                      className="timeInput"
+                      value={itemStartTime}
+                      onChange={(e) => setItemStartTime(e.target.value)}
+                      required
+                      disabled={availableItemStartTimes.length === 0}
+                    >
+                      <option value="">-- Select start time --</option>
+                      {availableItemStartTimes.map((time) => (
+                        <option key={time} value={time}>
+                          {formatTimeLabel(time)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <br />
+
+                  <label>
+                    End Date:
+                    <DatePicker
+                      onChange={(value: Value) => setItemEndDate(Array.isArray(value) ? value[0] : value)}
+                      value={itemEndDate}
+                      minDate={itemStartDate || new Date()}
+                      required
+                    />
+                  </label>
+
+                  <br />
+
+                  <label>
+                    End Time:
+                    <select
+                      className="timeInput"
+                      value={itemEndTime}
+                      onChange={(e) => setItemEndTime(e.target.value)}
+                      required
+                      disabled={availableItemEndTimes.length === 0}
+                    >
+                      <option value="">-- Select end time --</option>
+                      {availableItemEndTimes.map((time) => (
+                        <option key={time} value={time}>
+                          {formatTimeLabel(time)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </>
+              ) : (
+                <>
+                  <label>
+                    Select Room:
+                    <select
+                      className="itemInput"
+                      value={roomReservationForm.cabinId}
+                      onChange={(e) => setRoomReservationForm({ ...roomReservationForm, cabinId: e.target.value })}
+                      required
+                    >
+                      <option value="">-- Choose a room --</option>
+                      {availableRooms.map((room) => (
+                        <option key={room.id} value={room.id}>
+                          Cabin {room.cabin_number} - {room.type} - Deck {room.deck} - Capacity: {room.capacity}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <br />
+
+                  <label>
+                    Check-In Date:
+                    <DatePicker
+                      onChange={(value: Value) => setRoomStartDate(Array.isArray(value) ? value[0] : value)}
+                      value={roomStartDate}
+                      minDate={new Date()}
+                      required
+                    />
+                  </label>
+
+                  <br />
+
+                  <label>
+                    Check-In Time:
+                    <select
+                      className="timeInput"
+                      value={roomStartTime}
+                      onChange={(e) => setRoomStartTime(e.target.value)}
+                      required
+                      disabled={availableRoomStartTimes.length === 0}
+                    >
+                      <option value="">-- Select check-in time --</option>
+                      {availableRoomStartTimes.map((time) => (
+                        <option key={time} value={time}>
+                          {formatTimeLabel(time)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <br />
+
+                  <label>
+                    Check-Out Date:
+                    <DatePicker
+                      onChange={(value: Value) => setRoomEndDate(Array.isArray(value) ? value[0] : value)}
+                      value={roomEndDate}
+                      minDate={roomStartDate || new Date()}
+                      required
+                    />
+                  </label>
+
+                  <br />
+
+                  <label>
+                    Check-Out Time:
+                    <select
+                      className="timeInput"
+                      value={roomEndTime}
+                      onChange={(e) => setRoomEndTime(e.target.value)}
+                      required
+                      disabled={availableRoomEndTimes.length === 0}
+                    >
+                      <option value="">-- Select check-out time --</option>
+                      {availableRoomEndTimes.map((time) => (
+                        <option key={time} value={time}>
+                          {formatTimeLabel(time)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <br />
+
+                  {/* Additional Guests Section */}
+                  <div className="additionalGuestsSection">
+                    <h4>Additional Guests</h4>
+                    <p className="additionalGuestsInfo">
+                      {roomReservationForm.cabinId && availableRooms.find(r => String(r.id) === String(roomReservationForm.cabinId))
+                        ? `Room capacity: ${availableRooms.find(r => String(r.id) === String(roomReservationForm.cabinId)).capacity} (You can add ${availableRooms.find(r => String(r.id) === String(roomReservationForm.cabinId)).capacity - 1} more guest${availableRooms.find(r => String(r.id) === String(roomReservationForm.cabinId)).capacity - 1 !== 1 ? 's' : ''})`
+                        : "Select a room to add additional guests"}
+                    </p>
+
+                    {additionalGuestEmails.map((email, index) => (
+                      <div key={index} className="guestEmailRow">
+                        <label>
+                          Guest {index + 1} Email:
+                          <input
+                            type="email"
+                            className="quantityInput"
+                            placeholder="Enter guest email"
+                            value={email}
+                            onChange={(e) => handleUpdateGuestEmail(index, e.target.value)}
+                          />
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveGuestEmail(index)}
+                          className="removeGuestButton"
+                        >
+                          Remove
+                        </button>
+                      </div>
                     ))}
-                  </select>
-                </label>
 
-                <br />
+                    <button
+                      type="button"
+                      onClick={handleAddGuestEmail}
+                      className="addGuestButton"
+                    >
+                      + Add Guest Email
+                    </button>
 
-                <label>
-                  End Date:
-                  <DatePicker
-                    onChange={(value: Value) => setItemEndDate(Array.isArray(value) ? value[0] : value)}
-                    value={itemEndDate}
-                    minDate={itemStartDate || new Date()}
-                    required
-                  />
-                </label>
-
-                <br />
-
-                <label>
-                  End Time:
-                  <select
-                    className="timeInput"
-                    value={itemEndTime}
-                    onChange={(e) => setItemEndTime(e.target.value)}
-                    required
-                    disabled={availableItemEndTimes.length === 0}
-                  >
-                    <option value="">-- Select end time --</option>
-                    {availableItemEndTimes.map((time) => (
-                      <option key={time} value={time}>
-                        {formatTimeLabel(time)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </>
-            ) : (
-              <>
-                <label>
-                  Select Room:
-                  <select
-                    className="itemInput"
-                    value={roomReservationForm.cabinId}
-                    onChange={(e) => setRoomReservationForm({...roomReservationForm, cabinId: e.target.value})}
-                    required
-                  >
-                    <option value="">-- Choose a room --</option>
-                    {availableRooms.map((room) => (
-                      <option key={room.id} value={room.id}>
-                        Cabin {room.cabin_number} - {room.type} - Deck {room.deck} - Capacity: {room.capacity}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <br />
-
-                <label>
-                  Check-In Date:
-                  <DatePicker
-                    onChange={(value: Value) => setRoomStartDate(Array.isArray(value) ? value[0] : value)}
-                    value={roomStartDate}
-                    minDate={new Date()}
-                    required
-                  />
-                </label>
-
-                <br />
-
-                <label>
-                  Check-In Time:
-                  <select
-                    className="timeInput"
-                    value={roomStartTime}
-                    onChange={(e) => setRoomStartTime(e.target.value)}
-                    required
-                    disabled={availableRoomStartTimes.length === 0}
-                  >
-                    <option value="">-- Select check-in time --</option>
-                    {availableRoomStartTimes.map((time) => (
-                      <option key={time} value={time}>
-                        {formatTimeLabel(time)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <br />
-
-                <label>
-                  Check-Out Date:
-                  <DatePicker
-                    onChange={(value: Value) => setRoomEndDate(Array.isArray(value) ? value[0] : value)}
-                    value={roomEndDate}
-                    minDate={roomStartDate || new Date()}
-                    required
-                  />
-                </label>
-
-                <br />
-
-                <label>
-                  Check-Out Time:
-                  <select
-                    className="timeInput"
-                    value={roomEndTime}
-                    onChange={(e) => setRoomEndTime(e.target.value)}
-                    required
-                    disabled={availableRoomEndTimes.length === 0}
-                  >
-                    <option value="">-- Select check-out time --</option>
-                    {availableRoomEndTimes.map((time) => (
-                      <option key={time} value={time}>
-                        {formatTimeLabel(time)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <br />
-
-                {/* Additional Guests Section */}
-                <div className="additionalGuestsSection">
-                  <h4>Additional Guests</h4>
-                  <p className="additionalGuestsInfo">
-                    {roomReservationForm.cabinId && availableRooms.find(r => String(r.id) === String(roomReservationForm.cabinId))
-                      ? `Room capacity: ${availableRooms.find(r => String(r.id) === String(roomReservationForm.cabinId)).capacity} (You can add ${availableRooms.find(r => String(r.id) === String(roomReservationForm.cabinId)).capacity - 1} more guest${availableRooms.find(r => String(r.id) === String(roomReservationForm.cabinId)).capacity - 1 !== 1 ? 's' : ''})`
-                      : "Select a room to add additional guests"}
-                  </p>
-                  
-                  {additionalGuestEmails.map((email, index) => (
-                    <div key={index} className="guestEmailRow">
-                      <label>
-                        Guest {index + 1} Email:
-                        <input
-                          type="email"
-                          className="quantityInput"
-                          placeholder="Enter guest email"
-                          value={email}
-                          onChange={(e) => handleUpdateGuestEmail(index, e.target.value)}
-                        />
-                      </label>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveGuestEmail(index)}
-                        className="removeGuestButton"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  ))}
-                  
-                  <button
-                    type="button"
-                    onClick={handleAddGuestEmail}
-                    className="addGuestButton"
-                  >
-                    + Add Guest Email
-                  </button>
-                  
-                  {guestEmailError && (
-                    <div className="guestEmailError">
-                      {guestEmailError}
-                    </div>
-                  )}
-                </div>
-              </>
+                    {guestEmailError && (
+                      <div className="guestEmailError">
+                        {guestEmailError}
+                      </div>
+                    )}
+                  </div>
+                </>
               )}
 
               {formError && (

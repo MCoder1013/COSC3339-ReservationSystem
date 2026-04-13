@@ -314,7 +314,7 @@ router.post('/login', async (req: Request, res: Response) => {
     const shift = user.user_role === 'staff'
       ? await database.getStaffShiftByUserId(user.id)
       : null;
-    const isStaffAdmin = user.user_role === 'staff' && staffRole?.trim().toLowerCase() === 'admin';
+    const isStaffAdmin = user.user_role === 'admin';
 
     const token = jwt.sign({ id: user.id }, jwtSecret);
     res
@@ -358,7 +358,7 @@ router.get('/me', authRequired, async (req: Request, res: Response) => {
     const shift = user.user_role === 'staff'
       ? (syncedShift ?? await database.getStaffShiftByUserId(user.id))
       : null;
-    const isStaffAdmin = user.user_role === 'staff' && staffRole?.trim().toLowerCase() === 'admin';
+    const isStaffAdmin = user.user_role === 'admin';
 
     res.json({
       id: user.id,
