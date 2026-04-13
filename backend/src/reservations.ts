@@ -46,6 +46,8 @@ async function checkResourceTime(r: ReservationCheck, sql: TransactionSql<{}>) {
             AND cruise_id IS NOT DISTINCT FROM ${r.cruise_id}
             AND start_time < ${r.end_time}
             AND end_time > ${r.start_time}
+            AND status != 'Cancelled'
+            
     `;
 
     if (rows.length > 0) {
@@ -61,6 +63,7 @@ async function checkCabinTime(r: ReservationCheck, sql: TransactionSql<{}>) {
             AND cruise_id IS NOT DISTINCT FROM ${r.cruise_id}
             AND start_time < ${r.end_time}
             AND end_time > ${r.start_time}
+            AND status != 'Cancelled'
     `;
 
     if (rows.length > 0) {
@@ -76,6 +79,7 @@ async function checkStaffTime(r: ReservationCheck, sql: TransactionSql<{}>) {
             AND cruise_id IS NOT DISTINCT FROM ${r.cruise_id}
             AND start_time < ${r.end_time}
             AND end_time > ${r.start_time}
+            AND status != 'Cancelled'
     `;
 
     if (rows.length > 0) {
@@ -381,7 +385,8 @@ export async function deleteReservation(id:number, user_id: number, cancelleatio
     const newStatus: ReservationStatus = 'Cancelled';
 
     return await sql.begin(async sql => {
-    await sql`UPDATE reservations SET cancelled_at = NOW(), status = ${newStatus}, cancelleation_reason = "", cancelled_by_role "", cancelled_by_user_id = ${user_id} WHERE id = ${id}`;
+    await sql`UPDATE reservations SET cancelled_at = NOW(), status = ${newStatus}, cancelleation_reason = ${cancelleation_reason}, 
+    cancelled_by_role = ${cancelled_by_role}, cancelled_by_user_id = ${user_id} WHERE id = ${id}`;
     })
 }
 
@@ -478,7 +483,7 @@ export async function getUserIdGivenReservationId(id: number) {
 
     const rows = await sql`SELECT user_id FROM reservations WHERE id = ${id}`;
 
-    if(rows.length == 0) {
+    if(rows.length === 0) {
         throw new Error("There is no reservation with that ID"); 
     }
 
