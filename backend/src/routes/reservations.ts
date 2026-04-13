@@ -5,7 +5,7 @@ import {
   getUserRoomCruises
 } from '../reservations.js';
 import { getCurrentStaffAssignedCruises, getUserById, validateGuestEmails } from '../users.js';
-import { authRequired, } from './index.js';
+import { authRequired, isStaff, } from './index.js';
 import { sql } from '../database.js';
 
 
@@ -215,7 +215,7 @@ router.get('/reservations/eligible-cruises', authRequired, async (req: Request, 
   try {
     const user = req.user!;
 
-    if (user.user_role === 'staff' || user.user_role === 'admin') {
+    if (isStaff(user)) {
       const cruises = await sql`
         SELECT role
         FROM staff
@@ -223,7 +223,7 @@ router.get('/reservations/eligible-cruises', authRequired, async (req: Request, 
         LIMIT 1
       `;
 
-      const isAdmin = cruises[0]?.role?.trim().toLowerCase() === 'admin';
+      const isAdmin = user.user_role === 'admin';
 
       if (isAdmin) {
         const allCruises = await sql`

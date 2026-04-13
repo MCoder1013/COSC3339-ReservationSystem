@@ -20,7 +20,7 @@ export default function ReservationTable() {
 
   const [editData, setEditData] = useState<any>({});
 
-  const categories = ["Items", "Rooms", "Packages"] as const;
+  const categories = ["Rooms", "Items", "Packages"] as const;
 
   const [activeCategory, setActiveCategory] =
     useState<(typeof categories)[number]>("Items");

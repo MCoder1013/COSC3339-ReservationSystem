@@ -139,11 +139,11 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
   // Filter reservations by time period
   const filterByTimePeriod = <T extends { start_time: string; end_time: string }>(reservations: T[]): T[] => {
     const now = new Date();
-    
+
     return reservations.filter((res) => {
       const startTime = new Date(res.start_time);
       const endTime = new Date(res.end_time);
-      
+
       if (timePeriod === "Past") {
         // Past: end time is before now
         return endTime < now;
@@ -270,20 +270,20 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
           {activeTab === "reservations" && (
             <div className="reservationsTab">
               <h3>My Reservations</h3>
-              
+
               {/* Category tabs for Items, Rooms, Packages */}
               <div className="categoryTabs">
-                <button
-                  className={`categoryBtn ${reservationCategory === "Items" ? "active" : ""}`}
-                  onClick={() => setReservationCategory("Items")}
-                >
-                  Items
-                </button>
                 <button
                   className={`categoryBtn ${reservationCategory === "Rooms" ? "active" : ""}`}
                   onClick={() => setReservationCategory("Rooms")}
                 >
                   Rooms
+                </button>
+                <button
+                  className={`categoryBtn ${reservationCategory === "Items" ? "active" : ""}`}
+                  onClick={() => setReservationCategory("Items")}
+                >
+                  Items
                 </button>
                 <button
                   className={`categoryBtn ${reservationCategory === "Packages" ? "active" : ""}`}
