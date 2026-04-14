@@ -21,6 +21,7 @@ interface NewReservation {
     start_time: string
     end_time: string
     quantity_reserved: number
+    cancellation_reason: string
 }
 
 interface StaffAssignment {
@@ -73,6 +74,26 @@ async function sendEmailNotificationToStaff(assignment: StaffAssignment) {
     }
 }
 
+export async function sendEmailToUserForCancellation(userEmail: string, cancellation_reason: string | null, id: number) {
+        try {
+        if (id != null) {
+            await transporter.sendMail({
+                from: process.env.EMAIL,
+                to: userEmail,
+                subject: "Cancelled Reseravation",
+                html: `
+                <h2>Cancelled Reservation</h2>
+                <p>Sorry, we had to cancel your reservation for <strong>${await getItemFromID(id)}</strong>
+                it was cancelled becasue ${cancellation_reason}.</p>
+                `
+            });
+        }
+    } catch (error) {
+        console.error("error sending email notification", error);
+        throw error;
+    }
+}
+
 
 // upcoming reservations for user notifications
 async function checkUpcomingReservations(minsAhead: number): Promise<(NewReservation & { email: string })[]> {
@@ -84,6 +105,7 @@ async function checkUpcomingReservations(minsAhead: number): Promise<(NewReserva
           AND r.start_time <= NOW() + (${minsAhead} * interval '1 minute')
     ` as any[];
 }
+
 // upcoming shifts fo r staff - joins reservation staff, resrvations, users to give staff_id, staffemail from users, name, and the reservation times
 async function getUpcomingReservationAssignments(minsAhead: number): Promise<StaffAssignment[]> {
     return await sql`
@@ -100,6 +122,7 @@ async function getUpcomingReservationAssignments(minsAhead: number): Promise<Sta
           AND r.start_time <= NOW() + (${minsAhead} * interval '1 minute')
     ` as StaffAssignment[];
 }
+
 
 // same as before but with packages
 async function getUpcomingPackageAssignments(minsAhead: number): Promise<StaffAssignment[]> {
