@@ -434,7 +434,7 @@ export async function deleteReservation(id: number, cancelledByUserId?: number, 
 
     try {
         const email = await getEmailFromReservationId(id);
-        await sendEmailToUserForCancellation(email, cancellationReason, id); 
+        await sendEmailToUserForCancellation(email, cancellationReason ?? null, id); 
     } catch(error) {
         console.log("error sending email");
         throw(error);
