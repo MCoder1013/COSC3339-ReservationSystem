@@ -203,7 +203,7 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
       const formData = new FormData();
       formData.append("biography", bio);
 
-      if (userProfile?.role === "staff") {
+      if (userProfile?.role === "staff" || userProfile?.role === "admin") {
         formData.append("shift", selectedShift);
       }
 
@@ -503,7 +503,7 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
                     />
                   </div>
 
-                  {userProfile.role === "staff" && (
+                  {(userProfile.role === "staff" || userProfile.role === "admin") && (
                     <div className="formGroup">
                       <label>Shift:</label>
                       <select
