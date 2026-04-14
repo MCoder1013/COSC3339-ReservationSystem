@@ -1,6 +1,7 @@
 import postgres, { Row, RowList, TransactionSql } from 'postgres';
 import { sql } from './database.js';
 import { checkResourceCount } from './resources.js';
+import { sendEmailToUserForCancellation } from "./notifications.js"
 
 type ReservationStatus = 'Pending' | 'Confirmed' | 'Cancelled';
 
@@ -418,7 +419,7 @@ export async function getReservationsByUser(userId: number): Promise<RowList<Row
 }
 
 export async function deleteReservation(id: number, cancelledByUserId?: number, cancelledByRole?: string, cancellationReason?: string): Promise<void> {
-    return await sql.begin(async sql => {
+    await sql.begin(async sql => {
         await sql`
             UPDATE reservations
             SET 
@@ -430,6 +431,15 @@ export async function deleteReservation(id: number, cancelledByUserId?: number, 
             WHERE id = ${id}
         `;
     })
+
+    try {
+        const email = await getEmailFromReservationId(id);
+        await sendEmailToUserForCancellation(email, cancellationReason, id); 
+    } catch(error) {
+        console.log("error sending email");
+        throw(error);
+    }
+
 }
 
 // Get all item reservations for a specific user
@@ -605,4 +615,19 @@ export async function getStaffEligibleCruises(userId: number) {
     `;
 
     return rows;
+}
+
+export async function getEmailFromReservationId(id: number): Promise<string> {
+    const rows = await sql`
+        SELECT u.email
+        FROM reservations r
+        JOIN users u ON r.user_id = u.id
+        WHERE r.id = ${id}
+    `;
+
+    if (rows.length === 0) {
+        throw new Error("No reservation found with that ID");
+    }
+
+    return rows[0].email;
 }
