@@ -29,6 +29,7 @@ interface ItemReservation {
   email: string;
   start_time: string;
   end_time: string;
+  status?: string;
 }
 
 interface RoomReservation {
@@ -37,6 +38,7 @@ interface RoomReservation {
   email: string;
   start_time: string;
   end_time: string;
+  status?: string;
 }
 
 interface PackageReservation {
@@ -50,18 +52,26 @@ interface PackageReservation {
   staff_names: string;
 }
 
-
+type CancelledReservation = {
+  id: number;
+  type: "Item" | "Room";
+  name: string;
+  email: string;
+  start_time: string;
+  end_time: string;
+};
 
 export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const navigate = useNavigate();
   const { user, logout, updateUser } = useAuth();
   const [activeTab, setActiveTab] = useState<"reservations" | "editinfo">("reservations");
-  const [reservationCategory, setReservationCategory] = useState<"Items" | "Rooms" | "Packages">("Items");
+  const [reservationCategory, setReservationCategory] = useState<"Items" | "Rooms" | "Packages" | "Cancelled">("Items");
   const [timePeriod, setTimePeriod] = useState<"Past" | "Current" | "Future">("Future");
   const [userProfile, setUserProfile] = useState<UserProfile>();
   const [itemsReservations, setItemsReservations] = useState<ItemReservation[]>([]);
   const [roomsReservations, setRoomsReservations] = useState<RoomReservation[]>([]);
   const [packagesReservations, setPackagesReservations] = useState<PackageReservation[]>([]);
+  const [cancelledReservations, setCancelledReservations] = useState<CancelledReservation[]>([]);
   const [bio, setBio] = useState("");
   const [iconFile, setIconFile] = useState<File | null>(null);
   const [iconPreview, setIconPreview] = useState("");
@@ -77,9 +87,7 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
         const token = localStorage.getItem("token");
 
         const profileRes = await fetch("/api/auth/me", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { Authorization: `Bearer ${token}` },
         });
 
         if (!profileRes.ok) throw new Error("Failed to fetch profile");
@@ -92,27 +100,50 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
         setShiftConflicts([]);
 
         const itemsRes = await fetch("api/reservations/items", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { Authorization: `Bearer ${token}` },
         });
-
-        const itemsData = await itemsRes.json();
-        setItemsReservations(itemsData);
+        const itemsData: ItemReservation[] = await itemsRes.json();
 
         const roomsRes = await fetch("api/reservations/rooms", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { Authorization: `Bearer ${token}` },
         });
+        const roomsData: RoomReservation[] = await roomsRes.json();
 
-        const roomsData = await roomsRes.json();
-        setRoomsReservations(roomsData);
+        // Split active vs cancelled
+        setItemsReservations(itemsData.filter((r) => r.status !== "Cancelled"));
+        setRoomsReservations(roomsData.filter((r) => r.status !== "Cancelled"));
+
+        // Combine cancelled from both into one list
+        const cancelledItems: CancelledReservation[] = itemsData
+          .filter((r) => r.status === "Cancelled")
+          .map((r) => ({
+            id: r.id,
+            type: "Item",
+            name: r.resource_name,
+            email: r.email,
+            start_time: r.start_time,
+            end_time: r.end_time,
+          }));
+
+        const cancelledRooms: CancelledReservation[] = roomsData
+          .filter((r) => r.status === "Cancelled")
+          .map((r) => ({
+            id: r.id,
+            type: "Room",
+            name: r.cabin_number,
+            email: r.email,
+            start_time: r.start_time,
+            end_time: r.end_time,
+          }));
+
+        setCancelledReservations(
+          [...cancelledItems, ...cancelledRooms].sort(
+            (a, b) => new Date(b.end_time).getTime() - new Date(a.end_time).getTime()
+          )
+        );
 
         const packagesRes = await fetch("api/packages/my-events", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { Authorization: `Bearer ${token}` },
         });
 
         if (packagesRes.ok) {
@@ -130,13 +161,11 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
     fetchData();
   }, [isOpen]);
 
-  // Function to format date and time
   const formatDateTime = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString() + " " + date.toLocaleTimeString();
   };
 
-  // Filter reservations by time period
   const filterByTimePeriod = <T extends { start_time: string; end_time: string }>(reservations: T[]): T[] => {
     const now = new Date();
 
@@ -145,13 +174,10 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
       const endTime = new Date(res.end_time);
 
       if (timePeriod === "Past") {
-        // Past: end time is before now
         return endTime < now;
       } else if (timePeriod === "Current") {
-        // Current: now is between start and end time
         return startTime <= now && endTime >= now;
       } else {
-        // Future: start time is after now
         return startTime > now;
       }
     });
@@ -187,9 +213,7 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
 
       const response = await fetch("api/auth/update-profile", {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
         body: formData,
       });
 
@@ -271,7 +295,6 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
             <div className="reservationsTab">
               <h3>My Reservations</h3>
 
-              {/* Category tabs for Items, Rooms, Packages */}
               <div className="categoryTabs">
                 <button
                   className={`categoryBtn ${reservationCategory === "Rooms" ? "active" : ""}`}
@@ -291,31 +314,38 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
                 >
                   Packages
                 </button>
-              </div>
-
-              {/* Time period tabs for Past, Current, Future */}
-              <div className="timePeriodTabs">
                 <button
-                  className={`timePeriodBtn ${timePeriod === "Past" ? "active" : ""}`}
-                  onClick={() => setTimePeriod("Past")}
+                  className={`categoryBtn ${reservationCategory === "Cancelled" ? "active" : ""}`}
+                  onClick={() => setReservationCategory("Cancelled")}
                 >
-                  Past
-                </button>
-                <button
-                  className={`timePeriodBtn ${timePeriod === "Current" ? "active" : ""}`}
-                  onClick={() => setTimePeriod("Current")}
-                >
-                  Current
-                </button>
-                <button
-                  className={`timePeriodBtn ${timePeriod === "Future" ? "active" : ""}`}
-                  onClick={() => setTimePeriod("Future")}
-                >
-                  Future
+                  Cancelled
                 </button>
               </div>
 
-              {/* Content for each category */}
+              {/* Time period tabs — hidden for Cancelled since they're already done */}
+              {reservationCategory !== "Cancelled" && (
+                <div className="timePeriodTabs">
+                  <button
+                    className={`timePeriodBtn ${timePeriod === "Past" ? "active" : ""}`}
+                    onClick={() => setTimePeriod("Past")}
+                  >
+                    Past
+                  </button>
+                  <button
+                    className={`timePeriodBtn ${timePeriod === "Current" ? "active" : ""}`}
+                    onClick={() => setTimePeriod("Current")}
+                  >
+                    Current
+                  </button>
+                  <button
+                    className={`timePeriodBtn ${timePeriod === "Future" ? "active" : ""}`}
+                    onClick={() => setTimePeriod("Future")}
+                  >
+                    Future
+                  </button>
+                </div>
+              )}
+
               {reservationCategory === "Items" && (
                 (() => {
                   const filteredItems = filterByTimePeriod(itemsReservations);
@@ -412,6 +442,37 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
                     </table>
                   );
                 })()
+              )}
+
+              {reservationCategory === "Cancelled" && (
+                cancelledReservations.length === 0 ? (
+                  <p className="noDataMessage">You have no cancelled reservations.</p>
+                ) : (
+                  <table className="reservationsTable">
+                    <thead>
+                      <tr>
+                        <th>Reservation ID</th>
+                        <th>Type</th>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Start</th>
+                        <th>End</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {cancelledReservations.map((res) => (
+                        <tr key={`${res.type}-${res.id}`}>
+                          <td>{res.id}</td>
+                          <td>{res.type}</td>
+                          <td>{res.name}</td>
+                          <td>{res.email}</td>
+                          <td>{formatDateTime(res.start_time)}</td>
+                          <td>{formatDateTime(res.end_time)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )
               )}
             </div>
           )}
