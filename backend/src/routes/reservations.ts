@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import {
   addReservation, deleteReservation, getAllReservationsWithDetails, getReservationsByUser,
   updateReservation, getUserRoomReservations, getUserItemReservations, addGuestsToReservation,
-  getUserRoomCruises, getUserIdGivenReservationId
+  getUserRoomCruises
 } from '../reservations.js';
 import { getCurrentStaffAssignedCruises, getUserById, validateGuestEmails } from '../users.js';
 import { authRequired, } from './index.js';
