@@ -225,7 +225,10 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
 
     } catch (err) {
       console.error(err);
-      setSaveMessage("Error updating profile");
+      const message = err instanceof Error && err.message
+        ? err.message
+        : "Error updating profile";
+      setSaveMessage(message);
     }
 
     setTimeout(() => setSaveMessage(""), 3000);

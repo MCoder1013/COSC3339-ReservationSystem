@@ -308,11 +308,16 @@ router.post('/login', async (req: Request, res: Response) => {
     }
     // If email exists and password matches, login is successful
 
+    let syncedShift: string | null = null;
+    if (user.user_role === 'staff') {
+      syncedShift = await syncStaffShiftForToday(user.id);
+    }
+
     const staffRole = user.user_role === 'staff'
       ? await database.getStaffRoleByUserId(user.id)
       : null;
     const shift = user.user_role === 'staff'
-      ? await database.getStaffShiftByUserId(user.id)
+      ? (syncedShift ?? await database.getStaffShiftByUserId(user.id))
       : null;
     const isStaffAdmin = user.user_role === 'admin';
 

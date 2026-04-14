@@ -210,14 +210,20 @@ async function validateSingleShiftPerDayAssignments(
 
     const existingAssignments = await tx`
         SELECT
-            pes.staff_id,
+            assignment.staff_id,
             e.id AS event_id,
             e.name AS event_name,
             e.start_time,
             e.end_time
-        FROM package_event_staff pes
-        JOIN package_events e ON e.id = pes.event_id
-        WHERE pes.staff_id IN ${tx(staffIds)}
+        FROM (
+            SELECT pes.staff_id, pes.event_id
+            FROM package_event_staff pes
+            UNION
+            SELECT e.created_by AS staff_id, e.id AS event_id
+            FROM package_events e
+        ) assignment
+        JOIN package_events e ON e.id = assignment.event_id
+        WHERE assignment.staff_id IN ${tx(staffIds)}
           AND e.status <> 'Cancelled'
           AND (${excludeEventId ?? null}::INT IS NULL OR e.id <> ${excludeEventId ?? null})
         ORDER BY e.start_time ASC
