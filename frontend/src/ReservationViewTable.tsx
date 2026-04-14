@@ -32,6 +32,11 @@ export default function ReservationTable() {
 
   const [loading, setLoading] = useState(true);
 
+  // Cancellation modal state
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelReservationId, setCancelReservationId] = useState<number | null>(null);
+  const [cancelReason, setCancelReason] = useState('');
+
   // Function to format date and time
   const formatDateTime = (dateString: string) => {
     const date = new Date(dateString);
@@ -106,43 +111,82 @@ export default function ReservationTable() {
 
   const displayedReservations = getDisplayedReservations();
 
-  const handleDeleteReservation = async (reservationId: number) => {
+  const validateCancellationReason = (value: string) => {
+    const reason = value.trim();
+    if (reason.length < 10) {
+      return 'Please enter at least 10 characters for the cancellation reason.';
+    }
+
+    if (reason.length > 500) {
+      return 'Cancellation reason must be 500 characters or less.';
+    }
+
+    const safeTextPattern = /^[A-Za-z0-9 ,.!?'"()\-:\n\r]+$/;
+    if (!safeTextPattern.test(reason)) {
+      return 'Use plain text only (letters, numbers, spaces, and common punctuation).';
+    }
+
+    return null;
+  };
+
+  const openCancelModal = (reservationId: number) => {
+    setCancelReservationId(reservationId);
+    setCancelReason('');
+    setShowCancelModal(true);
+  };
+
+  const closeCancelModal = () => {
+    setShowCancelModal(false);
+    setCancelReservationId(null);
+    setCancelReason('');
+  };
+
+  const cancelReservation = async () => {
+    if (cancelReservationId === null) return;
+
+    setFormError('');
+
+    const validationError = validateCancellationReason(cancelReason);
+    if (validationError) {
+      setFormError(validationError);
+      return;
+    }
+
     try {
-      console.log("Deleting reservation:", reservationId);
-      
-      const response = await fetch(`${API_URL}/api/reservations/${reservationId}`, {
-        method: "DELETE",
-        credentials: "include",
+      const response = await fetch(`${API_URL}/api/reservations/${cancelReservationId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ reason: cancelReason.trim() }),
       });
 
-      if (response.ok) {
-        await loadReservations();
-        setFormError("");
-        return;
-      }
-
-      let errorMessage = `Failed to delete reservation (Status: ${response.status})`;
-      try {
-        const errorData = await response.json();
-        if (errorData.message) {
-          errorMessage = errorData.message;
-        } else if (errorData.error) {
-          errorMessage = errorData.error;
+      if (!response.ok) {
+        let errorMessage = `Failed to cancel reservation (Status: ${response.status})`;
+        try {
+          const errorData = await response.json();
+          if (errorData.message) {
+            errorMessage = errorData.message;
+          } else if (errorData.error) {
+            errorMessage = errorData.error;
+          }
+        } catch (jsonError) {
+          console.log(jsonError);
         }
-      } catch (jsonError) {
-        console.log(jsonError);
+        throw new Error(errorMessage);
       }
 
-      setFormError(errorMessage);
-      
       await loadReservations();
-      
-    } catch (error) {
-      console.error("Exception during delete:", error);
-      setFormError("Failed to delete reservation. Please try again.");
-      
-      await loadReservations();
+      closeCancelModal();
+    } catch (err: any) {
+      console.error(err);
+      setFormError(err.message || 'Could not cancel this reservation right now.');
     }
+  };
+
+  const handleDeleteReservation = (reservationId: number) => {
+    openCancelModal(reservationId);
   };
 
   return (
@@ -288,6 +332,49 @@ export default function ReservationTable() {
             </tbody>
           </table>
         )}
+
+      {/* Cancellation modal */}
+      {showCancelModal && (
+        <div className="modalOverlay">
+          <div className="modal">
+            <div className="modalHeader">
+              <h3 style={{ margin: 0 }}>Cancel Reservation</h3>
+              <button className="modalCloseButton" onClick={closeCancelModal} aria-label="Close cancel reservation dialog">
+                x
+              </button>
+            </div>
+
+            <p style={{ marginBottom: '8px' }}>
+              Enter a cancellation reason. This will be recorded with the cancellation.
+            </p>
+
+            <label htmlFor="cancel-reason-input" style={{ display: 'block', marginBottom: '6px' }}>
+              Reason
+            </label>
+            <textarea
+              id="cancel-reason-input"
+              className="itemInput"
+              style={{ width: '100%', minHeight: '120px', resize: 'vertical' }}
+              maxLength={500}
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+              placeholder="Example: Guest requested cancellation due to schedule change."
+            />
+            <p style={{ marginTop: '6px', marginBottom: '0', fontSize: '0.9rem' }}>
+              {cancelReason.trim().length}/500 characters
+            </p>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '14px' }}>
+              <button type="button" className="cancelButton" onClick={closeCancelModal}>
+                Keep Reservation
+              </button>
+              <button type="button" className="submitButton" onClick={cancelReservation}>
+                Submit Cancellation
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       </main>
 
       <footer className="footer">
