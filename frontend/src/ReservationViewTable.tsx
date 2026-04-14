@@ -11,7 +11,7 @@ export default function ReservationTable() {
   const [formError, setFormError] = useState<string>("");
 
   // tabs
-  const categories = ["Items", "Rooms", "Packages"] as const;
+  const categories = ["Items", "Rooms", "Packages", "Cancelled"] as const;
   const itemSubTabs = ["Individual", "Event"] as const;
 
   // current selected tab
@@ -24,10 +24,12 @@ export default function ReservationTable() {
     Items: any[];
     Rooms: any[];
     Packages: any[];
+    Cancelled: any[];
   }>({
     Items: [],
     Rooms: [],
     Packages: [],
+    Cancelled: [],
   });
 
   const [loading, setLoading] = useState(true);
@@ -52,7 +54,8 @@ export default function ReservationTable() {
         .filter(
           (res: any) => 
             res.resource_id !== null && 
-            res.cabin_id === null
+            res.cabin_id === null &&
+            String(res.status ?? '').toLowerCase() !== 'cancelled'
         )
         .sort((a: any, b: any) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
 
@@ -60,9 +63,14 @@ export default function ReservationTable() {
         .filter(
           (res: any) => 
             res.cabin_id !== null && 
-            res.resource_id === null
+            res.resource_id === null &&
+            String(res.status ?? '').toLowerCase() !== 'cancelled'
         )
         .sort((a: any, b: any) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+
+      const cancelledReservations = allReservations
+        .filter((res: any) => String(res.status ?? '').toLowerCase() === 'cancelled')
+        .sort((a: any, b: any) => new Date(b.cancelled_at ?? b.end_time ?? 0).getTime() - new Date(a.cancelled_at ?? a.end_time ?? 0).getTime());
 
       const packageReservations: any[] = [];
 
@@ -70,6 +78,7 @@ export default function ReservationTable() {
         Items: itemReservations,
         Rooms: roomReservations,
         Packages: packageReservations,
+        Cancelled: cancelledReservations,
       });
     } catch (error) {
       console.error("Error fetching reservations:", error);
@@ -86,6 +95,12 @@ export default function ReservationTable() {
   useEffect(() => {
     if (activeCategory !== "Items") {
       setActiveItemSubTab("Individual");
+    }
+  }, [activeCategory]);
+
+  useEffect(() => {
+    if (activeCategory === "Cancelled") {
+      loadReservations();
     }
   }, [activeCategory]);
 
@@ -262,6 +277,16 @@ export default function ReservationTable() {
                   <th>Check-Out</th>
                   <th>Actions</th>
                 </tr>
+              ) : activeCategory === "Cancelled" ? (
+                <tr>
+                  <th>Reservation ID</th>
+                  <th>Type</th>
+                  <th>Resource</th>
+                  <th>User Email</th>
+                  <th>Start Date</th>
+                  <th>Cancelled At</th>
+                  <th>Reason</th>
+                </tr>
               ) : (
                 <tr>
                   <th>Reservation ID</th>
@@ -326,6 +351,20 @@ export default function ReservationTable() {
                         Delete
                       </button>
                     </td>
+                  </tr>
+                ) : activeCategory === "Cancelled" ? (
+                  <tr key={reservation.id}>
+                    <td>
+                      {reservation.event_id && reservation.resource_id
+                        ? `E${reservation.event_id}-R${reservation.resource_id}`
+                        : reservation.id}
+                    </td>
+                    <td>{reservation.event_id ? 'Event Item' : reservation.cabin_id ? 'Room' : reservation.resource_id ? 'Item' : 'Other'}</td>
+                    <td>{reservation.cabin_number ?? reservation.resource_name ?? 'N/A'}</td>
+                    <td>{reservation.email}</td>
+                    <td>{formatDateTime(reservation.start_time)}</td>
+                    <td>{reservation.cancelled_at ? formatDateTime(reservation.cancelled_at) : 'N/A'}</td>
+                    <td>{reservation.cancellation_reason ?? 'No reason provided'}</td>
                   </tr>
                 ) : null
               )}

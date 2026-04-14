@@ -300,6 +300,8 @@ export async function getAllReservationsWithDetails() {
                 SELECT
                     r.id,
                     'reservation' AS reservation_type,
+                    NULL::INT AS event_id,
+                    NULL::VARCHAR AS event_name,
                     r.user_id,
                     r.cabin_id,
                     r.resource_id,
@@ -308,6 +310,9 @@ export async function getAllReservationsWithDetails() {
                     r.start_time,
                     r.end_time,
                     r.status,
+                    r.cancelled_at,
+                    r.cancelled_by_role,
+                    r.cancellation_reason,
                     r.quantity_reserved,
                     u.first_name,
                     u.last_name,
@@ -330,6 +335,8 @@ export async function getAllReservationsWithDetails() {
                 SELECT
                     (-1 * (pe.id * 1000 + pei.resource_id))::INT AS id,
                     'package_event_item' AS reservation_type,
+                    pe.id AS event_id,
+                    pe.name AS event_name,
                     pe.created_by AS user_id,
                     NULL::INT AS cabin_id,
                     pei.resource_id,
@@ -337,7 +344,13 @@ export async function getAllReservationsWithDetails() {
                     pe.cruise_id,
                     pe.start_time,
                     pe.end_time,
-                    'Confirmed'::reservations_status AS status,
+                    CASE
+                        WHEN pe.status = 'Cancelled' THEN 'Cancelled'::reservations_status
+                        ELSE 'Confirmed'::reservations_status
+                    END AS status,
+                    pe.cancelled_at,
+                    pe.cancelled_by_role,
+                    pe.cancellation_reason,
                     pei.quantity_required AS quantity_reserved,
                     u.first_name,
                     u.last_name,
