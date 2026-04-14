@@ -387,6 +387,8 @@ export async function getReservationsByUser(userId: number): Promise<RowList<Row
             r.cabin_id,
             r.cruise_id,
             r.quantity_reserved,
+            r.status,
+            r.cancelled_at,
             u.email,
             cr.cruise_name,
             res.name AS resource_name,

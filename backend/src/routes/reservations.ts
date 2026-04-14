@@ -142,9 +142,9 @@ router.post("/reservations/:id", authRequired, async (req: Request, res: Respons
 // RES-DELETE - cancels reservation by ID with cancellation reason
 router.delete('/reservations/:id', authRequired, async (req: Request, res: Response) => {
   const id = Number(req.params.id);
-  const { reason } = req.body;
+  const  reason = req.body?.reason ?? "Regular user doesn't need reason";
   const userId = req.user?.id;
-  const userRole = req.user?.role ?? 'user';
+  const userRole = req.user?.user_role ?? 'user';
 
   if (isNaN(id)) {
     return res.status(400).json({ message: "Invalid ID format" });
