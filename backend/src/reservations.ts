@@ -34,6 +34,7 @@ interface Reservation {
     status: ReservationStatus
     created_at: string
     quantity_reserved: number
+    cancelled_at: string
 }
 
 // checks for reservations to make sure the timeslots are not currently already being used for: staff members, resources, and cabins
@@ -45,6 +46,8 @@ async function checkResourceTime(r: ReservationCheck, sql: TransactionSql<{}>) {
             AND cruise_id IS NOT DISTINCT FROM ${r.cruise_id}
             AND start_time < ${r.end_time}
             AND end_time > ${r.start_time}
+            AND status != 'Cancelled'
+            
     `;
 
     if (rows.length > 0) {
@@ -60,6 +63,7 @@ async function checkCabinTime(r: ReservationCheck, sql: TransactionSql<{}>) {
             AND cruise_id IS NOT DISTINCT FROM ${r.cruise_id}
             AND start_time < ${r.end_time}
             AND end_time > ${r.start_time}
+            AND status != 'Cancelled'
     `;
 
     if (rows.length > 0) {
@@ -75,6 +79,7 @@ async function checkStaffTime(r: ReservationCheck, sql: TransactionSql<{}>) {
             AND cruise_id IS NOT DISTINCT FROM ${r.cruise_id}
             AND start_time < ${r.end_time}
             AND end_time > ${r.start_time}
+            AND status != 'Cancelled'
     `;
 
     if (rows.length > 0) {
@@ -286,6 +291,7 @@ export async function pullReservations(): Promise<Reservation[]> {
         WHERE
             r.user_id = u.id AND
             r.end_time > NOW()
+            AND r.status != 'Cancelled'
         `;
 
     return rows as any[] as Reservation[];
@@ -445,7 +451,7 @@ export async function getUserItemReservations(userId: number) {
             JOIN users u ON r.user_id = u.id
             JOIN resources res ON r.resource_id = res.id
             LEFT JOIN cruises cr ON r.cruise_id = cr.id
-            WHERE r.user_id = ${userId} AND r.resource_id IS NOT NULL
+            WHERE r.user_id = ${userId} AND r.resource_id IS NOT NULL AND r.status != 'Cancelled'
             ORDER BY r.start_time DESC
         `;
         return rows;
