@@ -178,6 +178,33 @@ export async function sendPackageEventCancelledEmailToAttendees(eventId: number,
     }
 }
 
+// sensd email to staff when a event they are working is cancleeed 
+export async function sendPackageEventCancelledEmailToStaff(eventId: number, eventName: string, cancellationReason: string | null): Promise<void> {
+    const staffMembers = await sql`
+        SELECT u.email, CONCAT(u.first_name, ' ', u.last_name) AS name
+        FROM package_event_staff pes
+        JOIN users u ON pes.staff_id = u.id
+        WHERE pes.event_id = ${eventId}
+    `;
+
+    for (const staff of staffMembers) {
+        try {
+            await transporter.sendMail({
+                from: process.env.EMAIL,
+                to: staff.email,
+                subject: `Event Cancelled: ${eventName}`,
+                html: `
+                    <h2>Event Cancelled</h2>
+                    <p>Hi <strong>${staff.name}</strong>, the event <strong>${eventName}</strong> you were assigned to has been cancelled enjoy your free time.</p>
+                    ${cancellationReason ? `<p>Reason: ${cancellationReason}</p>` : ''}
+                `
+            });
+        } catch (error) {
+            console.error(`Error sending cancellation email to staff ${staff.email}:`, error);
+        }
+    }
+}
+
 // Notify users 10 minutes before their reservation
 cron.schedule('0 * * * * *', async () => {
     const upcoming = await checkUpcomingReservations(10);
