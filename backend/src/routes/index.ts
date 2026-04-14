@@ -50,8 +50,8 @@ export const staffRequired: RequestHandler = (req, res, next) => {
     if (!req.user) {
         throw res.status(401).json({ error: 'Not authenticated' });
     }
-    const role = req.user.user_role
-    if (role !== 'staff' && role !== 'admin') {
+
+    if (!isStaff(req.user)) {
         throw res.status(401).json({ error: 'This route is only accessible to staff and admins' });
     }
 
@@ -67,12 +67,9 @@ export const adminRequired: RequestHandler = async (req, res, next) => {
         return next();
     }
 
-    if (role === 'staff') {
-        const staffRole = await getStaffRoleByUserId(req.user.id);
-        if (staffRole?.trim().toLowerCase() === 'admin') {
-            return next();
-        }
-    }
-
     throw res.status(401).json({ error: 'This route is only accessible to admins' });
+}
+
+export function isStaff(user: User) {
+    return user.user_role === 'staff' || user.user_role === 'admin';
 }

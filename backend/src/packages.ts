@@ -424,10 +424,19 @@ export async function updatePackageEvent(eventId: number, input: PackageEventInp
     });
 }
 
-export async function cancelPackageEvent(eventId: number) {
+export async function cancelPackageEvent(
+    eventId: number,
+    cancelledByUserId: number,
+    cancelledByRole: 'staff' | 'admin',
+    cancellationReason: string
+) {
     await sql`
         UPDATE package_events
-        SET status = 'Cancelled'
+        SET status = 'Cancelled',
+            cancelled_by_user_id = ${cancelledByUserId},
+            cancelled_by_role = ${cancelledByRole},
+            cancellation_reason = ${cancellationReason},
+            cancelled_at = CURRENT_TIMESTAMP
         WHERE id = ${eventId}
     `;
 }

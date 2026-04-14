@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { isAdminUser, useAuth } from "./AuthContext";
+import { isAdmin, isStaff, useAuth } from "./AuthContext";
 import { useState } from "react";
 import UserProfileModal from "./UserProfileModal";
 import "./NavBar.css";
@@ -13,7 +13,6 @@ export default function NavBar({ shipName }: NavBarProps) {
   const location = useLocation();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const isHomePage = location.pathname === "/";
-  const canAccessAnalytics = isAdminUser(user);
 
   return (
     <>
@@ -26,10 +25,10 @@ export default function NavBar({ shipName }: NavBarProps) {
           <h1>{shipName}</h1>
           <nav className="navLinks">
             {!isHomePage && <Link className="navButton" to="/">Home</Link>}
-            {user?.role === "staff" && <Link className="navButton" to="/inventory">Inventory</Link>}
-            {user?.role === "staff" && <Link className="navButton" to="/reservations">Reservations</Link>}
-            {canAccessAnalytics && <Link className="navButton" to="/analytics">Analytics</Link>}
-            {user?.role === "staff" && <Link className="navButton" to="/view-users">Users</Link>}
+            {isStaff(user) && <Link className="navButton" to="/inventory">Inventory</Link>}
+            {isStaff(user) && <Link className="navButton" to="/reservations">Reservations</Link>}
+            {isAdmin(user) && <Link className="navButton" to="/analytics">Analytics</Link>}
+            {isStaff(user) && <Link className="navButton" to="/view-users">Users</Link>}
             {user ? (
               <button
                 className="userIconBtn"

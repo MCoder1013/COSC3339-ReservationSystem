@@ -20,7 +20,7 @@ export default function ReservationTable() {
 
   const [editData, setEditData] = useState<any>({});
 
-  const categories = ["Items", "Rooms", "Packages"] as const;
+  const categories = ["Rooms", "Items", "Packages", "Cancelled"] as const;
 
   const [activeCategory, setActiveCategory] =
     useState<(typeof categories)[number]>("Items");
@@ -28,9 +28,11 @@ export default function ReservationTable() {
   const [reservationData, setReservationData] = useState<{
     Items: any[];
     Rooms: any[];
+    Cancelled: any[];
   }>({
     Items: [],
     Rooms: [],
+    Cancelled: [],
   });
 
   const [loading, setLoading] = useState(true);
@@ -96,6 +98,7 @@ export default function ReservationTable() {
           (res: any) =>
             res.resource_id !== null &&
             res.cabin_id === null &&
+            res.status !== 'Cancelled' &&
             new Date(res.end_time) >= now
         )
         .sort(
@@ -109,6 +112,7 @@ export default function ReservationTable() {
           (res: any) =>
             res.cabin_id !== null &&
             res.resource_id === null &&
+            res.status !== 'Cancelled' &&
             new Date(res.end_time) >= now
         )
         .sort(
@@ -117,9 +121,18 @@ export default function ReservationTable() {
             new Date(b.start_time).getTime()
         );
 
+      const cancelledData = allData
+        .filter((res: any) => res.status === 'Cancelled')
+        .sort(
+          (a: any, b: any) =>
+            new Date(b.end_time).getTime() -
+            new Date(a.end_time).getTime()
+        );
+
       setReservationData({
         Items: itemsData,
         Rooms: roomsData,
+        Cancelled: cancelledData,
       });
 
       setIsAuthenticated(true);
@@ -282,6 +295,47 @@ export default function ReservationTable() {
 
         {activeCategory === "Packages" ? (
           <PackageEventsList onlyJoined />
+        ) : activeCategory === "Cancelled" ? (
+          loading ? (
+            <p>Loading...</p>
+          ) : reservationData.Cancelled.length === 0 ? (
+            <div style={{ textAlign: "center", padding: "40px" }}>
+              No cancelled reservations.
+            </div>
+          ) : (
+            <table className="inventoryTable">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Type</th>
+                  <th>Name</th>
+                  <th>Email</th>
+                  <th>Start</th>
+                  <th>Status</th>
+                  <th>Cancelled At</th>
+                </tr>
+              </thead>
+              <tbody>
+                {reservationData.Cancelled.map((reservation) => (
+                  <tr key={reservation.id}>
+                    <td>{reservation.id}</td>
+                    <td>
+                      {reservation.cabin_id
+                        ? "Room"
+                        : reservation.resource_id
+                        ? "Item"
+                        : "Other"}
+                    </td>
+                    <td>{reservation.cabin_number ?? reservation.resource_name ?? "N/A"}</td>
+                    <td>{reservation.email}</td>
+                    <td>{formatDateTime(reservation.start_time)}</td>
+                    <td>{reservation.status}</td>
+                    <td>{formatDateTime(reservation.cancelled_at)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )
         ) : loading ? (
           <p>Loading...</p>
         ) : reservationData[activeCategory].length === 0 ? (
@@ -415,9 +469,7 @@ export default function ReservationTable() {
 
                             <input
                               type="datetime-local"
-                              min={
-                                getNowForInput()
-                              }
+                              min={getNowForInput()}
                               step={1800}
                               value={editData.end_time}
                               onChange={(e) =>

@@ -206,6 +206,11 @@ router.post('/packages/events/:id/cancel', staffRequired, async (req: Request, r
         return res.status(400).json({ error: 'Please provide a valid event ID.' });
     }
 
+    const reason = validateCancellationReason(req.body?.reason);
+    if (!reason) {
+        return res.status(400).json({ error: 'Please provide a cancellation reason between 10 and 500 plain-text characters.' });
+    }
+
     try {
         const existing: any = await getPackageEventById(eventId);
         if (!existing) {
@@ -216,7 +221,8 @@ router.post('/packages/events/:id/cancel', staffRequired, async (req: Request, r
             return res.status(403).json({ error: 'You do not have permission to cancel this event.' });
         }
 
-        await cancelPackageEvent(eventId);
+        const cancelledByRole = req.user!.user_role === 'admin' ? 'admin' : 'staff';
+        await cancelPackageEvent(eventId, req.user!.id, cancelledByRole, reason);
         res.json({ message: 'Event cancelled successfully' });
     } catch (error: any) {
         console.error('Failed to cancel package event:', error);

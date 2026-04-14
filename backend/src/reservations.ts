@@ -13,9 +13,9 @@ interface ReservationCheck {
 
 interface NewReservation {
     user_id: number
-    cabin_id: number | null
-    resource_id: number | null
-    staff_id: number | null
+    cabin_id: number
+    resource_id: number
+    staff_id: number
     cruise_id: number | null
     start_time: string
     end_time: string
@@ -25,9 +25,9 @@ interface NewReservation {
 interface Reservation {
     id: number
     user_id: number
-    cabin_id: number | null
-    resource_id: number | null
-    staff_id: number | null
+    cabin_id: number
+    resource_id: number
+    staff_id: number
     cruise_id: number | null
     start_time: string
     end_time: string
@@ -93,10 +93,19 @@ async function checkUserCruiseOverlap(userId: number, r: NewReservation, sql: Tr
     }
 
     const rows = await sql`
-        SELECT existing.id
+        SELECT
+            existing.id,
+            existing.user_id,
+            u.email,
+            u.first_name,
+            u.last_name,
+            existing.cruise_id,
+            existing.start_time,
+            existing.end_time
         FROM reservations existing
         JOIN cruises existing_cruise ON existing_cruise.id = existing.cruise_id
         JOIN cruises requested_cruise ON requested_cruise.id = ${r.cruise_id}
+        LEFT JOIN users u ON u.id = existing.user_id
         WHERE
             (
                 existing.user_id = ${userId}
@@ -116,7 +125,20 @@ async function checkUserCruiseOverlap(userId: number, r: NewReservation, sql: Tr
     `;
 
     if (rows.length > 0) {
-        throw new Error('You already have a reservation on another cruise with overlapping dates.');
+        const conflict = rows[0];
+        const conflictLabel = conflict.email || [conflict.first_name, conflict.last_name].filter(Boolean).join(' ') || `user ${conflict.user_id}`;
+        console.warn('[ReservationConflict][CruiseOverlap]', {
+            checked_user_id: userId,
+            requested_cruise_id: r.cruise_id,
+            requested_start_time: r.start_time,
+            requested_end_time: r.end_time,
+            conflicting_reservation_id: conflict.id,
+            conflicting_user_id: conflict.user_id,
+            conflicting_cruise_id: conflict.cruise_id,
+            conflicting_start_time: conflict.start_time,
+            conflicting_end_time: conflict.end_time
+        });
+        throw new Error(`Guest ${conflictLabel} already has a reservation on another cruise with overlapping dates.`);
     }
 }
 
@@ -126,8 +148,18 @@ async function checkUserRoomOnCruise(userId: number, r: NewReservation, sql: Tra
     }
 
     const rows = await sql`
-        SELECT existing.id
+        SELECT
+            existing.id,
+            existing.user_id,
+            u.email,
+            u.first_name,
+            u.last_name,
+            existing.cabin_id,
+            existing.cruise_id,
+            existing.start_time,
+            existing.end_time
         FROM reservations existing
+        LEFT JOIN users u ON u.id = existing.user_id
         WHERE
             (
                 existing.user_id = ${userId}
@@ -141,11 +173,28 @@ async function checkUserRoomOnCruise(userId: number, r: NewReservation, sql: Tra
             AND existing.cabin_id IS NOT NULL
             AND existing.cruise_id = ${r.cruise_id}
             AND existing.status <> 'Cancelled'
+            AND existing.start_time < ${r.end_time}
+            AND existing.end_time > ${r.start_time}
         LIMIT 1
     `;
 
     if (rows.length > 0) {
-        throw new Error('A selected guest already has a room reservation on this cruise.');
+        const conflict = rows[0];
+        const conflictLabel = conflict.email || [conflict.first_name, conflict.last_name].filter(Boolean).join(' ') || `user ${conflict.user_id}`;
+        console.warn('[ReservationConflict][RoomOnCruise]', {
+            checked_user_id: userId,
+            requested_cruise_id: r.cruise_id,
+            requested_cabin_id: r.cabin_id,
+            requested_start_time: r.start_time,
+            requested_end_time: r.end_time,
+            conflicting_reservation_id: conflict.id,
+            conflicting_user_id: conflict.user_id,
+            conflicting_cruise_id: conflict.cruise_id,
+            conflicting_cabin_id: conflict.cabin_id,
+            conflicting_start_time: conflict.start_time,
+            conflicting_end_time: conflict.end_time
+        });
+        throw new Error(`ROOM_CONFLICT: Guest ${conflictLabel} already has a room reservation on this cruise. (reservation ${conflict.id})`);
     }
 }
 
@@ -163,47 +212,13 @@ async function checkCruiseIsUpcoming(cruiseId: number, sql: TransactionSql<{}>) 
     }
 }
 
-export async function getUserRoomCruises(userId: number) {
-    const rows = await sql`
-        SELECT DISTINCT
-            cr.id,
-            cr.cruise_name,
-            cr.ship_name,
-            cr.departure_date,
-            cr.return_date
-        FROM reservations r
-        JOIN cruises cr ON cr.id = r.cruise_id
-        WHERE
-            r.cabin_id IS NOT NULL
-            AND r.status <> 'Cancelled'
-            AND r.end_time > NOW()
-            AND cr.return_date >= CURRENT_DATE
-            AND (
-                r.user_id = ${userId}
-                OR EXISTS (
-                    SELECT 1
-                    FROM reservation_groups rg
-                    WHERE rg.reservation_id = r.id
-                        AND rg.user_id = ${userId}
-                )
-            )
-        ORDER BY cr.departure_date ASC
-    `;
-
-    return rows;
-}
-
 export async function addReservation(r: NewReservation, participantUserIds?: number[]): Promise<number> {
     return await sql.begin(async sql => {
         return await addReservationWithTransaction(sql, r, participantUserIds)
     });
 }
 
-export async function addReservationWithTransaction(
-    sql: postgres.TransactionSql<{}>,
-    r: NewReservation,
-    participantUserIds?: number[]
-): Promise<number> {
+export async function addReservationWithTransaction(sql: postgres.TransactionSql<{}>, r: NewReservation, participantUserIds?: number[]): Promise<number> {
     const effectiveParticipants = participantUserIds && participantUserIds.length > 0
         ? Array.from(new Set(participantUserIds))
         : [r.user_id];
@@ -215,58 +230,6 @@ export async function addReservationWithTransaction(
 
     if (r.cruise_id != null) {
         await checkCruiseIsUpcoming(r.cruise_id, sql);
-    }
-
-    if (r.resource_id != null && r.cruise_id != null) {
-        const user = await sql`
-            SELECT user_role
-            FROM users
-            WHERE id = ${r.user_id}
-            LIMIT 1
-        `;
-
-        const isStaff = user[0]?.user_role === 'staff';
-
-        if (isStaff) {
-            const staffAssignment = await sql`
-                SELECT 1
-                FROM staff_cruises
-                WHERE staff_id = ${r.user_id}
-                AND cruise_id = ${r.cruise_id}
-                LIMIT 1
-            `;
-
-            if (staffAssignment.length === 0) {
-                throw new Error('You are not assigned to this cruise.');
-            }
-
-        } else {
-            const roomRows = await sql`
-                SELECT 1
-                FROM reservations existing
-                JOIN cruises cr ON cr.id = existing.cruise_id
-                WHERE
-                    existing.cabin_id IS NOT NULL
-                    AND existing.cruise_id = ${r.cruise_id}
-                    AND existing.status <> 'Cancelled'
-                    AND existing.end_time > NOW()
-                    AND cr.return_date >= CURRENT_DATE
-                    AND (
-                        existing.user_id = ${r.user_id}
-                        OR EXISTS (
-                            SELECT 1
-                            FROM reservation_groups rg
-                            WHERE rg.reservation_id = existing.id
-                            AND rg.user_id = ${r.user_id}
-                        )
-                    )
-                LIMIT 1
-            `;
-
-            if (roomRows.length === 0) {
-                throw new Error('You must have a room reservation on this cruise before reserving items.');
-            }
-        }
     }
 
     if (r.staff_id != null) {
@@ -288,13 +251,7 @@ export async function addReservationWithTransaction(
     }
 
     if (r.resource_id != null) {
-        await checkResourceCount({
-            resource_id: r.resource_id,
-            quantity_reserved: r.quantity_reserved,
-            start_time: r.start_time,
-            end_time: r.end_time,
-            cruise_id: r.cruise_id
-        }, sql);
+        await checkResourceCount(r, sql);
     }
 
     const result = await sql`
@@ -344,34 +301,80 @@ export async function pullReservations(): Promise<Reservation[]> {
 export async function getAllReservationsWithDetails() {
     try {
         const rows = await sql`
-            SELECT
-                r.id,
-                r.user_id,
-                r.cabin_id,
-                r.resource_id,
-                r.staff_id,
-                r.cruise_id,
-                r.start_time,
-                r.end_time,
-                r.status,
-                r.quantity_reserved,
-                u.first_name,
-                u.last_name,
-                u.email,
-                c.cabin_number,
-                c.type,
-                c.deck,
-                c.capacity,
-                cr.cruise_name,
-                res.name AS resource_name,
-                res.category
-            FROM reservations r
-            LEFT JOIN users u ON r.user_id = u.id
-            LEFT JOIN cabins c ON r.cabin_id = c.id
-            LEFT JOIN cruises cr ON r.cruise_id = cr.id
-            LEFT JOIN resources res ON r.resource_id = res.id
-            WHERE r.status != 'Cancelled'
-            ORDER BY r.start_time DESC
+            SELECT *
+            FROM (
+                SELECT
+                    r.id,
+                    'reservation' AS reservation_type,
+                    NULL::INT AS event_id,
+                    NULL::VARCHAR AS event_name,
+                    r.user_id,
+                    r.cabin_id,
+                    r.resource_id,
+                    r.staff_id,
+                    r.cruise_id,
+                    r.start_time,
+                    r.end_time,
+                    r.status,
+                    r.cancelled_at,
+                    r.cancelled_by_role,
+                    r.cancellation_reason,
+                    r.quantity_reserved,
+                    u.first_name,
+                    u.last_name,
+                    u.email,
+                    c.cabin_number,
+                    c.type::VARCHAR AS type,
+                    c.deck,
+                    c.capacity,
+                    cr.cruise_name,
+                    res.name AS resource_name,
+                    res.category
+                FROM reservations r
+                LEFT JOIN users u ON r.user_id = u.id
+                LEFT JOIN cabins c ON r.cabin_id = c.id
+                LEFT JOIN cruises cr ON r.cruise_id = cr.id
+                LEFT JOIN resources res ON r.resource_id = res.id
+
+                UNION ALL
+
+                SELECT
+                    (-1 * (pe.id * 1000 + pei.resource_id))::INT AS id,
+                    'package_event_item' AS reservation_type,
+                    pe.id AS event_id,
+                    pe.name AS event_name,
+                    pe.created_by AS user_id,
+                    NULL::INT AS cabin_id,
+                    pei.resource_id,
+                    NULL::INT AS staff_id,
+                    pe.cruise_id,
+                    pe.start_time,
+                    pe.end_time,
+                    CASE
+                        WHEN pe.status = 'Cancelled' THEN 'Cancelled'::reservations_status
+                        ELSE 'Confirmed'::reservations_status
+                    END AS status,
+                    pe.cancelled_at,
+                    pe.cancelled_by_role,
+                    pe.cancellation_reason,
+                    pei.quantity_required AS quantity_reserved,
+                    u.first_name,
+                    u.last_name,
+                    u.email,
+                    NULL::VARCHAR AS cabin_number,
+                    NULL::VARCHAR AS type,
+                    NULL::INT AS deck,
+                    NULL::INT AS capacity,
+                    cr.cruise_name,
+                    res.name AS resource_name,
+                    res.category
+                FROM package_event_items pei
+                JOIN package_events pe ON pe.id = pei.event_id
+                JOIN users u ON u.id = pe.created_by
+                JOIN cruises cr ON cr.id = pe.cruise_id
+                JOIN resources res ON res.id = pei.resource_id
+            ) combined
+            ORDER BY combined.start_time DESC
         `;
         return rows;
     } catch (error) {
@@ -390,6 +393,8 @@ export async function getReservationsByUser(userId: number): Promise<RowList<Row
             r.cabin_id,
             r.cruise_id,
             r.quantity_reserved,
+            r.status,
+            r.cancelled_at,
             u.email,
             cr.cruise_name,
             res.name AS resource_name,
@@ -399,20 +404,31 @@ export async function getReservationsByUser(userId: number): Promise<RowList<Row
         LEFT JOIN resources res ON r.resource_id = res.id
         LEFT JOIN cabins c ON r.cabin_id = c.id
         LEFT JOIN cruises cr ON r.cruise_id = cr.id
-        WHERE r.user_id = ${userId} AND r.status != 'Cancelled'
+                WHERE r.user_id = ${userId}
+                     OR EXISTS (
+                             SELECT 1
+                             FROM reservation_groups rg
+                             WHERE rg.reservation_id = r.id
+                                 AND rg.user_id = ${userId}
+                     )
         ORDER BY r.start_time DESC
     `;
 
     return rows;
 }
 
-// updated for soft deletion now will update the resrevations status and cancelled at time
-export async function deleteReservation(id:number, user_id: number, cancelleation_reason:string, cancelled_by_role:string): Promise<void> {
-    const newStatus: ReservationStatus = 'Cancelled';
-
+export async function deleteReservation(id: number, cancelledByUserId?: number, cancelledByRole?: string, cancellationReason?: string): Promise<void> {
     return await sql.begin(async sql => {
-    await sql`UPDATE reservations SET cancelled_at = NOW(), status = ${newStatus}, cancelleation_reason = ${cancelleation_reason}, 
-    cancelled_by_role = ${cancelled_by_role}, cancelled_by_user_id = ${user_id} WHERE id = ${id}`;
+        await sql`
+            UPDATE reservations
+            SET 
+                status = 'Cancelled',
+                cancelled_by_user_id = ${cancelledByUserId ?? null},
+                cancelled_by_role = ${cancelledByRole ?? null},
+                cancellation_reason = ${cancellationReason ?? null},
+                cancelled_at = CURRENT_TIMESTAMP
+            WHERE id = ${id}
+        `;
     })
 }
 
@@ -462,9 +478,16 @@ export async function getUserRoomReservations(userId: number) {
             JOIN users u ON r.user_id = u.id
             JOIN cabins c ON r.cabin_id = c.id
             LEFT JOIN cruises cr ON r.cruise_id = cr.id
-            WHERE r.user_id = ${userId}
-                AND r.cabin_id IS NOT NULL
-                AND r.status != 'Cancelled'
+            WHERE r.cabin_id IS NOT NULL
+                AND (
+                    r.user_id = ${userId}
+                    OR EXISTS (
+                        SELECT 1
+                        FROM reservation_groups rg
+                        WHERE rg.reservation_id = r.id
+                          AND rg.user_id = ${userId}
+                    )
+                )
             ORDER BY r.start_time DESC
         `;
 
@@ -506,14 +529,80 @@ export async function updateReservation(
     })
 }
 
-export async function getUserIdGivenReservationId(id: number) {
+export async function getUserRoomCruises(userId: number) {
+    const rows = await sql`
+        SELECT DISTINCT
+            cr.id,
+            cr.cruise_name,
+            cr.ship_name,
+            cr.departure_date,
+            cr.return_date,
+            cr.max_passengers
+        FROM reservations r
+        JOIN cruises cr ON cr.id = r.cruise_id
+        WHERE
+            r.cabin_id IS NOT NULL
+            AND r.status <> 'Cancelled'
+            AND r.end_time > NOW()
+            AND cr.return_date >= CURRENT_DATE
+            AND (
+                r.user_id = ${userId}
+                OR EXISTS (
+                    SELECT 1
+                    FROM reservation_groups rg
+                    WHERE rg.reservation_id = r.id
+                        AND rg.user_id = ${userId}
+                )
+            )
+        ORDER BY cr.departure_date ASC
+    `;
 
-    const rows = await sql`SELECT user_id FROM reservations WHERE id = ${id}`;
+    return rows;
+}
 
-    if(rows.length === 0) {
-        throw new Error("There is no reservation with that ID"); 
-    }
+export async function getStaffEligibleCruises(userId: number) {
+    const rows = await sql`
+        WITH staff_cruise_ids AS (
+            SELECT DISTINCT r.cruise_id AS cruise_id
+            FROM reservations r
+            WHERE r.cruise_id IS NOT NULL
+              AND (
+                    r.staff_id = ${userId}
+                    OR EXISTS (
+                        SELECT 1
+                        FROM reservation_staff rs
+                        WHERE rs.reservation_id = r.id
+                          AND rs.staff_id = ${userId}
+                    )
+              )
 
-    return rows[0].user_id;
+            UNION
 
+            SELECT DISTINCT pe.cruise_id AS cruise_id
+            FROM package_events pe
+            WHERE pe.cruise_id IS NOT NULL
+              AND (
+                    pe.created_by = ${userId}
+                    OR EXISTS (
+                        SELECT 1
+                        FROM package_event_staff pes
+                        WHERE pes.event_id = pe.id
+                          AND pes.staff_id = ${userId}
+                    )
+              )
+        )
+        SELECT
+            c.id,
+            c.cruise_name,
+            c.ship_name,
+            c.departure_date,
+            c.return_date,
+            c.max_passengers
+        FROM cruises c
+        JOIN staff_cruise_ids sci ON sci.cruise_id = c.id
+        WHERE c.return_date >= CURRENT_DATE
+        ORDER BY c.departure_date ASC
+    `;
+
+    return rows;
 }

@@ -139,24 +139,27 @@ router.post("/reservations/:id", authRequired, async (req: Request, res: Respons
   }
 });
 
-// RES-DELETE - deletes reservation by ID
+// RES-DELETE - cancels reservation by ID with cancellation reason
 router.delete('/reservations/:id', authRequired, async (req: Request, res: Response) => {
   const id = Number(req.params.id);
-  const user_id = req.user!.id;
-  const cancelleation_reason = req.body.cancelleation_reason;
-  const cancelled_by_role = req.body.cancelled_by_role;
+  const  reason = req.body?.reason ?? "Regular user doesn't need reason";
+  const userId = req.user?.id;
+  const userRole = req.user?.user_role ?? 'user';
 
   if (isNaN(id)) {
     return res.status(400).json({ message: "Invalid ID format" });
   }
-  if(user_id == await getUserIdGivenReservationId(id)) {
-    try {
-    await deleteReservation(id, user_id, cancelleation_reason, cancelled_by_role);
 
-    res.json({ message: "reservation deleted successfully" });
+  if (!reason || typeof reason !== 'string' || reason.trim().length === 0) {
+    return res.status(400).json({ message: "Cancellation reason is required" });
+  }
+
+  try {
+    await deleteReservation(id, userId, userRole, reason.trim());
+
+    res.json({ message: "reservation cancelled successfully" });
   } catch (error) {
-    res.status(500).json({ error: "failed to delete reservation" });
-  }  
+    res.status(500).json({ error: "failed to cancel reservation" });
   }
 });
 

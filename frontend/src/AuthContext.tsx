@@ -4,21 +4,21 @@ import type { ReactNode } from "react";
 export interface User {
   userId: number;
   firstName: string;
-  role: string;
+  role: 'normal' | 'staff' | 'admin';
   staffRole?: string | null;
   shift?: string | null;
-  canEditInventory?: boolean;
+  canEditInventory: boolean;
   profilePicture?: string | null;
 }
 
-export function isAdminUser(user: User | null | undefined): boolean {
-  if (!user) return false;
-
-  const normalizedRole = String(user.role ?? "").trim().toLowerCase();
-  const normalizedStaffRole = String(user.staffRole ?? "").trim().toLowerCase();
-
-  return normalizedRole === "admin" || (normalizedRole === "staff" && normalizedStaffRole === "admin");
+export function isAdmin(user: User | null | undefined): boolean {
+  return user?.role === 'admin'
 }
+
+export function isStaff(user: User | null | undefined): boolean {
+  return user?.role === 'staff' || user?.role === 'admin' 
+}
+
 
 interface AuthContextType {
   user: User | null;
@@ -69,7 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const refreshedUser: User = {
             userId: Number(profile.id ?? parsedUser?.userId ?? 0),
             firstName: String(profile.firstName ?? parsedUser?.firstName ?? ''),
-            role: String(profile.role ?? parsedUser?.role ?? 'normal'),
+            role: profile.role ?? parsedUser?.role ?? 'normal',
             staffRole: profile.staffRole ?? null,
             shift: profile.shift ?? parsedUser?.shift ?? null,
             canEditInventory: Boolean(profile.isStaffAdmin),

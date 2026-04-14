@@ -1,13 +1,13 @@
 import "./App.css";
 import { useNavigate } from "react-router-dom";
-import { isAdminUser, useAuth } from "./AuthContext";
+import { isAdmin, isStaff, useAuth } from "./AuthContext";
 import NavBar from "./NavBar";
 
 export default function App() {
   const shipName = "Starlight Pearl Cruises";
   const navigate = useNavigate();
   const { user } = useAuth();
-  const canAccessAnalytics = isAdminUser(user);
+  const canAccessAnalytics = isAdmin(user);
 
   return (
     <div className="page">
@@ -51,7 +51,7 @@ export default function App() {
                   </button>
                 </div>
                 
-                {user.role === "staff" && (
+                {isStaff(user) && (
                   <div className="dashboardCard">
                     <h3>Browse Inventory</h3>
                     <p>Explore available items and amenities</p>
