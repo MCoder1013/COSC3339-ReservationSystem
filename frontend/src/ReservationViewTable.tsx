@@ -334,9 +334,13 @@ export default function ReservationTable() {
         )}
 
       {/* Cancellation modal */}
-      {showCancelModal && (
-        <div className="modalOverlay">
-          <div className="modal">
+      {showCancelModal && cancelReservationId !== null && (
+        <div className="modalOverlay" onClick={closeCancelModal}>
+          <div
+            className="modalContent packageEventModalContent"
+            style={{ maxWidth: '560px', padding: '20px' }}
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="modalHeader">
               <h3 style={{ margin: 0 }}>Cancel Reservation</h3>
               <button className="modalCloseButton" onClick={closeCancelModal} aria-label="Close cancel reservation dialog">

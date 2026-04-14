@@ -313,7 +313,7 @@ export async function getAllReservationsWithDetails() {
                     u.last_name,
                     u.email,
                     c.cabin_number,
-                    c.type,
+                    c.type::VARCHAR AS type,
                     c.deck,
                     c.capacity,
                     cr.cruise_name,
