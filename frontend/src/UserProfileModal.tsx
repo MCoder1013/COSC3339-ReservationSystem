@@ -311,32 +311,6 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
           <button className="closeBtn" onClick={onClose}>✕</button>
         </div>
 
-        <div
-          className="loyaltyBanner"
-          style={{
-            background: `linear-gradient(135deg, ${loyaltyTier.accentDark} 0%, ${loyaltyTier.accent} 55%, #9ca2ff 100%)`,
-          }}
-        >
-          <div className="loyaltyBadgeWrap" aria-hidden="true">
-            <div className="loyaltyBadgeGlow" />
-            <img
-              className="loyaltyBadgeImage"
-              src={loyaltyTier.badgeSrc}
-              alt=""
-              role="presentation"
-            />
-          </div>
-
-          <div className="loyaltyTierCopy">
-            <span className="loyaltyTierName">{loyaltyTier.name}</span>
-          </div>
-
-          <div className="loyaltyPearls">
-            <span className="loyaltyLabel">Pearls</span>
-            <span className="loyaltyPearlCount">{loyaltyTier.pearls.toLocaleString()}</span>
-          </div>
-        </div>
-
         <div className="tabButtons">
           <button
             className={`tabBtn ${activeTab === "reservations" ? "active" : ""}`}
@@ -556,6 +530,32 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
                       Edit Profile
                     </button>
                   )}
+                </div>
+              </div>
+
+              <div
+                className="loyaltyBanner loyaltyBanner--profile"
+                style={{
+                  background: `linear-gradient(135deg, ${loyaltyTier.accentDark} 0%, ${loyaltyTier.accent} 55%, #9ca2ff 100%)`,
+                }}
+              >
+                <div className="loyaltyBadgeWrap" aria-hidden="true">
+                  <div className="loyaltyBadgeGlow" />
+                  <img
+                    className="loyaltyBadgeImage"
+                    src={loyaltyTier.badgeSrc}
+                    alt=""
+                    role="presentation"
+                  />
+                </div>
+
+                <div className="loyaltyTierCopy">
+                  <span className="loyaltyTierName">{loyaltyTier.name}</span>
+                </div>
+
+                <div className="loyaltyPearls">
+                  <span className="loyaltyLabel">Pearls</span>
+                  <span className="loyaltyPearlCount">{loyaltyTier.pearls.toLocaleString()}</span>
                 </div>
               </div>
 
