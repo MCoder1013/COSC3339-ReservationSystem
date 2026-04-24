@@ -80,9 +80,9 @@
   align-items: center;
   gap: 16px;
   padding: 14px 24px;
-  margin: 0 24px 10px;
+  margin: 0;
   min-height: 92px;
-  border-radius: 0 0 20px 20px;
+  border-radius: 20px;
   color: white;
   box-shadow: 0 12px 28px rgba(20, 24, 86, 0.18);
   position: relative;
@@ -271,10 +271,47 @@
   box-shadow: 0 10px 26px rgba(40, 48, 120, 0.08);
 }
 
+.profileTopRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 380px);
+  gap: 14px;
+  align-items: center;
+}
+
 .profileAvatarSection {
   display: flex;
   align-items: center;
   gap: 16px;
+}
+
+.loyaltyBanner--inline {
+  min-height: 78px;
+  padding: 10px 14px;
+  grid-template-columns: 58px minmax(0, 1fr) auto;
+  gap: 10px;
+}
+
+.loyaltyBanner--inline .loyaltyBadgeWrap {
+  width: 48px;
+  height: 48px;
+}
+
+.loyaltyBanner--inline .loyaltyBadgeGlow {
+  inset: 8px;
+}
+
+.loyaltyBanner--inline .loyaltyTierName {
+  font-size: 16px;
+}
+
+.loyaltyBanner--inline .loyaltyPearls {
+  min-width: 98px;
+  padding: 7px 10px;
+  border-radius: 12px;
+}
+
+.loyaltyBanner--inline .loyaltyPearlCount {
+  font-size: 20px;
 }
 
 .profileAvatar {
@@ -606,6 +643,22 @@
     margin: 0 16px;
     padding: 16px 14px;
     gap: 12px;
+  }
+
+  .profileTopRow {
+    grid-template-columns: 1fr;
+  }
+
+  .loyaltyBanner--inline {
+    width: 100%;
+    grid-template-columns: 1fr;
+    padding: 12px;
+  }
+
+  .loyaltyBanner--inline .loyaltyPearls {
+    min-width: 0;
+    width: 100%;
+    text-align: center;
   }
 
   .loyaltyPearls {

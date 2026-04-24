@@ -311,32 +311,6 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
           <button className="closeBtn" onClick={onClose}>✕</button>
         </div>
 
-        <div
-          className="loyaltyBanner"
-          style={{
-            background: `linear-gradient(135deg, ${loyaltyTier.accentDark} 0%, ${loyaltyTier.accent} 55%, #9ca2ff 100%)`,
-          }}
-        >
-          <div className="loyaltyBadgeWrap" aria-hidden="true">
-            <div className="loyaltyBadgeGlow" />
-            <img
-              className="loyaltyBadgeImage"
-              src={loyaltyTier.badgeSrc}
-              alt=""
-              role="presentation"
-            />
-          </div>
-
-          <div className="loyaltyTierCopy">
-            <span className="loyaltyTierName">{loyaltyTier.name}</span>
-          </div>
-
-          <div className="loyaltyPearls">
-            <span className="loyaltyLabel">Pearls</span>
-            <span className="loyaltyPearlCount">{loyaltyTier.pearls.toLocaleString()}</span>
-          </div>
-        </div>
-
         <div className="tabButtons">
           <button
             className={`tabBtn ${activeTab === "reservations" ? "active" : ""}`}
@@ -560,20 +534,48 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
               </div>
 
               <div className="profileCard">
-                <div className="profileAvatarSection">
-                  <div className="profileAvatar">
-                    {iconPreview || userProfile.profilePicture ? (
-                      <img
-                        src={iconPreview || userProfile.profilePicture || ""}
-                        alt={`${userProfile.firstName} ${userProfile.lastName} profile icon`}
-                      />
-                    ) : (
-                      <span>{userProfile.firstName.charAt(0)}{userProfile.lastName.charAt(0)}</span>
-                    )}
+                <div className="profileTopRow">
+                  <div className="profileAvatarSection">
+                    <div className="profileAvatar">
+                      {iconPreview || userProfile.profilePicture ? (
+                        <img
+                          src={iconPreview || userProfile.profilePicture || ""}
+                          alt={`${userProfile.firstName} ${userProfile.lastName} profile icon`}
+                        />
+                      ) : (
+                        <span>{userProfile.firstName.charAt(0)}{userProfile.lastName.charAt(0)}</span>
+                      )}
+                    </div>
+                    <div>
+                      <p className="profileName">{userProfile.firstName} {userProfile.lastName}</p>
+                      <p className="profileEmail">{userProfile.email}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="profileName">{userProfile.firstName} {userProfile.lastName}</p>
-                    <p className="profileEmail">{userProfile.email}</p>
+
+                  <div
+                    className="loyaltyBanner loyaltyBanner--inline"
+                    style={{
+                      background: `linear-gradient(135deg, ${loyaltyTier.accentDark} 0%, ${loyaltyTier.accent} 55%, #9ca2ff 100%)`,
+                    }}
+                  >
+                    <div className="loyaltyBadgeWrap" aria-hidden="true">
+                      <div className="loyaltyBadgeGlow" />
+                      <img
+                        className="loyaltyBadgeImage"
+                        src={loyaltyTier.badgeSrc}
+                        alt=""
+                        role="presentation"
+                      />
+                    </div>
+
+                    <div className="loyaltyTierCopy">
+                      <span className="loyaltyTierName">{loyaltyTier.name}</span>
+                    </div>
+
+                    <div className="loyaltyPearls">
+                      <span className="loyaltyLabel">Pearls</span>
+                      <span className="loyaltyPearlCount">{loyaltyTier.pearls.toLocaleString()}</span>
+                    </div>
                   </div>
                 </div>
 
