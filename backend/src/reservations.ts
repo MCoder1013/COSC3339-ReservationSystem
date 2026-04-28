@@ -105,6 +105,8 @@ async function checkUserCruiseOverlap(userId: number, r: NewReservation, sql: Tr
             )
             AND existing.cruise_id IS NOT NULL
             AND existing.status <> 'Cancelled'
+            AND existing.end_time > NOW()
+            AND existing.start_time <= NOW()
             AND existing.cruise_id <> ${r.cruise_id}
             AND daterange(existing_cruise.departure_date, existing_cruise.return_date, '[]')
                 && daterange(requested_cruise.departure_date, requested_cruise.return_date, '[]')
@@ -137,6 +139,7 @@ async function checkUserRoomOnCruise(userId: number, r: NewReservation, sql: Tra
             AND existing.cabin_id IS NOT NULL
             AND existing.cruise_id = ${r.cruise_id}
             AND existing.status <> 'Cancelled'
+            AND existing.end_time > NOW()
         LIMIT 1
     `;
 
