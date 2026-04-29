@@ -4,5 +4,5 @@ ADD COLUMN payment_status TEXT CHECK (payment_status IN ('unpaid','paid')) DEFAU
 ADD COLUMN payment_date TIMESTAMPTZ NULL,
 ADD COLUMN total_price NUMERIC(10,2) NOT NULL DEFAULT 0.00;
 
-ALTER TABLE packages
+ALTER TABLE packages_events
 ADD COLUMN price NUMERIC(10,2);
