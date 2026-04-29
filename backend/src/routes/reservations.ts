@@ -5,7 +5,7 @@ import {
   getUserRoomCruises
 } from '../reservations.js';
 import { getCurrentStaffAssignedCruises, getUserById, validateGuestEmails } from '../users.js';
-import { authRequired, isStaff, } from './index.js';
+import { authRequired, } from './index.js';
 import { sql } from '../database.js';
 
 
@@ -139,19 +139,27 @@ router.post("/reservations/:id", authRequired, async (req: Request, res: Respons
   }
 });
 
-// RES-DELETE - deletes reservation by ID
+// RES-DELETE - cancels reservation by ID with cancellation reason
 router.delete('/reservations/:id', authRequired, async (req: Request, res: Response) => {
   const id = Number(req.params.id);
+  const  reason = req.body?.reason ?? "Regular user doesn't need reason";
+  const userId = req.user?.id;
+  const userRole = req.user?.user_role ?? 'user';
 
   if (isNaN(id)) {
     return res.status(400).json({ message: "Invalid ID format" });
   }
-  try {
-    await deleteReservation(id);
 
-    res.json({ message: "reservation deleted successfully" });
+  if (!reason || typeof reason !== 'string' || reason.trim().length === 0) {
+    return res.status(400).json({ message: "Cancellation reason is required" });
+  }
+
+  try {
+    await deleteReservation(id, userId, userRole, reason.trim());
+
+    res.json({ message: "reservation cancelled successfully" });
   } catch (error) {
-    res.status(500).json({ error: "failed to delete reservation" });
+    res.status(500).json({ error: "failed to cancel reservation" });
   }
 });
 
@@ -215,7 +223,7 @@ router.get('/reservations/eligible-cruises', authRequired, async (req: Request, 
   try {
     const user = req.user!;
 
-    if (isStaff(user)) {
+    if (user.user_role === 'staff' || user.user_role === 'admin') {
       const cruises = await sql`
         SELECT role
         FROM staff
@@ -223,7 +231,7 @@ router.get('/reservations/eligible-cruises', authRequired, async (req: Request, 
         LIMIT 1
       `;
 
-      const isAdmin = user.user_role === 'admin';
+      const isAdmin = cruises[0]?.role?.trim().toLowerCase() === 'admin';
 
       if (isAdmin) {
         const allCruises = await sql`

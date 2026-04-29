@@ -22,7 +22,8 @@ export async function pullStaff() {
                 u.email
             FROM staff s
             LEFT JOIN users u ON u.id = s.staff_id
-            ORDER BY name
+            WHERE s.deleted_at IS NULL
+            ORDER BY name 
         `;
         return result;
     } catch (error) {
@@ -51,7 +52,15 @@ export async function addStaff(s: NewStaff): Promise<number> {
 
 export async function deleteStaff(id: number): Promise<number | undefined> {
     try {
-        const rows = await sql`DELETE FROM staff WHERE id = ${id} RETURNING id`;
+        const rows = await sql`UPDATE staff SET deleted_at = NOW() WHERE staff_id = ${id}  RETURNING id`;
+
+         if(rows.count === 0) {
+            throw new Error("No staff has that id");
+        }
+
+        await sql `UPDATE reservations SET status = 'Cancelled', cancelled_at = NOW() WHERE staff_id = ${id} AND status != 'Cancelled'`;
+
+
         return rows[0]?.id;
     } catch (error) {
         console.error("Error deleting staff member: ", error);
@@ -63,7 +72,7 @@ export async function deleteStaff(id: number): Promise<number | undefined> {
 export async function getStaffNameFromID(id: number): Promise<string> {
 
     const staffName = await sql`
-    SELECT name FROM staff WHERE id = ${id}
+    SELECT name FROM staff WHERE staff_id = ${id}
     `;
 
     return staffName[0].name; 

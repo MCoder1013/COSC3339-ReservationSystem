@@ -308,10 +308,12 @@ router.post('/login', async (req: Request, res: Response) => {
     }
     // If email exists and password matches, login is successful
 
-    const staffRole = user.user_role === 'staff'
+    const canHaveShift = user.user_role === 'staff' || user.user_role === 'admin';
+
+    const staffRole = canHaveShift
       ? await database.getStaffRoleByUserId(user.id)
       : null;
-    const shift = user.user_role === 'staff'
+    const shift = canHaveShift
       ? await database.getStaffShiftByUserId(user.id)
       : null;
     const isStaffAdmin = user.user_role === 'admin';
@@ -347,15 +349,17 @@ router.get('/me', authRequired, async (req: Request, res: Response) => {
   try {
     const user = req.user!;
 
+    const canHaveShift = user.user_role === 'staff' || user.user_role === 'admin';
+
     let syncedShift: string | null = null;
-    if (user.user_role === 'staff') {
+    if (canHaveShift) {
       syncedShift = await syncStaffShiftForToday(user.id);
     }
 
-    const staffRole = user.user_role === 'staff'
+    const staffRole = canHaveShift
       ? await database.getStaffRoleByUserId(user.id)
       : null;
-    const shift = user.user_role === 'staff'
+    const shift = canHaveShift
       ? (syncedShift ?? await database.getStaffShiftByUserId(user.id))
       : null;
     const isStaffAdmin = user.user_role === 'admin';
@@ -439,17 +443,23 @@ router.post('/update-profile', authRequired, upload.single('profilePicture'), as
     let nextShift: string | null = null;
 
     if (req.body.shift !== undefined) {
-      if (role !== 'staff') {
-        return res.status(400).json({ error: 'Only staff members can change shifts.' });
+      if (role !== 'staff' && role !== 'admin') {
+        return res.status(400).json({ error: 'Only staff and admin users can change shifts.' });
       }
 
       if (!requestedShift) {
         return res.status(400).json({ error: 'Shift must be Morning, Day, or Night.' });
       }
 
-      const currentShift = await syncStaffShiftForToday(userId);
+      let currentShift = await syncStaffShiftForToday(userId);
       if (!currentShift) {
-        return res.status(400).json({ error: 'Unable to locate your staff shift record.' });
+        // Ensure admin users can store a shift even if their staff record is missing.
+        if (role === 'admin') {
+          await database.upsertStaffRecord(userId, 'Other', requestedShift);
+          currentShift = requestedShift;
+        } else {
+          return res.status(400).json({ error: 'Unable to locate your staff shift record.' });
+        }
       }
 
       if (requestedShift !== currentShift) {

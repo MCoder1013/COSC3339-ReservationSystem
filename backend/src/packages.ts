@@ -1,5 +1,6 @@
 import postgres from 'postgres';
 import { sql } from './database.js';
+import { sendPackageEventCancelledEmailToAttendees, sendPackageEventCancelledEmailToStaff } from './notifications.js';
 
 export type PackageEventInput = {
     cruise_id: number;
@@ -424,12 +425,34 @@ export async function updatePackageEvent(eventId: number, input: PackageEventInp
     });
 }
 
-export async function cancelPackageEvent(eventId: number) {
+export async function cancelPackageEvent(
+    eventId: number,
+    cancelledByUserId: number,
+    cancelledByRole: 'staff' | 'admin',
+    cancellationReason: string
+) {
+                                 
     await sql`
         UPDATE package_events
-        SET status = 'Cancelled'
+        SET status = 'Cancelled',
+            cancelled_by_user_id = ${cancelledByUserId},
+            cancelled_by_role = ${cancelledByRole},
+            cancellation_reason = ${cancellationReason},
+            cancelled_at = CURRENT_TIMESTAMP
         WHERE id = ${eventId}
     `;
+
+    try {                                                                                                                                                                          
+        const rows = await sql`SELECT name FROM package_events WHERE id = ${eventId}`; 
+        const name = rows[0].name;
+
+        await sendPackageEventCancelledEmailToAttendees(eventId, name, cancellationReason)
+        await sendPackageEventCancelledEmailToStaff(eventId, name, cancellationReason);
+        
+    } catch(error) {
+        console.log("error sending email");
+        throw(error);
+    }
 }
 
 export async function getPackageEventById(eventId: number, viewerUserId?: number) {
