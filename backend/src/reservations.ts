@@ -177,8 +177,6 @@ async function checkUserRoomOnCruise(userId: number, r: NewReservation, sql: Tra
             AND existing.cruise_id = ${r.cruise_id}
             AND existing.status <> 'Cancelled'
             AND existing.end_time > NOW()
-            AND existing.start_time < ${r.end_time}
-            AND existing.end_time > ${r.start_time}
         LIMIT 1
     `;
 
