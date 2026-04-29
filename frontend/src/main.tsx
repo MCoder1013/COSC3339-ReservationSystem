@@ -11,6 +11,7 @@ import UserReservationTable from "./UserReservationViewTable";
 import Reservation from "./Reservation";
 import ViewUsers from "./ViewAllUsers"
 import Analytics from "./Analytics";
+import Gambling from "./Gambling";
 import "./index.css";
 
 function AdminRoute({ children }: { children: React.ReactElement }) {
@@ -43,6 +44,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
               </AdminRoute>
             }
           />
+          <Route path="/gambling" element={<Gambling />} />
         </Routes>
       </AuthProvider>
     </BrowserRouter>
