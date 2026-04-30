@@ -14,6 +14,7 @@ interface UserProfile {
   profilePicture: string | null;
   role: string;
   shift?: string | null;
+  pearls?: number;
 }
 
 type ShiftConflict = {
@@ -69,7 +70,8 @@ type CancelledReservation = {
 export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const navigate = useNavigate();
   const { user, logout, updateUser } = useAuth();
-  const [activeTab, setActiveTab] = useState<"reservations" | "editinfo">("reservations");
+  const [activeTab, setActiveTab] = useState<"reservations" | "profile">("reservations");
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [reservationCategory, setReservationCategory] = useState<"Items" | "Rooms" | "Packages" | "Cancelled">("Items");
   const [timePeriod, setTimePeriod] = useState<"Past" | "Current" | "Future">("Future");
   const [userProfile, setUserProfile] = useState<UserProfile>();
@@ -85,6 +87,70 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
   const [shiftConflicts, setShiftConflicts] = useState<ShiftConflict[]>([]);
   const [reviewDrafts, setReviewDrafts] = useState<Record<string, { rating: number; comment: string; submitted: boolean }>>({});
   const [reviewErrors, setReviewErrors] = useState<Record<string, string>>({});
+
+  function getLoyaltyTier(pearls: number) {
+  if (pearls < 500) {
+    return {
+      name: "Barnacle",
+      badgeSrc: "/images/Tier4.png",
+      accent: "#888",
+      accentDark: "#444",
+      accentSoft: "rgba(136,136,136,0.2)",
+    };
+  } else if (pearls < 1000) {
+    return {
+      name: "Coral",
+      badgeSrc: "/images/Tier3.png",
+      accent: "#4caf50",
+      accentDark: "#2e7d32",
+      accentSoft: "rgba(76,175,80,0.2)",
+    };
+  } else if (pearls < 2000) {
+    return {
+      name: "Clam",
+      badgeSrc: "/images/Tier2.png",
+      accent: "#2196f3",
+      accentDark: "#0d47a1",
+      accentSoft: "rgba(33,150,243,0.2)",
+    };
+  } else {
+    return {
+      name: "Pearl",
+      badgeSrc: "/images/Tier1.png",
+      accent: "#ffd700",
+      accentDark: "#b8860b",
+      accentSoft: "rgba(255,215,0,0.2)",
+    };
+  }
+}
+
+  const pearls = userProfile?.pearls ?? 2001; // 
+  const loyaltyTier = getLoyaltyTier(pearls);
+
+
+
+  
+  const isProfileStaff = userProfile?.role === "staff" || userProfile?.role === "admin";
+
+  const resetProfileEditor = () => {
+    setSaveMessage("");
+    setShiftConflicts([]);
+    setIconFile(null);
+    setBio(userProfile?.biography || "");
+    setIconPreview(userProfile?.profilePicture || "");
+    setSelectedShift(userProfile?.shift || "Day");
+    setIsEditingProfile(false);
+  };
+
+  const openProfileEditor = () => {
+    setSaveMessage("");
+    setShiftConflicts([]);
+    setBio(userProfile?.biography || "");
+    setIconPreview(userProfile?.profilePicture || "");
+    setSelectedShift(userProfile?.shift || "Day");
+    setIconFile(null);
+    setIsEditingProfile(true);
+  };
 
   useEffect(() => {
     if (!isOpen) return;
@@ -105,6 +171,9 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
         setIconPreview(profileData.profilePicture || "");
         setSelectedShift(profileData.shift || "Day");
         setShiftConflicts([]);
+        setSaveMessage("");
+        setIsEditingProfile(false);
+        setIconFile(null);
 
         const itemsRes = await fetch("api/reservations/items", {
           headers: { Authorization: `Bearer ${token}` },
@@ -395,6 +464,8 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
         shift: updatedShift,
       });
 
+      setIsEditingProfile(false);
+
       setSaveMessage("Profile updated successfully!");
 
     } catch (err) {
@@ -428,15 +499,18 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
         <div className="tabButtons">
           <button
             className={`tabBtn ${activeTab === "reservations" ? "active" : ""}`}
-            onClick={() => setActiveTab("reservations")}
+            onClick={() => {
+              resetProfileEditor();
+              setActiveTab("reservations");
+            }}
           >
             My Reservations
           </button>
           <button
-            className={`tabBtn ${activeTab === "editinfo" ? "active" : ""}`}
-            onClick={() => setActiveTab("editinfo")}
+            className={`tabBtn ${activeTab === "profile" ? "active" : ""}`}
+            onClick={() => setActiveTab("profile")}
           >
-            Edit Profile
+            My Profile
           </button>
         </div>
 
@@ -638,71 +712,136 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
             </div>
           )}
 
-          {activeTab === "editinfo" && (
-            <div className="editInfoTab">
-              <h3>Edit Profile Information</h3>
-              {userProfile && (
-                <div className="editForm">
-                  <div className="formGroup">
-                    <label>Name:</label>
-                    <p>{userProfile.firstName} {userProfile.lastName}</p>
+          {activeTab === "profile" && userProfile && (
+            <div className="profileTab">
+              <div className="profileHeaderRow">
+                <h3>My Profile</h3>
+                <div className="profileActions">
+                  {isEditingProfile ? (
+                    <button type="button" className="secondaryBtn" onClick={resetProfileEditor}>
+                      Cancel
+                    </button>
+                  ) : (
+                    <button type="button" className="secondaryBtn" onClick={openProfileEditor}>
+                      Edit Profile
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="profileCard">
+                <div className="profileTopRow">
+                  <div className="profileAvatarSection">
+                    <div className="profileAvatar">
+                      {iconPreview || userProfile.profilePicture ? (
+                        <img
+                          src={iconPreview || userProfile.profilePicture || ""}
+                          alt={`${userProfile.firstName} ${userProfile.lastName} profile icon`}
+                        />
+                      ) : (
+                        <span>{userProfile.firstName.charAt(0)}{userProfile.lastName.charAt(0)}</span>
+                      )}
+                    </div>
+                    <div>
+                      <p className="profileName">{userProfile.firstName} {userProfile.lastName}</p>
+                      <p className="profileEmail">{userProfile.email}</p>
+                    </div>
                   </div>
 
-                  <div className="formGroup">
-                    <label>Email:</label>
-                    <p>{userProfile.email}</p>
-                  </div>
+                  <div
+                    className="loyaltyBanner loyaltyBanner--inline"
+                    style={{
+                      background: `linear-gradient(135deg, ${loyaltyTier.accentDark} 0%, ${loyaltyTier.accent} 55%, #9ca2ff 100%)`,
+                    }}
+                  >
+                    <div className="loyaltyBadgeWrap" aria-hidden="true">
+                      <div className="loyaltyBadgeGlow" />
+                      <img
+                        className="loyaltyBadgeImage"
+                        src={loyaltyTier.badgeSrc}
+                        alt=""
+                        role="presentation"
+                      />
+                    </div>
 
+                    <div className="loyaltyTierCopy">
+                      <span className="loyaltyTierName">{loyaltyTier.name}</span>
+                    </div>
+
+                    <div className="loyaltyPearls">
+                      <span className="loyaltyLabel">Pearls</span>
+                      <span className="loyaltyPearlCount">{pearls.toLocaleString()}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="profileFields">
                   <div className="formGroup">
                     <label>Bio:</label>
-                    <textarea
-                      value={bio}
-                      onChange={(e) => setBio(e.target.value)}
-                      placeholder="Tell us about yourself..."
-                      rows={4}
-                      className="bioInput"
-                    />
+                    {isEditingProfile ? (
+                      <textarea
+                        value={bio}
+                        onChange={(e) => setBio(e.target.value)}
+                        placeholder="Tell us about yourself..."
+                        rows={4}
+                        className="bioInput"
+                      />
+                    ) : (
+                      <p>{userProfile.biography || "No bio added yet."}</p>
+                    )}
                   </div>
 
-                  {(userProfile.role === "staff" || userProfile.role === "admin") && (
+                  {isProfileStaff && (
                     <div className="formGroup">
                       <label>Shift:</label>
-                      <select
-                        value={selectedShift}
-                        onChange={(e) => setSelectedShift(e.target.value)}
-                        className="input"
-                      >
-                        <option value="Morning">Morning</option>
-                        <option value="Day">Day</option>
-                        <option value="Night">Night</option>
-                      </select>
+                      {isEditingProfile ? (
+                        <select
+                          value={selectedShift}
+                          onChange={(e) => setSelectedShift(e.target.value)}
+                          className="input"
+                        >
+                          <option value="Morning">Morning</option>
+                          <option value="Day">Day</option>
+                          <option value="Night">Night</option>
+                        </select>
+                      ) : (
+                        <p>{userProfile.shift || "No shift assigned."}</p>
+                      )}
                     </div>
                   )}
 
-                  <div className="formGroup">
-                    <label>User Icon:</label>
-                    <div className="iconUpload">
-                      {iconPreview && (
-                        <div className="iconPreviewWrapper">
-                          <img src={iconPreview} alt="Icon preview" className="iconPreview" />
-                        </div>
-                      )}
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleIconChange}
-                        className="fileInput"
-                      />
+                  {isEditingProfile && (
+                    <div className="formGroup">
+                      <label>User Icon:</label>
+                      <div className="iconUpload">
+                        {(iconPreview || userProfile.profilePicture) && (
+                          <div className="iconPreviewWrapper">
+                            <img src={iconPreview || userProfile.profilePicture || ""} alt="Icon preview" className="iconPreview" />
+                          </div>
+                        )}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleIconChange}
+                          className="fileInput"
+                        />
+                      </div>
                     </div>
-                  </div>
+                  )}
 
-                  {saveMessage && (
+                  {!isEditingProfile && (
+                    <div className="profileNote">
+                      Use Edit Profile to update your bio, shift, or icon.
+                    </div>
+                  )}
+
+                  {isEditingProfile && saveMessage && (
                     <p className={saveMessage.includes("Error") || saveMessage.includes("error") ? "errorMsg" : "successMsg"}>
                       {saveMessage}
                     </p>
                   )}
 
-                  {shiftConflicts.length > 0 && (
+                  {isEditingProfile && shiftConflicts.length > 0 && (
                     <div className="errorMsg">
                       {shiftConflicts.map((conflict) => (
                         <div key={conflict.id}>
@@ -712,11 +851,15 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
                     </div>
                   )}
 
-                  <button onClick={handleSaveProfile} className="saveBtn">
-                    Save Changes
-                  </button>
+                  {isEditingProfile && (
+                    <div className="profileActionRow">
+                      <button onClick={handleSaveProfile} className="saveBtn">
+                        Save Changes
+                      </button>
+                    </div>
+                  )}
                 </div>
-              )}
+              </div>
             </div>
           )}
         </div>
