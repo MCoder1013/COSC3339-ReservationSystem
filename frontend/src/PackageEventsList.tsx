@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { isAdmin, isStaff, useAuth } from './AuthContext';
 import { fetchData } from './api';
+import ReviewsModal, { type ReviewRecord } from './ReviewsModal';
 import { validatePaymentForm as validatePaymentFormFields, type PaymentForm } from './paymentValidation';
 import DatePicker from 'react-date-picker';
 import 'react-date-picker/dist/DatePicker.css';
@@ -170,6 +171,11 @@ export default function PackageEventsList({ showManagement = false, onlyJoined =
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [paymentError, setPaymentError] = useState('');
   const [pendingJoinEventId, setPendingJoinEventId] = useState<number | null>(null);
+  const [reviewsOpen, setReviewsOpen] = useState(false);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [reviewsError, setReviewsError] = useState('');
+  const [reviewsTitle, setReviewsTitle] = useState('Event reviews');
+  const [reviews, setReviews] = useState<ReviewRecord[]>([]);
   const [paymentForm, setPaymentForm] = useState<PaymentForm>({
     cardHolderName: '',
     cardNumber: '',
@@ -369,6 +375,24 @@ export default function PackageEventsList({ showManagement = false, onlyJoined =
     } catch (err) {
       console.error(err);
       setError('Unable to load event details right now. Please try again.');
+    }
+  };
+
+  const openEventReviews = async (eventId: number, eventName: string) => {
+    setReviewsOpen(true);
+    setReviewsLoading(true);
+    setReviewsError('');
+    setReviewsTitle(`Reviews for ${eventName}`);
+
+    try {
+      const data = await fetchData(`/api/ratings/events/${eventId}`);
+      setReviews(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error(err);
+      setReviews([]);
+      setReviewsError('Unable to load event reviews right now.');
+    } finally {
+      setReviewsLoading(false);
     }
   };
 
@@ -776,6 +800,9 @@ export default function PackageEventsList({ showManagement = false, onlyJoined =
                   <button type="button" className="smallButton" onClick={() => openEventDetail(event.id)}>
                     View Details
                   </button>
+                  <button type="button" className="smallButton" onClick={() => openEventReviews(event.id, event.name)}>
+                    View Reviews
+                  </button>
                   {canManageEvent(event) && (
                     <>
                       <button type="button" className="smallButton" onClick={() => beginEditEvent(event.id)}>
@@ -1020,6 +1047,20 @@ export default function PackageEventsList({ showManagement = false, onlyJoined =
           </div>
         </div>
       )}
+
+      <ReviewsModal
+        isOpen={reviewsOpen}
+        title={reviewsTitle}
+        subtitle="Reviews are only available for past events that were previously joined by a user."
+        reviews={reviews}
+        loading={reviewsLoading}
+        error={reviewsError}
+        emptyMessage="No reviews have been posted for this event yet."
+        onClose={() => {
+          setReviewsOpen(false);
+          setReviewsError('');
+        }}
+      />
 
       {showCancelModal && cancelEventId !== null && (
         <div className="modalOverlay" onClick={closeCancelModal}>

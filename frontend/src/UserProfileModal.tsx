@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "./AuthContext";
 import "./UserProfileModal.css";
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+
 interface UserProfile {
   id: number;
   firstName: string;
@@ -12,6 +14,7 @@ interface UserProfile {
   profilePicture: string | null;
   role: string;
   shift?: string | null;
+  pearls?: number;
 }
 
 type ShiftConflict = {
@@ -35,6 +38,8 @@ interface ItemReservation {
 interface RoomReservation {
   id: number;
   cabin_number: string;
+  cruise_name?: string | null;
+  ship_name?: string | null;
   email: string;
   start_time: string;
   end_time: string;
@@ -45,6 +50,7 @@ interface PackageReservation {
   id: number;
   name: string;
   description: string;
+  cruise_name?: string | null;
   start_time: string;
   end_time: string;
   status: string;
@@ -64,7 +70,8 @@ type CancelledReservation = {
 export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const navigate = useNavigate();
   const { user, logout, updateUser } = useAuth();
-  const [activeTab, setActiveTab] = useState<"reservations" | "editinfo">("reservations");
+  const [activeTab, setActiveTab] = useState<"reservations" | "profile">("reservations");
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [reservationCategory, setReservationCategory] = useState<"Items" | "Rooms" | "Packages" | "Cancelled">("Items");
   const [timePeriod, setTimePeriod] = useState<"Past" | "Current" | "Future">("Future");
   const [userProfile, setUserProfile] = useState<UserProfile>();
@@ -78,6 +85,72 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
   const [selectedShift, setSelectedShift] = useState("Day");
   const [saveMessage, setSaveMessage] = useState("");
   const [shiftConflicts, setShiftConflicts] = useState<ShiftConflict[]>([]);
+  const [reviewDrafts, setReviewDrafts] = useState<Record<string, { rating: number; comment: string; submitted: boolean }>>({});
+  const [reviewErrors, setReviewErrors] = useState<Record<string, string>>({});
+
+  function getLoyaltyTier(pearls: number) {
+  if (pearls < 500) {
+    return {
+      name: "Barnacle",
+      badgeSrc: "/images/Tier4.png",
+      accent: "#888",
+      accentDark: "#444",
+      accentSoft: "rgba(136,136,136,0.2)",
+    };
+  } else if (pearls < 1000) {
+    return {
+      name: "Coral",
+      badgeSrc: "/images/Tier3.png",
+      accent: "#4caf50",
+      accentDark: "#2e7d32",
+      accentSoft: "rgba(76,175,80,0.2)",
+    };
+  } else if (pearls < 2000) {
+    return {
+      name: "Clam",
+      badgeSrc: "/images/Tier2.png",
+      accent: "#2196f3",
+      accentDark: "#0d47a1",
+      accentSoft: "rgba(33,150,243,0.2)",
+    };
+  } else {
+    return {
+      name: "Pearl",
+      badgeSrc: "/images/Tier1.png",
+      accent: "#ffd700",
+      accentDark: "#b8860b",
+      accentSoft: "rgba(255,215,0,0.2)",
+    };
+  }
+}
+
+  const pearls = userProfile?.pearls ?? 2001; // 
+  const loyaltyTier = getLoyaltyTier(pearls);
+
+
+
+  
+  const isProfileStaff = userProfile?.role === "staff" || userProfile?.role === "admin";
+
+  const resetProfileEditor = () => {
+    setSaveMessage("");
+    setShiftConflicts([]);
+    setIconFile(null);
+    setBio(userProfile?.biography || "");
+    setIconPreview(userProfile?.profilePicture || "");
+    setSelectedShift(userProfile?.shift || "Day");
+    setIsEditingProfile(false);
+  };
+
+  const openProfileEditor = () => {
+    setSaveMessage("");
+    setShiftConflicts([]);
+    setBio(userProfile?.biography || "");
+    setIconPreview(userProfile?.profilePicture || "");
+    setSelectedShift(userProfile?.shift || "Day");
+    setIconFile(null);
+    setIsEditingProfile(true);
+  };
 
   useEffect(() => {
     if (!isOpen) return;
@@ -98,6 +171,9 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
         setIconPreview(profileData.profilePicture || "");
         setSelectedShift(profileData.shift || "Day");
         setShiftConflicts([]);
+        setSaveMessage("");
+        setIsEditingProfile(false);
+        setIconFile(null);
 
         const itemsRes = await fetch("api/reservations/items", {
           headers: { Authorization: `Bearer ${token}` },
@@ -183,6 +259,149 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
     });
   };
 
+  const reviewKey = (category: "Rooms" | "Packages", reservationId: number) => `${category}-${reservationId}`;
+
+  const getReviewDraft = (category: "Rooms" | "Packages", reservationId: number) => {
+    const key = reviewKey(category, reservationId);
+    return reviewDrafts[key] ?? { rating: 0, comment: "", submitted: false };
+  };
+
+  const updateReviewDraft = (
+    category: "Rooms" | "Packages",
+    reservationId: number,
+    updates: Partial<{ rating: number; comment: string; submitted: boolean }>
+  ) => {
+    const key = reviewKey(category, reservationId);
+
+    setReviewDrafts((current) => ({
+      ...current,
+      [key]: {
+        ...getReviewDraft(category, reservationId),
+        ...updates,
+      },
+    }));
+
+    setReviewErrors((current) => {
+      if (!current[key]) return current;
+      const next = { ...current };
+      delete next[key];
+      return next;
+    });
+  };
+
+  const submitReview = async (category: "Rooms" | "Packages", reservationId: number) => {
+    const draft = getReviewDraft(category, reservationId);
+    if (draft.rating === 0 || !draft.comment.trim()) {
+      updateReviewDraft(category, reservationId, { submitted: false });
+      return;
+    }
+
+    const key = reviewKey(category, reservationId);
+
+    try {
+      const response = await fetch(`${API_URL}/api/ratings`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          targetType: category === 'Rooms' ? 'room' : 'event',
+          targetId: reservationId,
+          rating: draft.rating,
+          review: draft.comment.trim(),
+        }),
+      });
+
+      const body = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(body?.error || 'Could not save your review right now.');
+      }
+
+      updateReviewDraft(category, reservationId, { submitted: true });
+      setReviewErrors((current) => {
+        if (!current[key]) return current;
+        const next = { ...current };
+        delete next[key];
+        return next;
+      });
+    } catch (error: any) {
+      console.error('Failed to save review:', error);
+      setReviewErrors((current) => ({
+        ...current,
+        [key]: error?.message || 'Could not save your review right now.',
+      }));
+      updateReviewDraft(category, reservationId, { submitted: false });
+    }
+  };
+
+  const renderReviewCard = (
+    category: "Rooms" | "Packages",
+    reservation: RoomReservation | PackageReservation
+  ) => {
+    const draft = getReviewDraft(category, reservation.id);
+    const title = category === "Rooms" ? (reservation as RoomReservation).cabin_number : (reservation as PackageReservation).name;
+    const subtitle = category === "Rooms"
+      ? "Tell us about the room, service, and overall stay."
+      : "Share how the event ran and how the experience felt.";
+    const detailLine = category === "Rooms"
+      ? `${(reservation as RoomReservation).cruise_name ? `Cruise: ${(reservation as RoomReservation).cruise_name}` : ''}${(reservation as RoomReservation).ship_name ? `${(reservation as RoomReservation).cruise_name ? ' · ' : ''}Ship: ${(reservation as RoomReservation).ship_name}` : ''}${(reservation as RoomReservation).cruise_name || (reservation as RoomReservation).ship_name ? ' · ' : ''}Stayed with ${(reservation as RoomReservation).email}`
+      : `${(reservation as PackageReservation).cruise_name ? `Cruise: ${(reservation as PackageReservation).cruise_name} · ` : ''}${(reservation as PackageReservation).staff_names || "Staff assigned at the event"}`;
+
+    return (
+      <article key={`${category}-${reservation.id}`} className="reviewCard">
+        <div className="reviewCardTop">
+          <div>
+            <p className="reviewEyebrow">Completed {category === "Rooms" ? "room stay" : "package event"}</p>
+            <h4>{title}</h4>
+          </div>
+          <span className="reviewChip">Ended {formatDateTime(reservation.end_time)}</span>
+        </div>
+
+        <p className="reviewMeta">{detailLine}</p>
+        <p className="reviewPrompt">{subtitle}</p>
+
+        <div className="starPicker" role="radiogroup" aria-label={`Rate ${title}`}>
+          {[1, 2, 3, 4, 5].map((star) => (
+            <button
+              key={star}
+              type="button"
+              className={`starBtn ${draft.rating >= star ? "active" : ""}`}
+              onClick={() => updateReviewDraft(category, reservation.id, { rating: star, submitted: false })}
+              aria-label={`${star} star${star === 1 ? "" : "s"}`}
+            >
+              ★
+            </button>
+          ))}
+          <span className="ratingLabel">{draft.rating > 0 ? `${draft.rating}/5 stars selected` : "Choose a rating"}</span>
+        </div>
+
+        <textarea
+          className="reviewTextArea"
+          placeholder={category === "Rooms" ? "What did you like or want improved about the room?" : "What stood out about the event?"}
+          value={draft.comment}
+          onChange={(e) => updateReviewDraft(category, reservation.id, { comment: e.target.value, submitted: false })}
+          rows={4}
+        />
+
+        <div className="reviewActions">
+          <span className="reviewNote">Saved reviews are attached to the reservation or event in the database.</span>
+          <button type="button" className="reviewSubmitBtn" onClick={() => submitReview(category, reservation.id)}>
+            Save review
+          </button>
+        </div>
+
+        {reviewErrors[reviewKey(category, reservation.id)] && (
+          <p className="reviewErrorMsg">{reviewErrors[reviewKey(category, reservation.id)]}</p>
+        )}
+
+        {draft.submitted && (
+          <p className="reviewSavedMsg">Your review has been saved.</p>
+        )}
+      </article>
+    );
+  };
+
   const handleIconChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -245,6 +464,8 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
         shift: updatedShift,
       });
 
+      setIsEditingProfile(false);
+
       setSaveMessage("Profile updated successfully!");
 
     } catch (err) {
@@ -278,15 +499,18 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
         <div className="tabButtons">
           <button
             className={`tabBtn ${activeTab === "reservations" ? "active" : ""}`}
-            onClick={() => setActiveTab("reservations")}
+            onClick={() => {
+              resetProfileEditor();
+              setActiveTab("reservations");
+            }}
           >
             My Reservations
           </button>
           <button
-            className={`tabBtn ${activeTab === "editinfo" ? "active" : ""}`}
-            onClick={() => setActiveTab("editinfo")}
+            className={`tabBtn ${activeTab === "profile" ? "active" : ""}`}
+            onClick={() => setActiveTab("profile")}
           >
-            Edit Profile
+            My Profile
           </button>
         </div>
 
@@ -294,6 +518,9 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
           {activeTab === "reservations" && (
             <div className="reservationsTab">
               <h3>My Reservations</h3>
+              <p className="reviewScopeNote">
+                Only concluded room stays and package events can be rated. Item reservations are excluded from reviews.
+              </p>
 
               <div className="categoryTabs">
                 <button
@@ -385,6 +612,10 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
                   const filteredRooms = filterByTimePeriod(roomsReservations);
                   return filteredRooms.length === 0 ? (
                     <p className="noDataMessage">You have no {timePeriod.toLowerCase()} rooms reservations.</p>
+                  ) : timePeriod === "Past" ? (
+                    <div className="reviewGrid">
+                      {filteredRooms.map((res) => renderReviewCard("Rooms", res))}
+                    </div>
                   ) : (
                     <table className="reservationsTable">
                       <thead>
@@ -417,6 +648,10 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
                   const filteredPackages = filterByTimePeriod(packagesReservations);
                   return filteredPackages.length === 0 ? (
                     <p className="noDataMessage">You have no {timePeriod.toLowerCase()} package events.</p>
+                  ) : timePeriod === "Past" ? (
+                    <div className="reviewGrid">
+                      {filteredPackages.map((res) => renderReviewCard("Packages", res))}
+                    </div>
                   ) : (
                     <table className="reservationsTable">
                       <thead>
@@ -477,71 +712,136 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
             </div>
           )}
 
-          {activeTab === "editinfo" && (
-            <div className="editInfoTab">
-              <h3>Edit Profile Information</h3>
-              {userProfile && (
-                <div className="editForm">
-                  <div className="formGroup">
-                    <label>Name:</label>
-                    <p>{userProfile.firstName} {userProfile.lastName}</p>
+          {activeTab === "profile" && userProfile && (
+            <div className="profileTab">
+              <div className="profileHeaderRow">
+                <h3>My Profile</h3>
+                <div className="profileActions">
+                  {isEditingProfile ? (
+                    <button type="button" className="secondaryBtn" onClick={resetProfileEditor}>
+                      Cancel
+                    </button>
+                  ) : (
+                    <button type="button" className="secondaryBtn" onClick={openProfileEditor}>
+                      Edit Profile
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="profileCard">
+                <div className="profileTopRow">
+                  <div className="profileAvatarSection">
+                    <div className="profileAvatar">
+                      {iconPreview || userProfile.profilePicture ? (
+                        <img
+                          src={iconPreview || userProfile.profilePicture || ""}
+                          alt={`${userProfile.firstName} ${userProfile.lastName} profile icon`}
+                        />
+                      ) : (
+                        <span>{userProfile.firstName.charAt(0)}{userProfile.lastName.charAt(0)}</span>
+                      )}
+                    </div>
+                    <div>
+                      <p className="profileName">{userProfile.firstName} {userProfile.lastName}</p>
+                      <p className="profileEmail">{userProfile.email}</p>
+                    </div>
                   </div>
 
-                  <div className="formGroup">
-                    <label>Email:</label>
-                    <p>{userProfile.email}</p>
-                  </div>
+                  <div
+                    className="loyaltyBanner loyaltyBanner--inline"
+                    style={{
+                      background: `linear-gradient(135deg, ${loyaltyTier.accentDark} 0%, ${loyaltyTier.accent} 55%, #9ca2ff 100%)`,
+                    }}
+                  >
+                    <div className="loyaltyBadgeWrap" aria-hidden="true">
+                      <div className="loyaltyBadgeGlow" />
+                      <img
+                        className="loyaltyBadgeImage"
+                        src={loyaltyTier.badgeSrc}
+                        alt=""
+                        role="presentation"
+                      />
+                    </div>
 
+                    <div className="loyaltyTierCopy">
+                      <span className="loyaltyTierName">{loyaltyTier.name}</span>
+                    </div>
+
+                    <div className="loyaltyPearls">
+                      <span className="loyaltyLabel">Pearls</span>
+                      <span className="loyaltyPearlCount">{pearls.toLocaleString()}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="profileFields">
                   <div className="formGroup">
                     <label>Bio:</label>
-                    <textarea
-                      value={bio}
-                      onChange={(e) => setBio(e.target.value)}
-                      placeholder="Tell us about yourself..."
-                      rows={4}
-                      className="bioInput"
-                    />
+                    {isEditingProfile ? (
+                      <textarea
+                        value={bio}
+                        onChange={(e) => setBio(e.target.value)}
+                        placeholder="Tell us about yourself..."
+                        rows={4}
+                        className="bioInput"
+                      />
+                    ) : (
+                      <p>{userProfile.biography || "No bio added yet."}</p>
+                    )}
                   </div>
 
-                  {(userProfile.role === "staff" || userProfile.role === "admin") && (
+                  {isProfileStaff && (
                     <div className="formGroup">
                       <label>Shift:</label>
-                      <select
-                        value={selectedShift}
-                        onChange={(e) => setSelectedShift(e.target.value)}
-                        className="input"
-                      >
-                        <option value="Morning">Morning</option>
-                        <option value="Day">Day</option>
-                        <option value="Night">Night</option>
-                      </select>
+                      {isEditingProfile ? (
+                        <select
+                          value={selectedShift}
+                          onChange={(e) => setSelectedShift(e.target.value)}
+                          className="input"
+                        >
+                          <option value="Morning">Morning</option>
+                          <option value="Day">Day</option>
+                          <option value="Night">Night</option>
+                        </select>
+                      ) : (
+                        <p>{userProfile.shift || "No shift assigned."}</p>
+                      )}
                     </div>
                   )}
 
-                  <div className="formGroup">
-                    <label>User Icon:</label>
-                    <div className="iconUpload">
-                      {iconPreview && (
-                        <div className="iconPreviewWrapper">
-                          <img src={iconPreview} alt="Icon preview" className="iconPreview" />
-                        </div>
-                      )}
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleIconChange}
-                        className="fileInput"
-                      />
+                  {isEditingProfile && (
+                    <div className="formGroup">
+                      <label>User Icon:</label>
+                      <div className="iconUpload">
+                        {(iconPreview || userProfile.profilePicture) && (
+                          <div className="iconPreviewWrapper">
+                            <img src={iconPreview || userProfile.profilePicture || ""} alt="Icon preview" className="iconPreview" />
+                          </div>
+                        )}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleIconChange}
+                          className="fileInput"
+                        />
+                      </div>
                     </div>
-                  </div>
+                  )}
 
-                  {saveMessage && (
+                  {!isEditingProfile && (
+                    <div className="profileNote">
+                      Use Edit Profile to update your bio, shift, or icon.
+                    </div>
+                  )}
+
+                  {isEditingProfile && saveMessage && (
                     <p className={saveMessage.includes("Error") || saveMessage.includes("error") ? "errorMsg" : "successMsg"}>
                       {saveMessage}
                     </p>
                   )}
 
-                  {shiftConflicts.length > 0 && (
+                  {isEditingProfile && shiftConflicts.length > 0 && (
                     <div className="errorMsg">
                       {shiftConflicts.map((conflict) => (
                         <div key={conflict.id}>
@@ -551,11 +851,15 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
                     </div>
                   )}
 
-                  <button onClick={handleSaveProfile} className="saveBtn">
-                    Save Changes
-                  </button>
+                  {isEditingProfile && (
+                    <div className="profileActionRow">
+                      <button onClick={handleSaveProfile} className="saveBtn">
+                        Save Changes
+                      </button>
+                    </div>
+                  )}
                 </div>
-              )}
+              </div>
             </div>
           )}
         </div>

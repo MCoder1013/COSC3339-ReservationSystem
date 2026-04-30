@@ -112,8 +112,7 @@ export default function ReservationTable() {
           (res: any) =>
             res.cabin_id !== null &&
             res.resource_id === null &&
-            res.status !== 'Cancelled' &&
-            new Date(res.end_time) >= now
+            res.status !== 'Cancelled'
         )
         .sort(
           (a: any, b: any) =>
@@ -359,6 +358,7 @@ export default function ReservationTable() {
                 <tr>
                   <th>ID</th>
                   <th>Cabin</th>
+                  <th>Cruise</th>
                   <th>Email</th>
                   <th>Check-In</th>
                   <th>Check-Out</th>
@@ -384,6 +384,7 @@ export default function ReservationTable() {
                     ) : (
                       <>
                         <td>{reservation.cabin_number}</td>
+                        <td>{reservation.cruise_name ?? "N/A"}</td>
                         <td>{reservation.email}</td>
                         <td>{formatDateTime(reservation.start_time)}</td>
                         <td>{formatDateTime(reservation.end_time)}</td>

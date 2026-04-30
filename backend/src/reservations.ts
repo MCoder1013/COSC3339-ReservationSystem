@@ -484,6 +484,7 @@ export async function getUserRoomReservations(userId: number) {
                 c.cabin_number,
                 r.cruise_id,
                 cr.cruise_name,
+                cr.ship_name,
                 r.start_time,
                 r.end_time,
                 r.status

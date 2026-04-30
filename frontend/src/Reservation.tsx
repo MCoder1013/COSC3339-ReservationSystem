@@ -9,6 +9,7 @@ import "react-calendar/dist/Calendar.css";
 import { formatInTimeZone } from 'date-fns-tz';
 import NavBar from "./NavBar";
 import PackageEventsTab from './PackageEventsTab';
+import ReviewsModal, { type ReviewRecord } from './ReviewsModal';
 import { useAuth } from './AuthContext';
 import { validatePaymentForm as validatePaymentFormFields } from "./paymentValidation";
 
@@ -112,6 +113,39 @@ export default function Reservation() {
     return Number.isNaN(numericId) ? cruiseId : numericId;
   };
 
+  const selectedRoom = availableRooms.find((room) => String(room.id) === String(roomReservationForm.cabinId));
+  const selectedCruiseLabel = cruises.find((cruise) => String(cruise.id) === String(selectedCruiseId))?.name
+    ?? accessibleCruises.find((cruise) => String(cruise.id) === String(selectedCruiseId))?.name
+    ?? 'the selected cruise';
+  const selectedRoomReviewsTitle = selectedRoom
+    ? `Reviews for Cabin ${selectedRoom.cabin_number} on ${selectedCruiseLabel}`
+    : 'Room reviews';
+
+  const openRoomReviews = async () => {
+    if (!roomReservationForm.cabinId || !selectedCruiseId) {
+      setRoomReviewsError('Please choose both a cruise and a room first.');
+      setRoomReviewsOpen(true);
+      return;
+    }
+
+    setRoomReviewsOpen(true);
+    setRoomReviewsLoading(true);
+    setRoomReviewsError('');
+
+    try {
+      const reviews = await fetchData(
+        `/api/ratings/rooms?cabinId=${encodeURIComponent(roomReservationForm.cabinId)}&cruiseId=${encodeURIComponent(selectedCruiseId)}`
+      );
+      setRoomReviews(Array.isArray(reviews) ? reviews : []);
+    } catch (error) {
+      console.error('Failed to load room reviews:', error);
+      setRoomReviews([]);
+      setRoomReviewsError('Unable to load room reviews right now.');
+    } finally {
+      setRoomReviewsLoading(false);
+    }
+  };
+
   const isUpcomingCruise = (cruise: any) => {
     const rawReturnDate = cruise?.return_date ?? cruise?.returnDate;
     if (!rawReturnDate) return true;
@@ -188,6 +222,10 @@ export default function Reservation() {
   const [roomEndTime, setRoomEndTime] = useState("");
   const [availableRoomStartTimes, setAvailableRoomStartTimes] = useState<string[]>([]);
   const [availableRoomEndTimes, setAvailableRoomEndTimes] = useState<string[]>([]);
+  const [roomReviewsOpen, setRoomReviewsOpen] = useState(false);
+  const [roomReviewsLoading, setRoomReviewsLoading] = useState(false);
+  const [roomReviewsError, setRoomReviewsError] = useState('');
+  const [roomReviews, setRoomReviews] = useState<ReviewRecord[]>([]);
 
   //additional guest emails for room reservations
   const [additionalGuestEmails, setAdditionalGuestEmails] = useState<string[]>([]);
@@ -1146,6 +1184,18 @@ export default function Reservation() {
                     </select>
                   </label>
 
+                  <div className="reviewActionRow">
+                    <button
+                      type="button"
+                      className="reviewActionButton"
+                      onClick={openRoomReviews}
+                      disabled={!roomReservationForm.cabinId || !selectedCruiseId}
+                    >
+                      View Reviews
+                    </button>
+                    <span className="reviewActionHint">See reviews for this room on the selected cruise.</span>
+                  </div>
+
                   <br />
 
                   <label>
@@ -1288,6 +1338,20 @@ export default function Reservation() {
           </form>
         </div>
       </main>
+
+      <ReviewsModal
+        isOpen={roomReviewsOpen}
+        title={selectedRoomReviewsTitle}
+        subtitle="Only past room reservations that were actually reviewed are shown here."
+        reviews={roomReviews}
+        loading={roomReviewsLoading}
+        error={roomReviewsError}
+        emptyMessage="No one has reviewed this room on the selected cruise yet."
+        onClose={() => {
+          setRoomReviewsOpen(false);
+          setRoomReviewsError('');
+        }}
+      />
 
       {isPaymentModalOpen && (
         <div className="paymentModalOverlay">
