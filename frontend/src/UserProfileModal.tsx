@@ -78,6 +78,7 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
   const [selectedShift, setSelectedShift] = useState("Day");
   const [saveMessage, setSaveMessage] = useState("");
   const [shiftConflicts, setShiftConflicts] = useState<ShiftConflict[]>([]);
+  const [reviewDrafts, setReviewDrafts] = useState<Record<string, { rating: number; comment: string; submitted: boolean }>>({});
 
   useEffect(() => {
     if (!isOpen) return;
@@ -181,6 +182,102 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
         return startTime > now;
       }
     });
+  };
+
+  const reviewKey = (category: "Rooms" | "Packages", reservationId: number) => `${category}-${reservationId}`;
+
+  const getReviewDraft = (category: "Rooms" | "Packages", reservationId: number) => {
+    const key = reviewKey(category, reservationId);
+    return reviewDrafts[key] ?? { rating: 0, comment: "", submitted: false };
+  };
+
+  const updateReviewDraft = (
+    category: "Rooms" | "Packages",
+    reservationId: number,
+    updates: Partial<{ rating: number; comment: string; submitted: boolean }>
+  ) => {
+    const key = reviewKey(category, reservationId);
+
+    setReviewDrafts((current) => ({
+      ...current,
+      [key]: {
+        ...getReviewDraft(category, reservationId),
+        ...updates,
+      },
+    }));
+  };
+
+  const submitReview = (category: "Rooms" | "Packages", reservationId: number) => {
+    const draft = getReviewDraft(category, reservationId);
+    if (draft.rating === 0 || !draft.comment.trim()) {
+      updateReviewDraft(category, reservationId, { submitted: false });
+      return;
+    }
+
+    updateReviewDraft(category, reservationId, { submitted: true });
+  };
+
+  const renderReviewCard = (
+    category: "Rooms" | "Packages",
+    reservation: RoomReservation | PackageReservation
+  ) => {
+    const draft = getReviewDraft(category, reservation.id);
+    const title = category === "Rooms" ? (reservation as RoomReservation).cabin_number : (reservation as PackageReservation).name;
+    const subtitle = category === "Rooms"
+      ? "Tell us about the room, service, and overall stay."
+      : "Share how the event ran and how the experience felt.";
+    const detailLine = category === "Rooms"
+      ? `Stayed with ${(reservation as RoomReservation).email}`
+      : (reservation as PackageReservation).staff_names || "Staff assigned at the event";
+
+    return (
+      <article key={`${category}-${reservation.id}`} className="reviewCard">
+        <div className="reviewCardTop">
+          <div>
+            <p className="reviewEyebrow">Completed {category === "Rooms" ? "room stay" : "package event"}</p>
+            <h4>{title}</h4>
+          </div>
+          <span className="reviewChip">Ended {formatDateTime(reservation.end_time)}</span>
+        </div>
+
+        <p className="reviewMeta">{detailLine}</p>
+        <p className="reviewPrompt">{subtitle}</p>
+
+        <div className="starPicker" role="radiogroup" aria-label={`Rate ${title}`}>
+          {[1, 2, 3, 4, 5].map((star) => (
+            <button
+              key={star}
+              type="button"
+              className={`starBtn ${draft.rating >= star ? "active" : ""}`}
+              onClick={() => updateReviewDraft(category, reservation.id, { rating: star })}
+              aria-label={`${star} star${star === 1 ? "" : "s"}`}
+            >
+              ★
+            </button>
+          ))}
+          <span className="ratingLabel">{draft.rating > 0 ? `${draft.rating}/5 stars selected` : "Choose a rating"}</span>
+        </div>
+
+        <textarea
+          className="reviewTextArea"
+          placeholder={category === "Rooms" ? "What did you like or want improved about the room?" : "What stood out about the event?"}
+          value={draft.comment}
+          onChange={(e) => updateReviewDraft(category, reservation.id, { comment: e.target.value, submitted: false })}
+          rows={4}
+        />
+
+        <div className="reviewActions">
+          <span className="reviewNote">Frontend preview only. Ratings are not saved yet.</span>
+          <button type="button" className="reviewSubmitBtn" onClick={() => submitReview(category, reservation.id)}>
+            Save review
+          </button>
+        </div>
+
+        {draft.submitted && (
+          <p className="reviewSavedMsg">Your review has been captured in the UI for this session.</p>
+        )}
+      </article>
+    );
   };
 
   const handleIconChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -294,6 +391,9 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
           {activeTab === "reservations" && (
             <div className="reservationsTab">
               <h3>My Reservations</h3>
+              <p className="reviewScopeNote">
+                Only concluded room stays and package events can be rated. Item reservations are excluded from reviews.
+              </p>
 
               <div className="categoryTabs">
                 <button
@@ -385,6 +485,10 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
                   const filteredRooms = filterByTimePeriod(roomsReservations);
                   return filteredRooms.length === 0 ? (
                     <p className="noDataMessage">You have no {timePeriod.toLowerCase()} rooms reservations.</p>
+                  ) : timePeriod === "Past" ? (
+                    <div className="reviewGrid">
+                      {filteredRooms.map((res) => renderReviewCard("Rooms", res))}
+                    </div>
                   ) : (
                     <table className="reservationsTable">
                       <thead>
@@ -417,6 +521,10 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
                   const filteredPackages = filterByTimePeriod(packagesReservations);
                   return filteredPackages.length === 0 ? (
                     <p className="noDataMessage">You have no {timePeriod.toLowerCase()} package events.</p>
+                  ) : timePeriod === "Past" ? (
+                    <div className="reviewGrid">
+                      {filteredPackages.map((res) => renderReviewCard("Packages", res))}
+                    </div>
                   ) : (
                     <table className="reservationsTable">
                       <thead>

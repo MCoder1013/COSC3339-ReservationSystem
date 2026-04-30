@@ -272,6 +272,7 @@ export default function ReservationTable() {
                 <tr>
                   <th>Reservation ID</th>
                   <th>Cabin Number</th>
+                  <th>Cruise</th>
                   <th>User Email</th>
                   <th>Check-In</th>
                   <th>Check-Out</th>
@@ -340,6 +341,7 @@ export default function ReservationTable() {
                   <tr key={reservation.id}>
                     <td>{reservation.id}</td>
                     <td>{reservation.cabin_number}</td>
+                    <td>{reservation.cruise_name ?? 'N/A'}</td>
                     <td>{reservation.email}</td>
                     <td>{formatDateTime(reservation.start_time)}</td>
                     <td>{formatDateTime(reservation.end_time)}</td>
