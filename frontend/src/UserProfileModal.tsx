@@ -12,6 +12,7 @@ interface UserProfile {
   profilePicture: string | null;
   role: string;
   shift?: string | null;
+  pearls?: number;
 }
 
 type ShiftConflict = {
@@ -79,15 +80,49 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
   const [selectedShift, setSelectedShift] = useState("Day");
   const [saveMessage, setSaveMessage] = useState("");
   const [shiftConflicts, setShiftConflicts] = useState<ShiftConflict[]>([]);
-  const loyaltyTier = {
-    name: "Barnacle Tier",
-    pearls: 639,
-    badgeSrc: "/images/barnacle-tier-badge.png",
-    accent: "#6f76ff",
-    accentDark: "#2b2f86",
-    accentSoft: "rgba(111, 118, 255, 0.18)",
-  };
 
+  function getLoyaltyTier(pearls: number) {
+  if (pearls < 500) {
+    return {
+      name: "Barnacle",
+      badgeSrc: "/images/Tier4.png",
+      accent: "#888",
+      accentDark: "#444",
+      accentSoft: "rgba(136,136,136,0.2)",
+    };
+  } else if (pearls < 1000) {
+    return {
+      name: "Coral",
+      badgeSrc: "/images/Tier3.png",
+      accent: "#4caf50",
+      accentDark: "#2e7d32",
+      accentSoft: "rgba(76,175,80,0.2)",
+    };
+  } else if (pearls < 2000) {
+    return {
+      name: "Clam",
+      badgeSrc: "/images/Tier2.png",
+      accent: "#2196f3",
+      accentDark: "#0d47a1",
+      accentSoft: "rgba(33,150,243,0.2)",
+    };
+  } else {
+    return {
+      name: "Pearl",
+      badgeSrc: "/images/Tier1.png",
+      accent: "#ffd700",
+      accentDark: "#b8860b",
+      accentSoft: "rgba(255,215,0,0.2)",
+    };
+  }
+}
+
+  const pearls = userProfile?.pearls ?? 2001; // 
+  const loyaltyTier = getLoyaltyTier(pearls);
+
+
+
+  
   const isProfileStaff = userProfile?.role === "staff" || userProfile?.role === "admin";
 
   const resetProfileEditor = () => {
@@ -574,7 +609,7 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
 
                     <div className="loyaltyPearls">
                       <span className="loyaltyLabel">Pearls</span>
-                      <span className="loyaltyPearlCount">{loyaltyTier.pearls.toLocaleString()}</span>
+                      <span className="loyaltyPearlCount">{pearls.toLocaleString()}</span>
                     </div>
                   </div>
                 </div>

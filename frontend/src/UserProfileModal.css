@@ -123,8 +123,8 @@
 }
 
 .loyaltyBadgeImage {
-  width: 92%;
-  height: 92%;
+  width: 100%;
+  height: 100%;
   object-fit: contain;
 }
 
@@ -285,15 +285,15 @@
 }
 
 .loyaltyBanner--inline {
-  min-height: 78px;
-  padding: 10px 14px;
-  grid-template-columns: 58px minmax(0, 1fr) auto;
-  gap: 10px;
+  grid-template-columns: 90px minmax(0, 1fr) auto;
 }
 
 .loyaltyBanner--inline .loyaltyBadgeWrap {
-  width: 48px;
-  height: 48px;
+  width: 110px;
+  height: 110px;
+  display: flex;
+  align-items: bottom;
+  justify-content: bottom;
 }
 
 .loyaltyBanner--inline .loyaltyBadgeGlow {
