@@ -3,10 +3,12 @@ import cors from 'cors'; // Required for Frontend-to-Backend communication
 import inventoryRoutes from "./routes/inventory.js";
 import authRoutes from "./routes/auth.js";
 import reservationRoutes from "./routes/reservations.js";
+import ratingRoutes from "./routes/ratings.js";
 import packageRoutes from "./routes/packages.js";
 import cookieParser from 'cookie-parser';
 import './notifications.js';
 import { authRequired, userMiddleware } from './routes/index.js';
+import { ensureRatingsSchema } from './ratings.js';
 
 
 const app = express();
@@ -24,6 +26,8 @@ app.use(cookieParser())
 app.use('/uploads', express.static('uploads'));
 // Ensures that the `req.userId` field is set
 app.use(userMiddleware);
+
+await ensureRatingsSchema();
 
 // ROUTES
 app.get('/', (_req, res) => {
@@ -47,6 +51,9 @@ app.use("/api", inventoryRoutes);
 
 // RESERVATIONS
 app.use("/api", reservationRoutes);
+
+// RATINGS
+app.use('/api', ratingRoutes);
 
 // PACKAGES / EVENTS
 app.use('/api', packageRoutes);

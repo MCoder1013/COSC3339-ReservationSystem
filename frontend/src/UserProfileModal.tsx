@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "./AuthContext";
 import "./UserProfileModal.css";
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+
 interface UserProfile {
   id: number;
   firstName: string;
@@ -35,6 +37,7 @@ interface ItemReservation {
 interface RoomReservation {
   id: number;
   cabin_number: string;
+  cruise_name?: string | null;
   email: string;
   start_time: string;
   end_time: string;
@@ -45,6 +48,7 @@ interface PackageReservation {
   id: number;
   name: string;
   description: string;
+  cruise_name?: string | null;
   start_time: string;
   end_time: string;
   status: string;
@@ -79,6 +83,7 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
   const [saveMessage, setSaveMessage] = useState("");
   const [shiftConflicts, setShiftConflicts] = useState<ShiftConflict[]>([]);
   const [reviewDrafts, setReviewDrafts] = useState<Record<string, { rating: number; comment: string; submitted: boolean }>>({});
+  const [reviewErrors, setReviewErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!isOpen) return;
@@ -205,16 +210,59 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
         ...updates,
       },
     }));
+
+    setReviewErrors((current) => {
+      if (!current[key]) return current;
+      const next = { ...current };
+      delete next[key];
+      return next;
+    });
   };
 
-  const submitReview = (category: "Rooms" | "Packages", reservationId: number) => {
+  const submitReview = async (category: "Rooms" | "Packages", reservationId: number) => {
     const draft = getReviewDraft(category, reservationId);
     if (draft.rating === 0 || !draft.comment.trim()) {
       updateReviewDraft(category, reservationId, { submitted: false });
       return;
     }
 
-    updateReviewDraft(category, reservationId, { submitted: true });
+    const key = reviewKey(category, reservationId);
+
+    try {
+      const response = await fetch(`${API_URL}/api/ratings`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          targetType: category === 'Rooms' ? 'room' : 'event',
+          targetId: reservationId,
+          rating: draft.rating,
+          review: draft.comment.trim(),
+        }),
+      });
+
+      const body = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(body?.error || 'Could not save your review right now.');
+      }
+
+      updateReviewDraft(category, reservationId, { submitted: true });
+      setReviewErrors((current) => {
+        if (!current[key]) return current;
+        const next = { ...current };
+        delete next[key];
+        return next;
+      });
+    } catch (error: any) {
+      console.error('Failed to save review:', error);
+      setReviewErrors((current) => ({
+        ...current,
+        [key]: error?.message || 'Could not save your review right now.',
+      }));
+      updateReviewDraft(category, reservationId, { submitted: false });
+    }
   };
 
   const renderReviewCard = (
@@ -227,8 +275,8 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
       ? "Tell us about the room, service, and overall stay."
       : "Share how the event ran and how the experience felt.";
     const detailLine = category === "Rooms"
-      ? `Stayed with ${(reservation as RoomReservation).email}`
-      : (reservation as PackageReservation).staff_names || "Staff assigned at the event";
+      ? `${(reservation as RoomReservation).cruise_name ? `Cruise: ${(reservation as RoomReservation).cruise_name} · ` : ''}Stayed with ${(reservation as RoomReservation).email}`
+      : `${(reservation as PackageReservation).cruise_name ? `Cruise: ${(reservation as PackageReservation).cruise_name} · ` : ''}${(reservation as PackageReservation).staff_names || "Staff assigned at the event"}`;
 
     return (
       <article key={`${category}-${reservation.id}`} className="reviewCard">
@@ -249,7 +297,7 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
               key={star}
               type="button"
               className={`starBtn ${draft.rating >= star ? "active" : ""}`}
-              onClick={() => updateReviewDraft(category, reservation.id, { rating: star })}
+              onClick={() => updateReviewDraft(category, reservation.id, { rating: star, submitted: false })}
               aria-label={`${star} star${star === 1 ? "" : "s"}`}
             >
               ★
@@ -267,14 +315,18 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
         />
 
         <div className="reviewActions">
-          <span className="reviewNote">Frontend preview only. Ratings are not saved yet.</span>
+          <span className="reviewNote">Saved reviews are attached to the reservation or event in the database.</span>
           <button type="button" className="reviewSubmitBtn" onClick={() => submitReview(category, reservation.id)}>
             Save review
           </button>
         </div>
 
+        {reviewErrors[reviewKey(category, reservation.id)] && (
+          <p className="reviewErrorMsg">{reviewErrors[reviewKey(category, reservation.id)]}</p>
+        )}
+
         {draft.submitted && (
-          <p className="reviewSavedMsg">Your review has been captured in the UI for this session.</p>
+          <p className="reviewSavedMsg">Your review has been saved.</p>
         )}
       </article>
     );
