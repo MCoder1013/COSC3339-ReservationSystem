@@ -15,7 +15,8 @@
     "react": "^19.2.0",
     "react-datetime-picker": "^7.0.1",
     "react-dom": "^19.2.0",
-    "react-router-dom": "^7.13.0"
+    "react-router-dom": "^7.13.0",
+    "react-custom-roulette": "git+https://github.com/Angoweb/react-custom-roulette#a8e89b0ff82c2650b5cd9519eaaac2390ca72c89"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
