@@ -2,6 +2,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { isAdmin, isStaff, useAuth } from './AuthContext';
 import { fetchData } from './api';
+import ReviewsModal, { type ReviewRecord } from './ReviewsModal';
+import { validatePaymentForm as validatePaymentFormFields, type PaymentForm } from './paymentValidation';
 import DatePicker from 'react-date-picker';
 import 'react-date-picker/dist/DatePicker.css';
 import 'react-calendar/dist/Calendar.css';
@@ -157,6 +159,7 @@ export default function PackageEventsList({ showManagement = false, onlyJoined =
   const [staffMembers, setStaffMembers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
   const [selectedEvent, setSelectedEvent] = useState<any | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
@@ -165,6 +168,21 @@ export default function PackageEventsList({ showManagement = false, onlyJoined =
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelEventId, setCancelEventId] = useState<number | null>(null);
   const [cancelReason, setCancelReason] = useState('');
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [paymentError, setPaymentError] = useState('');
+  const [pendingJoinEventId, setPendingJoinEventId] = useState<number | null>(null);
+  const [reviewsOpen, setReviewsOpen] = useState(false);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [reviewsError, setReviewsError] = useState('');
+  const [reviewsTitle, setReviewsTitle] = useState('Event reviews');
+  const [reviews, setReviews] = useState<ReviewRecord[]>([]);
+  const [paymentForm, setPaymentForm] = useState<PaymentForm>({
+    cardHolderName: '',
+    cardNumber: '',
+    expirationDate: '',
+    securityCode: '',
+    zipCode: '',
+  });
 
   const editCreatorShift = useMemo(() => {
     if (!selectedEvent?.created_by) return null;
@@ -360,7 +378,52 @@ export default function PackageEventsList({ showManagement = false, onlyJoined =
     }
   };
 
-  const handleJoinEvent = async (eventId: number) => {
+  const openEventReviews = async (eventId: number, eventName: string) => {
+    setReviewsOpen(true);
+    setReviewsLoading(true);
+    setReviewsError('');
+    setReviewsTitle(`Reviews for ${eventName}`);
+
+    try {
+      const data = await fetchData(`/api/ratings/events/${eventId}`);
+      setReviews(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error(err);
+      setReviews([]);
+      setReviewsError('Unable to load event reviews right now.');
+    } finally {
+      setReviewsLoading(false);
+    }
+  };
+
+  const resetPaymentForm = () => {
+    setPaymentForm({
+      cardHolderName: '',
+      cardNumber: '',
+      expirationDate: '',
+      securityCode: '',
+      zipCode: '',
+    });
+  };
+
+  const closePaymentModal = () => {
+    setIsPaymentModalOpen(false);
+    setPaymentError('');
+    setPendingJoinEventId(null);
+    resetPaymentForm();
+  };
+
+  const beginPaymentForEvent = (eventId: number) => {
+    setError('');
+    setPaymentError('');
+    setPendingJoinEventId(eventId);
+    resetPaymentForm();
+    setIsPaymentModalOpen(true);
+  };
+
+  type JoinResult = { success: boolean; message?: string };
+
+  const handleJoinEvent = async (eventId: number): Promise<JoinResult> => {
     setError('');
     try {
       const response = await fetch(`${API_URL}/api/packages/events/${eventId}/join`, {
@@ -370,15 +433,43 @@ export default function PackageEventsList({ showManagement = false, onlyJoined =
 
       const body = await response.json().catch(() => null);
       if (!response.ok) {
-        throw new Error(body?.error || 'Could not join this event right now.');
+        const message = body?.error || 'Could not join this event right now.';
+        console.error('Backend error:', body);
+        setError(message);
+        return { success: false, message };
       }
 
       await loadEvents();
-      await openEventDetail(eventId);
+      return { success: true };
     } catch (err: any) {
       console.error(err);
-      setError(err.message || 'Could not join this event right now.');
+      const message = err?.message || 'Could not join this event right now.';
+      setError(message);
+      return { success: false, message };
     }
+  };
+
+  const handlePaymentSubmit = async () => {
+
+    if (pendingJoinEventId === null) {
+      setPaymentError('Please choose an event to reserve first.');
+      return;
+    }
+
+    const validationError = validatePaymentFormFields(paymentForm);
+    if (validationError) {
+      setPaymentError(validationError);
+      return;
+    }
+
+    const result = await handleJoinEvent(pendingJoinEventId);
+    if (result.success) {
+      setSuccess('Reservation submitted successfully.');
+      await openEventDetail(pendingJoinEventId);
+      return;
+    }
+
+    setPaymentError(result.message ?? 'Unable to complete the reservation. Please try again.');
   };
 
   const handleLeaveEvent = async (eventId: number) => {
@@ -671,6 +762,20 @@ export default function PackageEventsList({ showManagement = false, onlyJoined =
 
   return (
     <div>
+      {success && (
+        <div
+          style={{
+            backgroundColor: 'rgba(36, 128, 52, 0.18)',
+            color: '#0e4a1a',
+            border: '1px solid rgba(36, 128, 52, 0.4)',
+            padding: '8px',
+            borderRadius: '6px',
+            marginBottom: '8px',
+          }}
+        >
+          {success}
+        </div>
+      )}
       {error && <div className="errorMessage">{error}</div>}
 
       {events.length === 0 ? (
@@ -694,6 +799,9 @@ export default function PackageEventsList({ showManagement = false, onlyJoined =
                 <td>
                   <button type="button" className="smallButton" onClick={() => openEventDetail(event.id)}>
                     View Details
+                  </button>
+                  <button type="button" className="smallButton" onClick={() => openEventReviews(event.id, event.name)}>
+                    View Reviews
                   </button>
                   {canManageEvent(event) && (
                     <>
@@ -923,7 +1031,7 @@ export default function PackageEventsList({ showManagement = false, onlyJoined =
 
             <div style={{ marginTop: '14px', display: 'flex', gap: '8px', justifyContent: 'center' }}>
               {user && Number(selectedEvent.spots_left) > 0 && !selectedEvent.is_joined && (
-                <button className="submitButton" onClick={() => handleJoinEvent(selectedEvent.id)}>
+                <button type="button" className="submitButton" onClick={() => beginPaymentForEvent(selectedEvent.id)}>
                   Reserve My Spot
                 </button>
               )}
@@ -939,6 +1047,20 @@ export default function PackageEventsList({ showManagement = false, onlyJoined =
           </div>
         </div>
       )}
+
+      <ReviewsModal
+        isOpen={reviewsOpen}
+        title={reviewsTitle}
+        subtitle="Reviews are only available for past events that were previously joined by a user."
+        reviews={reviews}
+        loading={reviewsLoading}
+        error={reviewsError}
+        emptyMessage="No reviews have been posted for this event yet."
+        onClose={() => {
+          setReviewsOpen(false);
+          setReviewsError('');
+        }}
+      />
 
       {showCancelModal && cancelEventId !== null && (
         <div className="modalOverlay" onClick={closeCancelModal}>
@@ -981,6 +1103,143 @@ export default function PackageEventsList({ showManagement = false, onlyJoined =
               <button type="button" className="submitButton" onClick={cancelEvent}>
                 Submit Cancellation
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isPaymentModalOpen && (
+        <div className="paymentModalOverlay">
+          <div className="paymentModalContent">
+            <div className="paymentModalHeader">
+              <div>
+                <h3>Secure Payment</h3>
+                <p className="paymentModalSubtitle">
+                  Enter your payment details to reserve your spot for this event.
+                </p>
+              </div>
+              <button type="button" className="paymentModalCloseButton" onClick={closePaymentModal}>
+                ✕
+              </button>
+            </div>
+
+            <div className="paymentForm">
+              {success && (
+                <div
+                  style={{
+                    backgroundColor: 'rgba(36, 128, 52, 0.18)',
+                    color: '#0e4a1a',
+                    border: '1px solid rgba(36, 128, 52, 0.4)',
+                    padding: '10px 12px',
+                    borderRadius: '8px',
+                    marginBottom: '10px',
+                  }}
+                >
+                  {success}
+                </div>
+              )}
+
+              <div className="paymentFormGrid">
+                <label className="paymentField paymentFieldFull">
+                  Card Holder&apos;s Name
+                  <input
+                    type="text"
+                    autoComplete="cc-name"
+                    value={paymentForm.cardHolderName}
+                    onChange={(event) => {
+                      setPaymentError('');
+                      setSuccess('');
+                      setPaymentForm({ ...paymentForm, cardHolderName: event.target.value });
+                    }}
+                    placeholder="Name as shown on card"
+                  />
+                </label>
+
+                <label className="paymentField paymentFieldFull">
+                  Card Number
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="cc-number"
+                    value={paymentForm.cardNumber}
+                    onChange={(event) => {
+                      setPaymentError('');
+                      setSuccess('');
+                      const digitsOnly = event.target.value.replace(/\D/g, '').slice(0, 16);
+                      const formatted = digitsOnly.match(/.{1,4}/g)?.join(' ') ?? '';
+                      setPaymentForm({ ...paymentForm, cardNumber: formatted });
+                    }}
+                    placeholder="1234 5678 9012 3456"
+                  />
+                </label>
+
+                <label className="paymentField">
+                  Expiration Date
+                  <input
+                    type="text"
+                    autoComplete="cc-exp"
+                    inputMode="numeric"
+                    placeholder="12/28"
+                    maxLength={5}
+                    value={paymentForm.expirationDate}
+                    onChange={(event) => {
+                      setPaymentError('');
+                      setSuccess('');
+                      const digitsOnly = event.target.value.replace(/\D/g, '').slice(0, 4);
+                      const formatted = digitsOnly.length > 2 ? `${digitsOnly.slice(0, 2)}/${digitsOnly.slice(2)}` : digitsOnly;
+                      setPaymentForm({ ...paymentForm, expirationDate: formatted });
+                    }}
+                  />
+                  <span className="paymentFieldHint">Use MM/YY format, for example 12/28.</span>
+                </label>
+
+                <label className="paymentField">
+                  Security Code
+                  <input
+                    type="text"
+                    autoComplete="cc-csc"
+                    inputMode="numeric"
+                    maxLength={3}
+                    value={paymentForm.securityCode}
+                    onChange={(event) => {
+                      setPaymentError('');
+                      setSuccess('');
+                      const digitsOnly = event.target.value.replace(/\D/g, '').slice(0, 3);
+                      setPaymentForm({ ...paymentForm, securityCode: digitsOnly });
+                    }}
+                    placeholder="123"
+                  />
+                </label>
+
+                <label className="paymentField">
+                  ZIP Code
+                  <input
+                    type="text"
+                    autoComplete="postal-code"
+                    inputMode="numeric"
+                    maxLength={5}
+                    value={paymentForm.zipCode}
+                    onChange={(event) => {
+                      setPaymentError('');
+                      setSuccess('');
+                      const digitsOnly = event.target.value.replace(/\D/g, '').slice(0, 5);
+                      setPaymentForm({ ...paymentForm, zipCode: digitsOnly });
+                    }}
+                    placeholder="12345"
+                  />
+                </label>
+              </div>
+
+              {paymentError && <div className="paymentError">{paymentError}</div>}
+
+              <div className="paymentActions">
+                <button type="button" className="paymentSecondaryButton" onClick={closePaymentModal}>
+                  Cancel
+                </button>
+                <button type="button" className="paymentPrimaryButton" onClick={() => void handlePaymentSubmit()}>
+                  Complete Reservation
+                </button>
+              </div>
             </div>
           </div>
         </div>

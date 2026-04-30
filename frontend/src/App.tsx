@@ -1,6 +1,6 @@
 import "./App.css";
 import { useNavigate } from "react-router-dom";
-import { isAdmin, isStaff, useAuth } from "./AuthContext";
+import { isAdmin, isNormal, isStaff, useAuth } from "./AuthContext";
 import NavBar from "./NavBar";
 
 export default function App() {
@@ -50,6 +50,17 @@ export default function App() {
                     New Reservation
                   </button>
                 </div>
+
+                {isNormal(user) && 
+                <div className="dashboardCard">
+                  <h3>Gambling</h3>
+                  <p>Play roulette and bet your pearls to win prizes!</p>
+                  <button onClick={() => navigate("/gambling")} className="primaryBtn">
+                    Enter 
+                  </button>
+                </div>
+                }
+
                 
                 {isStaff(user) && (
                   <div className="dashboardCard">

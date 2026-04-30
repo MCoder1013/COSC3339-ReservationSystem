@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "./AuthContext";
 import "./UserProfileModal.css";
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+
 interface UserProfile {
   id: number;
   firstName: string;
@@ -36,6 +38,8 @@ interface ItemReservation {
 interface RoomReservation {
   id: number;
   cabin_number: string;
+  cruise_name?: string | null;
+  ship_name?: string | null;
   email: string;
   start_time: string;
   end_time: string;
@@ -46,6 +50,7 @@ interface PackageReservation {
   id: number;
   name: string;
   description: string;
+  cruise_name?: string | null;
   start_time: string;
   end_time: string;
   status: string;
@@ -80,6 +85,8 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
   const [selectedShift, setSelectedShift] = useState("Day");
   const [saveMessage, setSaveMessage] = useState("");
   const [shiftConflicts, setShiftConflicts] = useState<ShiftConflict[]>([]);
+  const [reviewDrafts, setReviewDrafts] = useState<Record<string, { rating: number; comment: string; submitted: boolean }>>({});
+  const [reviewErrors, setReviewErrors] = useState<Record<string, string>>({});
 
   function getLoyaltyTier(pearls: number) {
   if (pearls < 500) {
@@ -252,6 +259,149 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
     });
   };
 
+  const reviewKey = (category: "Rooms" | "Packages", reservationId: number) => `${category}-${reservationId}`;
+
+  const getReviewDraft = (category: "Rooms" | "Packages", reservationId: number) => {
+    const key = reviewKey(category, reservationId);
+    return reviewDrafts[key] ?? { rating: 0, comment: "", submitted: false };
+  };
+
+  const updateReviewDraft = (
+    category: "Rooms" | "Packages",
+    reservationId: number,
+    updates: Partial<{ rating: number; comment: string; submitted: boolean }>
+  ) => {
+    const key = reviewKey(category, reservationId);
+
+    setReviewDrafts((current) => ({
+      ...current,
+      [key]: {
+        ...getReviewDraft(category, reservationId),
+        ...updates,
+      },
+    }));
+
+    setReviewErrors((current) => {
+      if (!current[key]) return current;
+      const next = { ...current };
+      delete next[key];
+      return next;
+    });
+  };
+
+  const submitReview = async (category: "Rooms" | "Packages", reservationId: number) => {
+    const draft = getReviewDraft(category, reservationId);
+    if (draft.rating === 0 || !draft.comment.trim()) {
+      updateReviewDraft(category, reservationId, { submitted: false });
+      return;
+    }
+
+    const key = reviewKey(category, reservationId);
+
+    try {
+      const response = await fetch(`${API_URL}/api/ratings`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          targetType: category === 'Rooms' ? 'room' : 'event',
+          targetId: reservationId,
+          rating: draft.rating,
+          review: draft.comment.trim(),
+        }),
+      });
+
+      const body = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(body?.error || 'Could not save your review right now.');
+      }
+
+      updateReviewDraft(category, reservationId, { submitted: true });
+      setReviewErrors((current) => {
+        if (!current[key]) return current;
+        const next = { ...current };
+        delete next[key];
+        return next;
+      });
+    } catch (error: any) {
+      console.error('Failed to save review:', error);
+      setReviewErrors((current) => ({
+        ...current,
+        [key]: error?.message || 'Could not save your review right now.',
+      }));
+      updateReviewDraft(category, reservationId, { submitted: false });
+    }
+  };
+
+  const renderReviewCard = (
+    category: "Rooms" | "Packages",
+    reservation: RoomReservation | PackageReservation
+  ) => {
+    const draft = getReviewDraft(category, reservation.id);
+    const title = category === "Rooms" ? (reservation as RoomReservation).cabin_number : (reservation as PackageReservation).name;
+    const subtitle = category === "Rooms"
+      ? "Tell us about the room, service, and overall stay."
+      : "Share how the event ran and how the experience felt.";
+    const detailLine = category === "Rooms"
+      ? `${(reservation as RoomReservation).cruise_name ? `Cruise: ${(reservation as RoomReservation).cruise_name}` : ''}${(reservation as RoomReservation).ship_name ? `${(reservation as RoomReservation).cruise_name ? ' · ' : ''}Ship: ${(reservation as RoomReservation).ship_name}` : ''}${(reservation as RoomReservation).cruise_name || (reservation as RoomReservation).ship_name ? ' · ' : ''}Stayed with ${(reservation as RoomReservation).email}`
+      : `${(reservation as PackageReservation).cruise_name ? `Cruise: ${(reservation as PackageReservation).cruise_name} · ` : ''}${(reservation as PackageReservation).staff_names || "Staff assigned at the event"}`;
+
+    return (
+      <article key={`${category}-${reservation.id}`} className="reviewCard">
+        <div className="reviewCardTop">
+          <div>
+            <p className="reviewEyebrow">Completed {category === "Rooms" ? "room stay" : "package event"}</p>
+            <h4>{title}</h4>
+          </div>
+          <span className="reviewChip">Ended {formatDateTime(reservation.end_time)}</span>
+        </div>
+
+        <p className="reviewMeta">{detailLine}</p>
+        <p className="reviewPrompt">{subtitle}</p>
+
+        <div className="starPicker" role="radiogroup" aria-label={`Rate ${title}`}>
+          {[1, 2, 3, 4, 5].map((star) => (
+            <button
+              key={star}
+              type="button"
+              className={`starBtn ${draft.rating >= star ? "active" : ""}`}
+              onClick={() => updateReviewDraft(category, reservation.id, { rating: star, submitted: false })}
+              aria-label={`${star} star${star === 1 ? "" : "s"}`}
+            >
+              ★
+            </button>
+          ))}
+          <span className="ratingLabel">{draft.rating > 0 ? `${draft.rating}/5 stars selected` : "Choose a rating"}</span>
+        </div>
+
+        <textarea
+          className="reviewTextArea"
+          placeholder={category === "Rooms" ? "What did you like or want improved about the room?" : "What stood out about the event?"}
+          value={draft.comment}
+          onChange={(e) => updateReviewDraft(category, reservation.id, { comment: e.target.value, submitted: false })}
+          rows={4}
+        />
+
+        <div className="reviewActions">
+          <span className="reviewNote">Saved reviews are attached to the reservation or event in the database.</span>
+          <button type="button" className="reviewSubmitBtn" onClick={() => submitReview(category, reservation.id)}>
+            Save review
+          </button>
+        </div>
+
+        {reviewErrors[reviewKey(category, reservation.id)] && (
+          <p className="reviewErrorMsg">{reviewErrors[reviewKey(category, reservation.id)]}</p>
+        )}
+
+        {draft.submitted && (
+          <p className="reviewSavedMsg">Your review has been saved.</p>
+        )}
+      </article>
+    );
+  };
+
   const handleIconChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -368,6 +518,9 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
           {activeTab === "reservations" && (
             <div className="reservationsTab">
               <h3>My Reservations</h3>
+              <p className="reviewScopeNote">
+                Only concluded room stays and package events can be rated. Item reservations are excluded from reviews.
+              </p>
 
               <div className="categoryTabs">
                 <button
@@ -459,6 +612,10 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
                   const filteredRooms = filterByTimePeriod(roomsReservations);
                   return filteredRooms.length === 0 ? (
                     <p className="noDataMessage">You have no {timePeriod.toLowerCase()} rooms reservations.</p>
+                  ) : timePeriod === "Past" ? (
+                    <div className="reviewGrid">
+                      {filteredRooms.map((res) => renderReviewCard("Rooms", res))}
+                    </div>
                   ) : (
                     <table className="reservationsTable">
                       <thead>
@@ -491,6 +648,10 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
                   const filteredPackages = filterByTimePeriod(packagesReservations);
                   return filteredPackages.length === 0 ? (
                     <p className="noDataMessage">You have no {timePeriod.toLowerCase()} package events.</p>
+                  ) : timePeriod === "Past" ? (
+                    <div className="reviewGrid">
+                      {filteredPackages.map((res) => renderReviewCard("Packages", res))}
+                    </div>
                   ) : (
                     <table className="reservationsTable">
                       <thead>

@@ -9,7 +9,9 @@ import "react-calendar/dist/Calendar.css";
 import { formatInTimeZone } from 'date-fns-tz';
 import NavBar from "./NavBar";
 import PackageEventsTab from './PackageEventsTab';
+import ReviewsModal, { type ReviewRecord } from './ReviewsModal';
 import { useAuth } from './AuthContext';
+import { validatePaymentForm as validatePaymentFormFields } from "./paymentValidation";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -19,17 +21,6 @@ type Value = ValuePiece | [ValuePiece, ValuePiece];
 type CruiseOption = {
   id: string;
   name: string;
-};
-
-type ItemReservationWindow = {
-  start: Date;
-  end: Date;
-  quantityReserved: number;
-};
-
-type RoomReservationWindow = {
-  start: Date;
-  end: Date;
 };
 
 const RESERVATION_CRUISE_MAP_KEY = "reservationCruiseMapV1";
@@ -48,7 +39,6 @@ export default function Reservation() {
   const [accessibleCruises, setAccessibleCruises] = useState<CruiseOption[]>([]);
   const [selectedCruiseId, setSelectedCruiseId] = useState<string>("");
   const [isCruiseLoading, setIsCruiseLoading] = useState<boolean>(true);
-  const [reservationCruiseMap, setReservationCruiseMap] = useState<Record<string, string>>({});
   const isCruiseSelected = selectedCruiseId !== "";
   const normalizedRole = String(user?.role ?? "").toLowerCase();
   const hideRoomsTab = normalizedRole === "staff" || normalizedRole === "admin" || String(user?.staffRole ?? "").toLowerCase() === "admin";
@@ -82,6 +72,16 @@ export default function Reservation() {
   const [itemEndTime, setItemEndTime] = useState("");
   const [availableItemStartTimes, setAvailableItemStartTimes] = useState<string[]>([]);
   const [availableItemEndTimes, setAvailableItemEndTimes] = useState<string[]>([]);
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [paymentError, setPaymentError] = useState("");
+  const [paymentSuccess, setPaymentSuccess] = useState("");
+  const [paymentForm, setPaymentForm] = useState({
+    cardHolderName: "",
+    cardNumber: "",
+    expirationDate: "",
+    securityCode: "",
+    zipCode: "",
+  });
 
 
   const timeSelected =
@@ -90,58 +90,60 @@ export default function Reservation() {
     itemEndDate &&
     itemEndTime;
 
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(RESERVATION_CRUISE_MAP_KEY);
-      if (!raw) return;
-
-      const parsed = JSON.parse(raw) as Record<string, string>;
-      if (parsed && typeof parsed === "object") {
-        setReservationCruiseMap(parsed);
-      }
-    } catch (error) {
-      console.error("Error loading reservation cruise mappings:", error);
-    }
-  }, []);
-
   const saveReservationCruiseMapping = (reservationId: number | string, cruiseId: string) => {
     const id = String(reservationId);
     if (!id || !cruiseId) return;
 
-    setReservationCruiseMap((previous) => {
+    try {
+      const raw = localStorage.getItem(RESERVATION_CRUISE_MAP_KEY);
+      const previous = raw ? (JSON.parse(raw) as Record<string, string>) : {};
       const next = {
         ...previous,
         [id]: cruiseId,
       };
 
-      try {
-        localStorage.setItem(RESERVATION_CRUISE_MAP_KEY, JSON.stringify(next));
-      } catch (error) {
-        console.error("Error saving reservation cruise mapping:", error);
-      }
-
-      return next;
-    });
-  };
-
-  const getReservationCruiseId = (reservation: any): string | undefined => {
-    if (reservation?.cruise_id !== null && reservation?.cruise_id !== undefined) {
-      return String(reservation.cruise_id);
+      localStorage.setItem(RESERVATION_CRUISE_MAP_KEY, JSON.stringify(next));
+    } catch (error) {
+      console.error("Error saving reservation cruise mapping:", error);
     }
-
-    const reservationId = reservation?.id;
-    if (reservationId === null || reservationId === undefined) return undefined;
-    return reservationCruiseMap[String(reservationId)];
-  };
-
-  const belongsToSelectedCruise = (reservation: any): boolean => {
-    if (!selectedCruiseId) return false;
-    return getReservationCruiseId(reservation) === selectedCruiseId;
   };
 
   const normalizeCruiseIdForPayload = (cruiseId: string) => {
     const numericId = Number(cruiseId);
     return Number.isNaN(numericId) ? cruiseId : numericId;
+  };
+
+  const selectedRoom = availableRooms.find((room) => String(room.id) === String(roomReservationForm.cabinId));
+  const selectedCruiseLabel = cruises.find((cruise) => String(cruise.id) === String(selectedCruiseId))?.name
+    ?? accessibleCruises.find((cruise) => String(cruise.id) === String(selectedCruiseId))?.name
+    ?? 'the selected cruise';
+  const selectedRoomReviewsTitle = selectedRoom
+    ? `Reviews for Cabin ${selectedRoom.cabin_number} on ${selectedCruiseLabel}`
+    : 'Room reviews';
+
+  const openRoomReviews = async () => {
+    if (!roomReservationForm.cabinId || !selectedCruiseId) {
+      setRoomReviewsError('Please choose both a cruise and a room first.');
+      setRoomReviewsOpen(true);
+      return;
+    }
+
+    setRoomReviewsOpen(true);
+    setRoomReviewsLoading(true);
+    setRoomReviewsError('');
+
+    try {
+      const reviews = await fetchData(
+        `/api/ratings/rooms?cabinId=${encodeURIComponent(roomReservationForm.cabinId)}&cruiseId=${encodeURIComponent(selectedCruiseId)}`
+      );
+      setRoomReviews(Array.isArray(reviews) ? reviews : []);
+    } catch (error) {
+      console.error('Failed to load room reviews:', error);
+      setRoomReviews([]);
+      setRoomReviewsError('Unable to load room reviews right now.');
+    } finally {
+      setRoomReviewsLoading(false);
+    }
   };
 
   const isUpcomingCruise = (cruise: any) => {
@@ -220,6 +222,10 @@ export default function Reservation() {
   const [roomEndTime, setRoomEndTime] = useState("");
   const [availableRoomStartTimes, setAvailableRoomStartTimes] = useState<string[]>([]);
   const [availableRoomEndTimes, setAvailableRoomEndTimes] = useState<string[]>([]);
+  const [roomReviewsOpen, setRoomReviewsOpen] = useState(false);
+  const [roomReviewsLoading, setRoomReviewsLoading] = useState(false);
+  const [roomReviewsError, setRoomReviewsError] = useState('');
+  const [roomReviews, setRoomReviews] = useState<ReviewRecord[]>([]);
 
   //additional guest emails for room reservations
   const [additionalGuestEmails, setAdditionalGuestEmails] = useState<string[]>([]);
@@ -263,232 +269,121 @@ export default function Reservation() {
     setAdditionalGuestEmails(updatedEmails);
   };
 
-  // Generate all 30-minute time slots for a day
-  const generateTimeSlots = (): string[] => {
-    const slots = [];
-    for (let hour = 0; hour < 24; hour++) {
-      for (let minute = 0; minute < 60; minute += 30) {
-        const timeStr = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
-        slots.push(timeStr);
-      }
-    }
-    return slots;
-  };
-
-
-  // 
-  const fetchCurrentAvailability = async (
-    resourceId: string,
-    startDate: Date,
-    startTime: string,
-    endDate: Date,
-    endTime: string
-  ) => {
-    if (!selectedCruiseId || !resourceId || !startDate || !startTime || !endDate || !endTime) {
-      setCurrentAvailability(null);
-      return;
-    }
-
-    try {
-      const startDateTime = combineDateAndTime(startDate, startTime);
-      const endDateTime = combineDateAndTime(endDate, endTime);
-      const selectedItem = availableItems.find((item) => String(item.id) === String(resourceId));
-      const totalQuantity = selectedItem ? Number(selectedItem.quantity) : 0;
-
-      const scopedReservations = await getItemReservations(resourceId);
-      const reservedQty = scopedReservations
-        .filter((res) => intervalsOverlap(startDateTime, endDateTime, res.start, res.end))
-        .reduce((sum, res) => sum + res.quantityReserved, 0);
-
-      setCurrentAvailability(Math.max(totalQuantity - reservedQty, 0));
-    } catch (error) {
-      console.error("Error fetching availability:", error);
-      setCurrentAvailability(null);
-    }
-  };
-
-  useEffect(() => {
-    if (
-      activeCategory === "Items" &&
-      itemReservationForm.itemId &&
-      itemStartDate &&
-      itemStartTime &&
-      itemEndDate &&
-      itemEndTime
-    ) {
-      fetchCurrentAvailability(
-        itemReservationForm.itemId,
-        itemStartDate,
-        itemStartTime,
-        itemEndDate,
-        itemEndTime
-      );
-    }
-  }, [
-    selectedCruiseId,
-    itemReservationForm.itemId,
-    itemStartDate,
-    itemStartTime,
-    itemEndDate,
-    itemEndTime,
-    availableItems,
-  ]);
-
-
-  // Convert time string (HH:mm) to minutes for comparison
-  const timeToMinutes = (timeStr: string): number => {
-    const [hours, minutes] = timeStr.split(":").map(Number);
-    return hours * 60 + minutes;
-  };
-
-  const formatTimeLabel = (timeStr: string): string => {
+  function formatTimeLabel(timeStr: string) {
     const [hours, minutes] = timeStr.split(":").map(Number);
     const period = hours >= 12 ? "PM" : "AM";
     const hour12 = hours % 12 === 0 ? 12 : hours % 12;
     return `${hour12}:${String(minutes).padStart(2, "0")} ${period}`;
+  }
+
+  function combineDateAndTime(date: Date, timeStr: string) {
+    const [hours, minutes] = timeStr.split(":").map(Number);
+    const result = new Date(date);
+    result.setHours(hours, minutes, 0, 0);
+    return result;
+  }
+
+  const generateTimeSlots = (): string[] => {
+    const slots: string[] = [];
+
+    for (let hour = 0; hour < 24; hour++) {
+      for (let minute = 0; minute < 60; minute += 30) {
+        slots.push(`${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`);
+      }
+    }
+
+    return slots;
   };
 
-  const isSameCalendarDay = (left: Date, right: Date) => {
+  const timeToMinutes = (timeStr: string) => {
+    const [hours, minutes] = timeStr.split(":").map(Number);
+    return hours * 60 + minutes;
+  };
+
+  const getNextHalfHourMinutes = (date: Date) => {
+    const totalMinutes = date.getHours() * 60 + date.getMinutes();
+    return Math.ceil(totalMinutes / 30) * 30;
+  };
+
+  const isSameCalendarDay = (firstDate: Date, secondDate: Date) => {
     return (
-      left.getFullYear() === right.getFullYear() &&
-      left.getMonth() === right.getMonth() &&
-      left.getDate() === right.getDate()
+      firstDate.getFullYear() === secondDate.getFullYear() &&
+      firstDate.getMonth() === secondDate.getMonth() &&
+      firstDate.getDate() === secondDate.getDate()
     );
   };
 
-  const getNextHalfHourMinutes = (reference: Date) => {
-    const minutesOfDay = reference.getHours() * 60 + reference.getMinutes();
-    const onExactBoundary = reference.getMinutes() % 30 === 0 && reference.getSeconds() === 0 && reference.getMilliseconds() === 0;
-    if (onExactBoundary) return minutesOfDay;
-    return Math.floor(minutesOfDay / 30) * 30 + 30;
-  };
-
-  // Format datetime from date and time string
-  const combineDateAndTime = (date: Date, timeStr: string): Date => {
-    let hours: number;
-    let minutes: number;
-
-    // Handle both 24-hour format (HH:mm) and 12-hour format (H:mm AM/PM)
-    const timeRegex = /^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i;
-    const match = timeStr.match(timeRegex);
-
-    if (match) {
-      hours = parseInt(match[1]);
-      minutes = parseInt(match[2]);
-      const period = match[3]?.toUpperCase();
-
-      // Convert 12-hour to 24-hour format if AM/PM is present
-      if (period) {
-        if (period === 'PM' && hours !== 12) {
-          hours += 12;
-        } else if (period === 'AM' && hours === 12) {
-          hours = 0;
-        }
-      }
-    } else {
-      // Fallback to original parsing for backward compatibility
-      const parts = timeStr.split(":").map(Number);
-      hours = parts[0] || 0;
-      minutes = parts[1] || 0;
-    }
-
-    const combined = new Date(date);
-    combined.setHours(hours, minutes, 0, 0);
-    return combined;
-  };
-
-  const getDayBounds = (date: Date) => {
-    const dayStart = new Date(date);
-    dayStart.setHours(0, 0, 0, 0);
-
-    const dayEnd = new Date(date);
-    dayEnd.setHours(23, 59, 59, 999);
-
-    return { dayStart, dayEnd };
-  };
-
-  const getMinutesOfDay = (dateTime: Date) => {
-    return dateTime.getHours() * 60 + dateTime.getMinutes();
-  };
-
-  const getItemReservations = async (itemId: string): Promise<ItemReservationWindow[]> => {
-    if (!selectedCruiseId) {
-      return [];
-    }
-
-    const allReservations = await fetchData(`/api/reservations?resource_id=${itemId}`);
-
-    return allReservations
-      .filter((res: any) => res.resource_id === Number(itemId) && belongsToSelectedCruise(res))
-      .map((res: any) => ({
-        start: new Date(res.start_time),
-        end: new Date(res.end_time),
-        quantityReserved: Number(res.quantity_reserved) || 0,
-      }));
-  };
-
-  const getRoomReservations = async (cabinId: string): Promise<RoomReservationWindow[]> => {
-    if (!selectedCruiseId) {
-      return [];
-    }
-
-    const allReservations = await fetchData(`/api/reservations?cabin_id=${cabinId}`);
-
-    return allReservations
-      .filter((res: any) => res.cabin_id === Number(cabinId) && belongsToSelectedCruise(res))
-      .map((res: any) => ({
-        start: new Date(res.start_time),
-        end: new Date(res.end_time),
-      }));
-  };
-
   const intervalsOverlap = (startA: Date, endA: Date, startB: Date, endB: Date) => {
-    return startA < endB && endA > startB;
-  };
-
-  const getItemReservationsForDay = async (itemId: string, date: Date) => {
-    const { dayStart, dayEnd } = getDayBounds(date);
-    const allReservations = await getItemReservations(itemId);
-
-    return allReservations
-      .filter((res: any) => {
-        return intervalsOverlap(dayStart, dayEnd, res.start, res.end);
-      })
-      .map((res: any) => ({
-        startMinutes: getMinutesOfDay(res.start > dayStart ? res.start : dayStart),
-        endMinutes: getMinutesOfDay(res.end < dayEnd ? res.end : dayEnd),
-        quantityReserved: res.quantityReserved,
-      }));
-  };
-
-  const getRoomReservationsForDay = async (cabinId: string, date: Date) => {
-    const { dayStart, dayEnd } = getDayBounds(date);
-    const allReservations = await getRoomReservations(cabinId);
-
-    return allReservations
-      .filter((res: any) => {
-        return intervalsOverlap(dayStart, dayEnd, res.start, res.end);
-      })
-      .map((res: any) => ({
-        startMinutes: getMinutesOfDay(res.start > dayStart ? res.start : dayStart),
-        endMinutes: getMinutesOfDay(res.end < dayEnd ? res.end : dayEnd),
-      }));
+    return startA < endB && startB < endA;
   };
 
   const getReservedItemQuantityAtMinute = (
     reservations: { startMinutes: number; endMinutes: number; quantityReserved: number }[],
-    minute: number
+    minute: number,
   ) => {
     return reservations
-      .filter((res) => minute >= res.startMinutes && minute <= res.endMinutes)
-      .reduce((sum, res) => sum + res.quantityReserved, 0);
+      .filter((reservation) => minute >= reservation.startMinutes && minute <= reservation.endMinutes)
+      .reduce((sum, reservation) => sum + reservation.quantityReserved, 0);
+  };
+
+  const loadReservationWindows = async () => {
+    const rows = await fetchData("/api/reservations");
+    return Array.isArray(rows) ? rows : [];
+  };
+
+  const getItemReservationsForDay = async (itemId: string, date: Date) => {
+    const reservations = await loadReservationWindows();
+    return reservations
+      .filter((reservation: any) => String(reservation.resource_id) === String(itemId))
+      .filter((reservation: any) => reservation.status !== "Cancelled")
+      .filter((reservation: any) => isSameCalendarDay(new Date(reservation.start_time), date))
+      .map((reservation: any) => ({
+        startMinutes: timeToMinutes(new Date(reservation.start_time).toTimeString().slice(0, 5)),
+        endMinutes: timeToMinutes(new Date(reservation.end_time).toTimeString().slice(0, 5)),
+        quantityReserved: Number(reservation.quantity_reserved) || 0,
+      }));
+  };
+
+  const getItemReservations = async (itemId: string) => {
+    const reservations = await loadReservationWindows();
+    return reservations
+      .filter((reservation: any) => String(reservation.resource_id) === String(itemId))
+      .filter((reservation: any) => reservation.status !== "Cancelled")
+      .map((reservation: any) => ({
+        start: new Date(reservation.start_time),
+        end: new Date(reservation.end_time),
+        quantityReserved: Number(reservation.quantity_reserved) || 0,
+      }));
+  };
+
+  const getRoomReservationsForDay = async (cabinId: string, date: Date) => {
+    const reservations = await loadReservationWindows();
+    return reservations
+      .filter((reservation: any) => String(reservation.cabin_id) === String(cabinId))
+      .filter((reservation: any) => reservation.status !== "Cancelled")
+      .filter((reservation: any) => isSameCalendarDay(new Date(reservation.start_time), date))
+      .map((reservation: any) => ({
+        startMinutes: timeToMinutes(new Date(reservation.start_time).toTimeString().slice(0, 5)),
+        endMinutes: timeToMinutes(new Date(reservation.end_time).toTimeString().slice(0, 5)),
+      }));
   };
 
   const isRoomReservedAtMinute = (
     reservations: { startMinutes: number; endMinutes: number }[],
-    minute: number
+    minute: number,
   ) => {
-    return reservations.some((res) => minute >= res.startMinutes && minute <= res.endMinutes);
+    return reservations.some((reservation) => minute >= reservation.startMinutes && minute <= reservation.endMinutes);
+  };
+
+  const getRoomReservations = async (cabinId: string) => {
+    const reservations = await loadReservationWindows();
+    return reservations
+      .filter((reservation: any) => String(reservation.cabin_id) === String(cabinId))
+      .filter((reservation: any) => reservation.status !== "Cancelled")
+      .map((reservation: any) => ({
+        start: new Date(reservation.start_time),
+        end: new Date(reservation.end_time),
+      }));
   };
 
   const isItemIntervalAvailable = (
@@ -801,74 +696,122 @@ export default function Reservation() {
   }, [selectedCruiseId]);
 
   //reservation submission
-  const handleReservationSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const resetPaymentForm = () => {
+    setPaymentForm({
+      cardHolderName: "",
+      cardNumber: "",
+      expirationDate: "",
+      securityCode: "",
+      zipCode: "",
+    });
+  };
 
-    setFormError("");
-    setFormSuccess("");
+  const closePaymentModal = () => {
+    setIsPaymentModalOpen(false);
+    setPaymentError("");
+    setPaymentSuccess("");
+    resetPaymentForm();
+  };
 
+  const validateReservationBeforePayment = (): string | null => {
     if (!selectedCruiseId) {
-      setFormError("Please select a cruise before making a reservation.");
-      return;
+      return "Please select a cruise before making a reservation.";
     }
 
     if (!Number.isInteger(Number(selectedCruiseId))) {
-      setFormError("Please choose a valid cruise from the dropdown.");
-      return;
+      return "Please choose a valid cruise from the dropdown.";
     }
 
     if (activeCategory === "Items") {
-      //validate item selection
       if (!itemReservationForm.itemId) {
-        setFormError("Please select an item to reserve.");
-        return;
+        return "Please select an item to reserve.";
       }
 
-      //validate quantity entered is a positive integer
       const quantity = parseInt(itemReservationForm.quantity);
       if (isNaN(quantity) || quantity < 1) {
-        setFormError("Please enter a valid quantity (minimum 1).");
-        return;
+        return "Please enter a valid quantity (minimum 1).";
       }
 
-      //validate quantity does not exceed available amount
       const selectedItem = availableItems.find((item) => String(item.id) === String(itemReservationForm.itemId));
       if (selectedItem && quantity > selectedItem.quantity) {
-        setFormError(`Quantity exceeds available amount. Available: ${selectedItem.quantity}`);
-        return;
+        return `Quantity exceeds available amount. Available: ${selectedItem.quantity}`;
       }
 
-      //validate start date selected
       if (!itemStartDate) {
-        setFormError("Please select a start date for the reservation.");
-        return;
+        return "Please select a start date for the reservation.";
       }
 
-      //validate start time selected
       if (!itemStartTime) {
-        setFormError("Please select a start time for the reservation.");
-        return;
+        return "Please select a start time for the reservation.";
       }
 
-      //validate end date selected
       if (!itemEndDate) {
-        setFormError("Please select an end date for the reservation.");
-        return;
+        return "Please select an end date for the reservation.";
       }
 
-      //validate end time selected
       if (!itemEndTime) {
-        setFormError("Please select an end time for the reservation.");
-        return;
+        return "Please select an end time for the reservation.";
       }
 
-      //validate end date/time is after start date/time
-      const startDateTime = combineDateAndTime(itemStartDate, itemStartTime);
-      const endDateTime = combineDateAndTime(itemEndDate, itemEndTime);
+      const startDateTime = combineDateAndTime(itemStartDate as Date, itemStartTime);
+      const endDateTime = combineDateAndTime(itemEndDate as Date, itemEndTime);
       if (endDateTime <= startDateTime) {
-        setFormError("End date/time must be after start date/time.");
-        return;
+        return "End date/time must be after start date/time.";
       }
+
+      return null;
+    }
+
+    if (activeCategory === "Rooms") {
+      if (!roomReservationForm.cabinId) {
+        return "Please select a room to reserve.";
+      }
+
+      if (!roomStartDate) {
+        return "Please select a check-in date.";
+      }
+
+      if (!roomStartTime) {
+        return "Please select a check-in time.";
+      }
+
+      if (!roomEndDate) {
+        return "Please select a check-out date.";
+      }
+
+      if (!roomEndTime) {
+        return "Please select a check-out time.";
+      }
+
+      const startDateTime = combineDateAndTime(roomStartDate as Date, roomStartTime);
+      const endDateTime = combineDateAndTime(roomEndDate as Date, roomEndTime);
+      if (endDateTime <= startDateTime) {
+        return "Check-out date/time must be after check-in date/time.";
+      }
+
+      for (let i = 0; i < additionalGuestEmails.length; i++) {
+        const email = additionalGuestEmails[i].trim();
+        if (email && !email.includes("@")) {
+          return `Guest ${i + 1} email is invalid. Please enter a valid email address.`;
+        }
+      }
+
+      return null;
+    }
+
+    return null;
+  };
+
+  type SubmitResult = { success: boolean; message?: string };
+
+  const submitReservationRequest = async (): Promise<SubmitResult> => {
+    setFormError("");
+    setFormSuccess("");
+
+    if (activeCategory === "Items") {
+      const quantity = parseInt(itemReservationForm.quantity);
+      const startDateTime = combineDateAndTime(itemStartDate as Date, itemStartTime);
+      const endDateTime = combineDateAndTime(itemEndDate as Date, itemEndTime);
 
       try {
         const formatForMySQL = (date: Date) => {
@@ -895,7 +838,9 @@ export default function Reservation() {
 
         if (!response.ok) {
           console.error("Backend error:", responseData);
-          throw new Error(`Failed to create reservation: ${response.status}`);
+          const message = responseData?.error || `Failed to create reservation: ${response.status}`;
+          setFormError(message);
+          return { success: false, message };
         }
 
         if (responseData?.reservationId) {
@@ -903,70 +848,25 @@ export default function Reservation() {
         }
 
         setFormSuccess("Item reservation submitted successfully.");
-
-        // Reset form
         setItemReservationForm({ itemId: "", quantity: "" });
         setItemStartDate(new Date());
         setItemStartTime("");
         setItemEndDate(new Date());
         setItemEndTime("");
-
-        // Refresh available items to show updated quantities
         await loadAvailableItems();
+        return { success: true };
       }
       catch (error) {
         console.error("Failed to create reservation:", error);
-        setFormError("An error occurred. Please try again.");
+        const message = (error as any)?.message ?? "An error occurred. Please try again.";
+        setFormError(message);
+        return { success: false, message };
       }
-    } else if (activeCategory === "Rooms") {
-      //validate room selection
-      if (!roomReservationForm.cabinId) {
-        setFormError("Please select a room to reserve.");
-        return;
-      }
+    }
 
-      //validate start date selected
-      if (!roomStartDate) {
-        setFormError("Please select a check-in date.");
-        return;
-      }
-
-      //validate start time selected
-      if (!roomStartTime) {
-        setFormError("Please select a check-in time.");
-        return;
-      }
-
-      //validate end date selected
-      if (!roomEndDate) {
-        setFormError("Please select a check-out date.");
-        return;
-      }
-
-      //validate end time selected
-      if (!roomEndTime) {
-        setFormError("Please select a check-out time.");
-        return;
-      }
-
-      //validate end date/time is after start date/time
-      const startDateTime = combineDateAndTime(roomStartDate, roomStartTime);
-      const endDateTime = combineDateAndTime(roomEndDate, roomEndTime);
-      if (endDateTime <= startDateTime) {
-        setFormError("Check-out date/time must be after check-in date/time.");
-        return;
-      }
-
-      //validate guest emails if any are provided
-      for (let i = 0; i < additionalGuestEmails.length; i++) {
-        const email = additionalGuestEmails[i].trim();
-        if (email && !email.includes('@')) {
-          setFormError(`Guest ${i + 1} email is invalid. Please enter a valid email address.`);
-          return;
-        }
-      }
-
-      //filter out empty email entries
+    if (activeCategory === "Rooms") {
+      const startDateTime = combineDateAndTime(roomStartDate as Date, roomStartTime);
+      const endDateTime = combineDateAndTime(roomEndDate as Date, roomEndTime);
       const validGuestEmails = additionalGuestEmails.filter(email => email.trim() !== "");
 
       try {
@@ -996,7 +896,9 @@ export default function Reservation() {
 
         if (!response.ok) {
           console.error("Backend error:", responseData);
-          throw new Error(responseData?.error || "Failed to create reservation");
+          const message = responseData?.error || "Failed to create reservation";
+          setFormError(message);
+          return { success: false, message };
         }
 
         if (responseData?.reservationId) {
@@ -1004,7 +906,6 @@ export default function Reservation() {
         }
 
         setFormSuccess("Room reservation submitted successfully.");
-        // Reset form
         setRoomReservationForm({ cabinId: "" });
         setRoomStartDate(new Date());
         setRoomStartTime("");
@@ -1012,19 +913,55 @@ export default function Reservation() {
         setRoomEndTime("");
         setAdditionalGuestEmails([]);
         setGuestEmailError("");
-
-        // Refresh available rooms to show updated availability
         await loadAvailableRooms();
         await loadCruises();
+        return { success: true };
       }
       catch (error: any) {
         console.error("Failed to create reservation:", error);
-        setFormError(error.message);
+        const message = error?.message ?? 'An error occurred. Please try again.';
+        setFormError(message);
+        return { success: false, message };
       }
-    } else {
-      // Package reservations are handled inside the package events list.
+    }
+
+    return { success: false, message: 'Unsupported reservation type' };
+  };
+
+  const handleReservationSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    setFormError("");
+    setFormSuccess("");
+
+    const reservationError = validateReservationBeforePayment();
+    if (reservationError) {
+      setFormError(reservationError);
       return;
     }
+
+    setPaymentError("");
+    setPaymentSuccess("");
+    resetPaymentForm();
+    setIsPaymentModalOpen(true);
+  };
+
+  const handlePaymentSubmit = async () => {
+
+    const paymentValidationError = validatePaymentFormFields(paymentForm);
+    if (paymentValidationError) {
+      setPaymentError(paymentValidationError);
+      return;
+    }
+
+    const result = await submitReservationRequest();
+    if (result.success) {
+      setPaymentError("");
+      setPaymentSuccess("Reservation made successfully.");
+      return;
+    }
+
+    setPaymentError(result.message ?? "Unable to complete the reservation. Please try again.");
   };
 
   return (
@@ -1247,6 +1184,18 @@ export default function Reservation() {
                     </select>
                   </label>
 
+                  <div className="reviewActionRow">
+                    <button
+                      type="button"
+                      className="reviewActionButton"
+                      onClick={openRoomReviews}
+                      disabled={!roomReservationForm.cabinId || !selectedCruiseId}
+                    >
+                      View Reviews
+                    </button>
+                    <span className="reviewActionHint">See reviews for this room on the selected cruise.</span>
+                  </div>
+
                   <br />
 
                   <label>
@@ -1382,13 +1331,163 @@ export default function Reservation() {
 
               {activeCategory !== "Packages" && (
                 <button type="submit" className="submitButton">
-                  Submit Reservation
+                  Continue to Payment
                 </button>
               )}
             </fieldset>
           </form>
         </div>
       </main>
+
+      <ReviewsModal
+        isOpen={roomReviewsOpen}
+        title={selectedRoomReviewsTitle}
+        subtitle="Only past room reservations that were actually reviewed are shown here."
+        reviews={roomReviews}
+        loading={roomReviewsLoading}
+        error={roomReviewsError}
+        emptyMessage="No one has reviewed this room on the selected cruise yet."
+        onClose={() => {
+          setRoomReviewsOpen(false);
+          setRoomReviewsError('');
+        }}
+      />
+
+      {isPaymentModalOpen && (
+        <div className="paymentModalOverlay">
+          <div className="paymentModalContent">
+            <div className="paymentModalHeader">
+              <div>
+                <h3>Secure Payment</h3>
+              </div>
+              <button type="button" className="paymentModalCloseButton" onClick={closePaymentModal}>
+                ✕
+              </button>
+            </div>
+
+            <div className="paymentForm">
+              {paymentSuccess && (
+                <div
+                  style={{
+                    backgroundColor: "rgba(36, 128, 52, 0.18)",
+                    color: "#0e4a1a",
+                    border: "1px solid rgba(36, 128, 52, 0.4)",
+                    padding: "10px 12px",
+                    borderRadius: "8px",
+                    marginBottom: "10px",
+                  }}
+                >
+                  {paymentSuccess}
+                </div>
+              )}
+
+              <div className="paymentFormGrid">
+                <label className="paymentField paymentFieldFull">
+                  Card Holder's Name
+                  <input
+                    type="text"
+                    autoComplete="cc-name"
+                    value={paymentForm.cardHolderName}
+                    onChange={(event) => {
+                      setPaymentError("");
+                      setPaymentSuccess("");
+                      setPaymentForm({ ...paymentForm, cardHolderName: event.target.value });
+                    }}
+                    placeholder="Name as shown on card"
+                  />
+                </label>
+
+                <label className="paymentField paymentFieldFull">
+                  Card Number
+                  <input
+                    type="text"
+                    autoComplete="cc-number"
+                    inputMode="numeric"
+                    maxLength={19}
+                    value={paymentForm.cardNumber}
+                    onChange={(event) => {
+                      setPaymentError("");
+                      setPaymentSuccess("");
+                      const digitsOnly = event.target.value.replace(/\D/g, "").slice(0, 16);
+                      const formatted = digitsOnly.replace(/(.{4})/g, "$1 ").trim();
+                      setPaymentForm({ ...paymentForm, cardNumber: formatted });
+                    }}
+                    placeholder="1234 5678 9012 3456"
+                  />
+                </label>
+
+                <label className="paymentField">
+                  Expiration Date
+                  <input
+                    type="text"
+                    autoComplete="cc-exp"
+                    inputMode="numeric"
+                    placeholder="12/28"
+                    maxLength={5}
+                    value={paymentForm.expirationDate}
+                    onChange={(event) => {
+                      setPaymentError("");
+                      setPaymentSuccess("");
+                      const digitsOnly = event.target.value.replace(/\D/g, '').slice(0, 4);
+                      const formatted = digitsOnly.length > 2 ? `${digitsOnly.slice(0, 2)}/${digitsOnly.slice(2)}` : digitsOnly;
+                      setPaymentForm({ ...paymentForm, expirationDate: formatted });
+                    }}
+                  />
+                  <span className="paymentFieldHint">Use MM/YY format, for example 12/28.</span>
+                </label>
+
+                <label className="paymentField">
+                  Security Code
+                  <input
+                    type="text"
+                    autoComplete="cc-csc"
+                    inputMode="numeric"
+                    maxLength={3}
+                    value={paymentForm.securityCode}
+                    onChange={(event) => {
+                      setPaymentError("");
+                      setPaymentSuccess("");
+                      const digitsOnly = event.target.value.replace(/\D/g, "").slice(0, 3);
+                      setPaymentForm({ ...paymentForm, securityCode: digitsOnly });
+                    }}
+                    placeholder="123"
+                  />
+                </label>
+
+                <label className="paymentField paymentFieldFull">
+                  Zip Code
+                  <input
+                    type="text"
+                    autoComplete="postal-code"
+                    inputMode="numeric"
+                    maxLength={5}
+                    value={paymentForm.zipCode}
+                    onChange={(event) => {
+                      setPaymentError("");
+                      setPaymentSuccess("");
+                      const digitsOnly = event.target.value.replace(/\D/g, "").slice(0, 5);
+                      setPaymentForm({ ...paymentForm, zipCode: digitsOnly });
+                    }}
+                    placeholder="12345"
+                  />
+                </label>
+              </div>
+
+              {paymentError && <div className="paymentError">{paymentError}</div>}
+
+              <div className="paymentActions">
+                <button type="button" className="paymentSecondaryButton" onClick={closePaymentModal}>
+                  Cancel
+                </button>
+                <button type="button" className="paymentPrimaryButton" onClick={() => void handlePaymentSubmit()}>
+                  Submit / Reserve
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <footer className="footer">
         <div className="container">© 2026 {shipName}</div>
       </footer>

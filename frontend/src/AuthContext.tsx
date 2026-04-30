@@ -19,6 +19,9 @@ export function isStaff(user: User | null | undefined): boolean {
   return user?.role === 'staff' || user?.role === 'admin' 
 }
 
+export function isNormal(user: User | null | undefined): boolean {
+  return user?.role === 'normal'
+}
 
 interface AuthContextType {
   user: User | null;
