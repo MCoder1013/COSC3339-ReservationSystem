@@ -38,6 +38,7 @@ interface RoomReservation {
   id: number;
   cabin_number: string;
   cruise_name?: string | null;
+  ship_name?: string | null;
   email: string;
   start_time: string;
   end_time: string;
@@ -275,7 +276,7 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
       ? "Tell us about the room, service, and overall stay."
       : "Share how the event ran and how the experience felt.";
     const detailLine = category === "Rooms"
-      ? `${(reservation as RoomReservation).cruise_name ? `Cruise: ${(reservation as RoomReservation).cruise_name} · ` : ''}Stayed with ${(reservation as RoomReservation).email}`
+      ? `${(reservation as RoomReservation).cruise_name ? `Cruise: ${(reservation as RoomReservation).cruise_name}` : ''}${(reservation as RoomReservation).ship_name ? `${(reservation as RoomReservation).cruise_name ? ' · ' : ''}Ship: ${(reservation as RoomReservation).ship_name}` : ''}${(reservation as RoomReservation).cruise_name || (reservation as RoomReservation).ship_name ? ' · ' : ''}Stayed with ${(reservation as RoomReservation).email}`
       : `${(reservation as PackageReservation).cruise_name ? `Cruise: ${(reservation as PackageReservation).cruise_name} · ` : ''}${(reservation as PackageReservation).staff_names || "Staff assigned at the event"}`;
 
     return (
