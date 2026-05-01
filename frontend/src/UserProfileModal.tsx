@@ -128,19 +128,30 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
 
 
   useEffect(() => {
+    if (user?.role !== "normal") {
+      setPearls(0);
+      return;
+    }
+
     const loadPearls = async () => {
       try {
         const res = await fetch("/api/loyalty");
-        const data = await res.json();
 
-        setPearls(data.points); // or data[0].points depending on backend
+        if (!res.ok) {
+          setPearls(0);
+          return;
+        }
+
+        const data = await res.json();
+        setPearls(data?.points ?? 0);
       } catch (err) {
         console.error("Failed to load pearls", err);
+        setPearls(0);
       }
     };
 
     loadPearls();
-  }, []);
+  }, [user]);
 
   
   const isProfileStaff = userProfile?.role === "staff" || userProfile?.role === "admin";
@@ -760,32 +771,34 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
                       <p className="profileEmail">{userProfile.email}</p>
                     </div>
                   </div>
+                  
+                  {user?.role === "normal" && (
+                    <div
+                      className="loyaltyBanner loyaltyBanner--inline"
+                      style={{
+                        background: `linear-gradient(135deg, ${loyaltyTier.accentDark} 0%, ${loyaltyTier.accent} 55%, #9ca2ff 100%)`,
+                      }}
+                    >
+                      <div className="loyaltyBadgeWrap" aria-hidden="true">
+                        <div className="loyaltyBadgeGlow" />
+                        <img
+                          className="loyaltyBadgeImage"
+                          src={loyaltyTier.badgeSrc}
+                          alt=""
+                          role="presentation"
+                        />
+                      </div>
 
-                  <div
-                    className="loyaltyBanner loyaltyBanner--inline"
-                    style={{
-                      background: `linear-gradient(135deg, ${loyaltyTier.accentDark} 0%, ${loyaltyTier.accent} 55%, #9ca2ff 100%)`,
-                    }}
-                  >
-                    <div className="loyaltyBadgeWrap" aria-hidden="true">
-                      <div className="loyaltyBadgeGlow" />
-                      <img
-                        className="loyaltyBadgeImage"
-                        src={loyaltyTier.badgeSrc}
-                        alt=""
-                        role="presentation"
-                      />
-                    </div>
+                      <div className="loyaltyTierCopy">
+                        <span className="loyaltyTierName">{loyaltyTier.name}</span>
+                      </div>
 
-                    <div className="loyaltyTierCopy">
-                      <span className="loyaltyTierName">{loyaltyTier.name}</span>
+                      <div className="loyaltyPearls">
+                        <span className="loyaltyLabel">Pearls</span>
+                        <span className="loyaltyPearlCount">{pearls.toLocaleString()}</span>
+                      </div>
                     </div>
-
-                    <div className="loyaltyPearls">
-                      <span className="loyaltyLabel">Pearls</span>
-                      <span className="loyaltyPearlCount">{pearls.toLocaleString()}</span>
-                    </div>
-                  </div>
+                  )}
                 </div>
 
                 <div className="profileFields">
