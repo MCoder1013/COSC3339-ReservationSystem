@@ -1,7 +1,7 @@
 -- Deshawn King: 
 -- This migration adds a new table called "ratings" to the database. The "ratings" table will store user ratings and reviews for their reservations. Each rating is associated with a specific reservation and user, and includes a rating value (between 1 and 5) and an optional review text. The table also includes timestamps for when each rating was created.
 
-CREATE TABLE ratings (
+CREATE TABLE IF NOT EXISTS ratings(
     id SERIAL PRIMARY KEY,
     reservation_id INT UNIQUE NOT NULL,
     user_id INT NOT NULL,
