@@ -28,6 +28,15 @@ export async function insertStaff(staff_id: number, role: StaffRole, shift: stri
   `;
 }
 
+export async function insertLoyalty(userId: number, points: number) {
+  await sql`
+    INSERT INTO loyalty_accounts
+      (user_id, points)
+    VALUES
+      (${userId}, ${points});
+  `;
+}
+
 export async function getUserByEmail(email: string) {
     const result = await sql`SELECT * FROM users WHERE email = ${email}`;
     return result[0]; // first user or undefined

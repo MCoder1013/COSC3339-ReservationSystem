@@ -275,6 +275,17 @@ router.post('/register', async (req, res) => {
     }
   }
 
+  if (userRole === "normal") {
+    try {
+      await database.insertLoyalty(userId, 0);
+    } catch (err) {
+      console.error('Error creating loyalty record:', err);
+      return res.status(500).json({
+        error: 'Error creating loyalty record'
+      });
+    }
+  }
+
   res.json({
     message: 'Successfully registered!'
   });
