@@ -123,11 +123,24 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
     };
   }
 }
-
-  const pearls = userProfile?.pearls ?? 2001; // 
+  const [pearls, setPearls] = useState<number>(0);
   const loyaltyTier = getLoyaltyTier(pearls);
 
 
+  useEffect(() => {
+    const loadPearls = async () => {
+      try {
+        const res = await fetch("/api/loyalty");
+        const data = await res.json();
+
+        setPearls(data.points); // or data[0].points depending on backend
+      } catch (err) {
+        console.error("Failed to load pearls", err);
+      }
+    };
+
+    loadPearls();
+  }, []);
 
   
   const isProfileStaff = userProfile?.role === "staff" || userProfile?.role === "admin";

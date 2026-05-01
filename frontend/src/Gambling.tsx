@@ -3,6 +3,7 @@ import "./App.css";
 import NavBar from "./NavBar";
 import RouletteWheel from "./RouletteWheel";
 import type { SlotData } from "./RouletteWheel";
+import { useEffect } from "react";
 
 type BetType = "color" | "number";
 type BetColor = "blue" | "purple" | "white";
@@ -50,7 +51,6 @@ function checkWin(slot: SlotData, bet: Bet): boolean {
 }
 
 const QUICK_CHIPS = [5, 10, 25, 50, 100];
-const STARTING_BALANCE = 500;
 
 export default function Gambling() {
   const shipName = "Starlight Pearl Cruises";
@@ -62,7 +62,7 @@ export default function Gambling() {
   const [pendingBet, setPendingBet] = useState<Bet | null>(null);
 
   // Balance & result
-  const [balance, setBalance] = useState(STARTING_BALANCE);
+  const [balance, setBalance] = useState(0);
   const [lastResult, setLastResult] = useState<{ won: boolean; amount: number } | null>(null);
 
   // Betting panel local state
@@ -75,25 +75,66 @@ export default function Gambling() {
   const potentialWin = wager * getMultiplier(currentBet);
   const canBet = !mustSpin && wager >= 1 && wager <= balance && (betType === "number" || selectedColor !== null);
 
-  const handlePlaceBet = () => {
+  const handlePlaceBet = async () => {
     if (!canBet) return;
-    setBalance((b) => b - wager);
-    setLastResult(null);
-    setPendingBet({ ...currentBet });
-    const newPrize = Math.floor(Math.random() * wheelData.length);
-    setPrizeNumber(newPrize);
-    setMustSpin(true);
+
+    try {
+      const res = await fetch("/api/loyalty/deduct", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ amount: wager }),
+      });
+
+      const data = await res.json();
+      setBalance(data.points);
+
+      setLastResult(null);
+      setPendingBet({ ...currentBet });
+
+      const newPrize = Math.floor(Math.random() * wheelData.length);
+      setPrizeNumber(newPrize);
+      setMustSpin(true);
+    } catch (err) {
+      console.error(err);
+    }
   };
 
-  const handleStopSpinning = (slot: SlotData) => {
+  const handleStopSpinning = async (slot: SlotData) => {
     setMustSpin(false);
     if (!pendingBet) return;
+
     const won = checkWin(slot, pendingBet);
     const payout = won ? pendingBet.wager * getMultiplier(pendingBet) : 0;
-    if (won) setBalance((b) => b + payout);
+
+    if (won) {
+      try {
+        const res = await fetch("/api/loyalty/add", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ amount: payout }),
+        });
+
+        const data = await res.json();
+        setBalance(data.points);
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
     setLastResult({ won, amount: won ? payout : pendingBet.wager });
     setPendingBet(null);
   };
+
+  useEffect(() => {
+    fetch("/api/loyalty")
+      .then((res) => res.json())
+      .then((data) => setBalance(data.points))
+      .catch((err) => console.error(err));
+  }, []);
 
   return (
     <div className="page">
