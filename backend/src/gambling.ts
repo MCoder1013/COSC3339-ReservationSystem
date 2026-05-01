@@ -3,10 +3,10 @@ import { TransactionSql } from 'postgres';
 
 export async function pullLoyalty(user_id: number) {
     try {
-        const rows = await sql`
+        await sql`
             INSERT INTO loyalty_accounts (user_id, points)
             VALUES (${user_id}, 0)
-            ON CONFLICT (user_id) DO NOTHING;
+            ON CONFLICT (user_id) DO NOTHING
         `;
 
         const result = await sql`
