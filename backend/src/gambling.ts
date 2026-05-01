@@ -4,16 +4,18 @@ import { TransactionSql } from 'postgres';
 export async function pullLoyalty(user_id: number) {
     try {
         const rows = await sql`
+            INSERT INTO loyalty_accounts (user_id, points)
+            VALUES (${user_id}, 0)
+            ON CONFLICT (user_id) DO NOTHING;
+        `;
+
+        const result = await sql`
             SELECT points
             FROM loyalty_accounts
             WHERE user_id = ${user_id}
         `;
 
-        if (rows.length === 0) {
-            throw new Error("Loyalty record not found");
-        }
-
-        return rows[0];
+        return result[0];
     } catch (error) {
         console.error("Error pulling loyalty:", error);
         throw error;
