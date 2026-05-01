@@ -139,7 +139,7 @@ router.delete('/resources/:name', adminRequired, async (req: Request, res: Respo
 
     try {
         const resourceId = await deleteResource(name);
-        if (resourceId !== undefined) {
+        if (resourceId === undefined) {
             return res.status(404).json({ message: "Resource not found" })
         }
 

@@ -5,6 +5,7 @@ import authRoutes from "./routes/auth.js";
 import reservationRoutes from "./routes/reservations.js";
 import ratingRoutes from "./routes/ratings.js";
 import packageRoutes from "./routes/packages.js";
+import gamblingRoutes from "./routes/gambling.js";
 import cookieParser from 'cookie-parser';
 import './notifications.js';
 import { authRequired, userMiddleware } from './routes/index.js';
@@ -57,6 +58,8 @@ app.use('/api', ratingRoutes);
 
 // PACKAGES / EVENTS
 app.use('/api', packageRoutes);
+
+app.use('/api', gamblingRoutes);
 
 const PORT = 3000;
 

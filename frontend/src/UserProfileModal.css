@@ -384,6 +384,8 @@
   outline: none;
   border-color: rgba(106, 122, 255, 0.8);
   box-shadow: 0 0 0 3px rgba(106, 122, 255, 0.1);
+}
+
 .reviewScopeNote {
   margin: -8px 0 20px;
   color: #5a5f86;
