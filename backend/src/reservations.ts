@@ -328,6 +328,7 @@ export async function getAllReservationsWithDetails() {
                     u.last_name,
                     u.email,
                     c.cabin_number,
+                    c.price,
                     c.type::VARCHAR AS type,
                     c.deck,
                     c.capacity,
@@ -366,6 +367,7 @@ export async function getAllReservationsWithDetails() {
                     u.last_name,
                     u.email,
                     NULL::VARCHAR AS cabin_number,
+                    NULL::NUMERIC AS price,
                     NULL::VARCHAR AS type,
                     NULL::INT AS deck,
                     NULL::INT AS capacity,
@@ -402,7 +404,8 @@ export async function getReservationsByUser(userId: number): Promise<RowList<Row
             u.email,
             cr.cruise_name,
             res.name AS resource_name,
-            c.cabin_number
+            c.cabin_number,
+            c.price
         FROM reservations r
         JOIN users u ON r.user_id = u.id
         LEFT JOIN resources res ON r.resource_id = res.id
@@ -453,8 +456,10 @@ export async function getUserItemReservations(userId: number) {
                 r.id,
                 u.first_name,
                 u.last_name,
+                u.email,
                 res.name AS resource_name,
                 res.category,
+                r.quantity_reserved,
                 r.cruise_id,
                 cr.cruise_name,
                 r.start_time,
@@ -481,7 +486,9 @@ export async function getUserRoomReservations(userId: number) {
                 r.id,
                 u.first_name,
                 u.last_name,
+                u.email,
                 c.cabin_number,
+                c.price,
                 r.cruise_id,
                 cr.cruise_name,
                 cr.ship_name,

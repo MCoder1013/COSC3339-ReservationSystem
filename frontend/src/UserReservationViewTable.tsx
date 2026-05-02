@@ -358,6 +358,7 @@ export default function ReservationTable() {
                 <tr>
                   <th>ID</th>
                   <th>Cabin</th>
+                  <th>Price</th>
                   <th>Cruise</th>
                   <th>Email</th>
                   <th>Check-In</th>
@@ -384,6 +385,7 @@ export default function ReservationTable() {
                     ) : (
                       <>
                         <td>{reservation.cabin_number}</td>
+                        <td>{reservation.price !== undefined && reservation.price !== null ? `$${Number(reservation.price).toFixed(2)}` : 'N/A'}</td>
                         <td>{reservation.cruise_name ?? "N/A"}</td>
                         <td>{reservation.email}</td>
                         <td>{formatDateTime(reservation.start_time)}</td>

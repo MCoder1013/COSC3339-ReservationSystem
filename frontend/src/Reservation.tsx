@@ -1184,6 +1184,13 @@ export default function Reservation() {
                     </select>
                   </label>
 
+                  <p>
+                    <strong>Price:</strong>{' '}
+                    {selectedRoom?.price !== undefined && selectedRoom?.price !== null
+                      ? `$${Number(selectedRoom.price).toFixed(2)}`
+                      : 'N/A'}
+                  </p>
+
                   <div className="reviewActionRow">
                     <button
                       type="button"

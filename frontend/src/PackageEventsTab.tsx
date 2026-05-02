@@ -30,6 +30,7 @@ type EventFormState = {
   name: string;
   description: string;
   capacity: string;
+  price: string;
   start_date: Date | null;
   start_time: string;
   end_time: string;
@@ -47,6 +48,7 @@ const emptyForm: EventFormState = {
   name: '',
   description: '',
   capacity: '',
+  price: '',
   start_date: new Date(),
   start_time: '',
   end_time: '',
@@ -372,6 +374,11 @@ export default function PackageEventsTab({ cruiseId }: Props) {
       if (!Number.isInteger(qty) || qty < 1) return 'Each required item quantity must be at least 1.';
     }
 
+    if (formState.price !== undefined && formState.price !== '') {
+      const p = Number(formState.price);
+      if (Number.isNaN(p) || p < 0) return 'Price must be a valid non-negative number.';
+    }
+
     return null;
   };
 
@@ -394,6 +401,7 @@ export default function PackageEventsTab({ cruiseId }: Props) {
       name: formState.name.trim(),
       description: formState.description.trim(),
       capacity: Number(formState.capacity),
+      price: formState.price === '' || formState.price == null ? 0 : Number(formState.price),
       start_time: start.toISOString(),
       end_time: end.toISOString(),
       staff_ids: formState.staff_ids.filter((value) => value !== '').map((value) => Number(value)),
@@ -498,6 +506,21 @@ export default function PackageEventsTab({ cruiseId }: Props) {
                 value={formState.capacity}
                 onChange={(e) => setFormState((prev) => ({ ...prev, capacity: e.target.value }))}
                 required
+              />
+            </label>
+
+            <br />
+
+            <label>
+              Price:
+              <input
+                className="quantityInput"
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="0.00"
+                value={(formState as any).price}
+                onChange={(e) => setFormState((prev) => ({ ...prev, price: e.target.value }))}
               />
             </label>
 
