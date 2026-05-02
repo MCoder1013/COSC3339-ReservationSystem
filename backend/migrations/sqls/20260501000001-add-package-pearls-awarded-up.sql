@@ -1,0 +1,2 @@
+ALTER TABLE package_events
+ADD COLUMN pearls_awarded BOOLEAN NOT NULL DEFAULT FALSE;
