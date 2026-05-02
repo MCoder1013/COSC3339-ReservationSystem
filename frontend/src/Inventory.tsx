@@ -41,6 +41,7 @@ export default function Inventory() {
     deck: "",
     type: "Economy",
     capacity: "",
+    price: "",
     status: "Available"
   });
 
@@ -308,6 +309,7 @@ export default function Inventory() {
               <tr>
                 <th>Cabin</th>
                 <th>Deck</th>
+                <th>Price</th>
                 <th>Status</th>
               </tr>
             ) : (
@@ -326,6 +328,7 @@ export default function Inventory() {
                 <tr key={item.id}>
                   <td>{item.cabin_number}</td>
                   <td>{item.deck}</td>
+                  <td>${Number(item.price).toFixed(2)}</td>
                   <td>{item.status}</td>
                 </tr>
               ) : (
@@ -388,6 +391,18 @@ export default function Inventory() {
                       <option value="Balcony">Balcony</option>
                       <option value="Suite">Suite</option>
                     </select>
+                  </label>
+
+                  <label>
+                    Price:
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="0.00"
+                      value={roomForm.price}
+                      onChange={(e) => setRoomForm({ ...roomForm, price: e.target.value })}
+                    />
                   </label>
 
                   <label>

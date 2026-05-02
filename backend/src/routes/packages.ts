@@ -32,6 +32,7 @@ function parseEventInput(body: any): PackageEventInput {
         cruise_id: Number(body.cruise_id),
         name: String(body.name ?? '').trim(),
         description: String(body.description ?? '').trim(),
+        price: body.price == null ? undefined : Number(body.price),
         capacity: Number(body.capacity),
         start_time: String(body.start_time ?? ''),
         end_time: String(body.end_time ?? ''),
@@ -77,6 +78,10 @@ function validateBasicInput(input: PackageEventInput): string | null {
         }
     }
 
+    if (input.price != null) {
+        const p = Number(input.price);
+        if (Number.isNaN(p) || p < 0) return 'Price must be a valid non-negative number.';
+    }
     return null;
 }
 

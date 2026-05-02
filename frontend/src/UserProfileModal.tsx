@@ -646,6 +646,7 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
                         <tr>
                           <th>Reservation ID</th>
                           <th>Cabin Number</th>
+                          <th>Price</th>
                           <th>User Email</th>
                           <th>Check-In</th>
                           <th>Check-Out</th>
@@ -656,6 +657,7 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
                           <tr key={res.id}>
                             <td>{res.id}</td>
                             <td>{res.cabin_number}</td>
+                            <td>${Number(res.price).toFixed(2)}</td>
                             <td>{res.email}</td>
                             <td>{formatDateTime(res.start_time)}</td>
                             <td>{formatDateTime(res.end_time)}</td>
@@ -681,6 +683,7 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
                       <thead>
                         <tr>
                           <th>Event Name</th>
+                          <th>Price</th>
                           <th>Staff Running</th>
                           <th>Start</th>
                           <th>End</th>
@@ -691,6 +694,7 @@ export default function UserProfileModal({ isOpen, onClose }: { isOpen: boolean;
                         {filteredPackages.map((res) => (
                           <tr key={res.id}>
                             <td>{res.name}</td>
+                            <td>${Number(res.price).toFixed(2)}</td>
                             <td>{res.staff_names || "TBD"}</td>
                             <td>{formatDateTime(res.start_time)}</td>
                             <td>{formatDateTime(res.end_time)}</td>

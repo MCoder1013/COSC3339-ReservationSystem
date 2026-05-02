@@ -39,6 +39,7 @@ type EventFormState = {
   name: string;
   description: string;
   capacity: string;
+  price: string;
   start_date: Date | null;
   start_time: string;
   end_date: Date | null;
@@ -51,6 +52,7 @@ const emptyForm: EventFormState = {
   name: '',
   description: '',
   capacity: '',
+  price: '',
   start_date: new Date(),
   start_time: '',
   end_date: new Date(),
@@ -511,6 +513,7 @@ export default function PackageEventsList({ showManagement = false, onlyJoined =
         name: detail.name ?? '',
         description: detail.description ?? '',
         capacity: String(detail.capacity ?? ''),
+        price: detail.price != null ? String(detail.price) : '',
         start_date: detail.start_time ? new Date(detail.start_time) : new Date(),
         start_time: toTimeValue(detail.start_time),
         end_date: detail.end_time ? new Date(detail.end_time) : new Date(),
@@ -702,6 +705,11 @@ export default function PackageEventsList({ showManagement = false, onlyJoined =
       if (!Number.isInteger(qty) || qty < 1) return 'Each required item quantity must be at least 1.';
     }
 
+    if (editFormState.price !== '') {
+      const p = Number(editFormState.price);
+      if (Number.isNaN(p) || p < 0) return 'Price must be a valid non-negative number.';
+    }
+
     return null;
   };
 
@@ -718,6 +726,7 @@ export default function PackageEventsList({ showManagement = false, onlyJoined =
       name: editFormState.name.trim(),
       description: editFormState.description.trim(),
       capacity: Number(editFormState.capacity),
+      price: editFormState.price === '' ? 0 : Number(editFormState.price),
       start_time: combineDateAndTime(editFormState.start_date as Date, editFormState.start_time).toISOString(),
       end_time: combineDateAndTime(editFormState.start_date as Date, editFormState.end_time).toISOString(),
       staff_ids: editFormState.staff_ids.filter((value) => value !== '').map((value) => Number(value)),
@@ -848,6 +857,12 @@ export default function PackageEventsList({ showManagement = false, onlyJoined =
             </div>
             <p>{selectedEvent.description}</p>
             <p><strong>Spots Left:</strong> {Number(selectedEvent.spots_left) <= 0 ? 'FULL' : selectedEvent.spots_left}</p>
+            <p>
+              <strong>Price:</strong>{' '}
+              {selectedEvent.price !== undefined && selectedEvent.price !== null
+                ? `$${Number(selectedEvent.price).toFixed(2)}`
+                : 'N/A'}
+            </p>
             <p><strong>Start:</strong> {toReadableDateTime(selectedEvent.start_time)}</p>
             <p><strong>End:</strong> {toReadableDateTime(selectedEvent.end_time)}</p>
             <p>

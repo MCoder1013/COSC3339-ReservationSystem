@@ -23,10 +23,10 @@ router.get('/rooms', authRequired, async (req: Request, res: Response) => {
 
 // ROOMS-POST 
 router.post("/rooms", adminRequired, async (req: Request, res: Response) => {
-    const { cabin_number, deck, type, capacity, status } = req.body;
+    const { cabin_number, deck, type, capacity, status, price } = req.body;
 
     try {
-        const roomId = await addRoom({ cabin_number, deck, type, capacity, status });
+        const roomId = await addRoom({ cabin_number, deck: Number(deck), type, capacity: Number(capacity), status, price: price == null ? undefined : Number(price) });
         res.status(201).json({
             message: "Room added successfully!",
             roomId
