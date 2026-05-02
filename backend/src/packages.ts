@@ -7,6 +7,7 @@ export type PackageEventInput = {
     name: string;
     description: string;
     capacity: number;
+    price?: number;
     start_time: string;
     end_time: string;
     staff_ids: number[];
@@ -371,8 +372,8 @@ export async function createPackageEvent(createdBy: number, input: PackageEventI
         await validateItemAvailability(input.item_requirements, input.start_time, input.end_time, tx);
 
         const result = await tx`
-            INSERT INTO package_events (cruise_id, name, description, capacity, start_time, end_time, created_by)
-            VALUES (${input.cruise_id}, ${input.name}, ${input.description}, ${input.capacity}, ${input.start_time}, ${input.end_time}, ${creatorId})
+            INSERT INTO package_events (cruise_id, name, description, capacity, price, start_time, end_time, created_by)
+            VALUES (${input.cruise_id}, ${input.name}, ${input.description}, ${input.capacity}, ${input.price ?? 0.00}, ${input.start_time}, ${input.end_time}, ${creatorId})
             RETURNING id
         `;
 
@@ -415,6 +416,7 @@ export async function updatePackageEvent(eventId: number, input: PackageEventInp
                 name = ${input.name},
                 description = ${input.description},
                 capacity = ${input.capacity},
+                price = ${input.price ?? 0.00},
                 start_time = ${input.start_time},
                 end_time = ${input.end_time}
             WHERE id = ${eventId}
@@ -462,6 +464,7 @@ export async function getPackageEventById(eventId: number, viewerUserId?: number
             e.cruise_id,
             e.name,
             e.description,
+            e.price,
             e.capacity,
             e.start_time,
             e.end_time,
@@ -553,6 +556,7 @@ export async function listActivePackageEvents(userId?: number, cruiseId?: number
             e.cruise_id,
             e.name,
             e.description,
+            e.price,
             e.capacity,
             e.start_time,
             e.end_time,
@@ -596,6 +600,7 @@ export async function listJoinedPackageEvents(userId: number) {
             e.id,
             e.name,
             e.description,
+            e.price,
             e.capacity,
             e.start_time,
             e.end_time,

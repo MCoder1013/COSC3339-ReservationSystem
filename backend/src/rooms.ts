@@ -9,6 +9,7 @@ interface NewRoom {
     type: RoomType
     capacity: number
     status: RoomStatus
+    price?: number
 }
 
 // pull all rooms from room table
@@ -45,9 +46,9 @@ export async function addRoom(r: NewRoom): Promise<number> {
 
         const result = await sql`
             INSERT INTO cabins
-                (cabin_number, deck, type, capacity, status)
+                (cabin_number, deck, type, capacity, status, price)
             VALUES
-                (${r.cabin_number}, ${r.deck}, ${r.type}, ${r.capacity}, ${r.status})
+                (${r.cabin_number}, ${r.deck}, ${r.type}, ${r.capacity}, ${r.status}, ${r.price ?? 0.00})
             RETURNING id
         `;
 
