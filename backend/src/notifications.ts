@@ -205,6 +205,75 @@ export async function sendPackageEventCancelledEmailToStaff(eventId: number, eve
     }
 }
 
+// Award 1 pearl per dollar for completed reservations
+async function awardPearlsForCompletedReservations(): Promise<void> {
+    const completed = await sql`
+        SELECT id, user_id, total_price
+        FROM reservations
+        WHERE end_time < NOW()
+          AND status != 'Cancelled'
+          AND pearls_awarded = FALSE
+          AND total_price > 0
+    `;
+
+    for (const reservation of completed) {
+        const pearls = Math.floor(Number(reservation.total_price));
+        if (pearls <= 0) continue;
+
+        await sql`
+            INSERT INTO loyalty_accounts (user_id, points)
+            VALUES (${reservation.user_id}, ${pearls})
+            ON CONFLICT (user_id) DO UPDATE
+            SET points = loyalty_accounts.points + ${pearls}
+        `;
+        await sql`
+            UPDATE reservations SET pearls_awarded = TRUE WHERE id = ${reservation.id}
+        `;
+    }
+}
+
+cron.schedule('0 * * * * *', async () => {
+    await awardPearlsForCompletedReservations();
+});
+
+// Award 1 pearl per dollar for completed package events (to each attendee)
+async function awardPearlsForCompletedPackageEvents(): Promise<void> {
+    const completed = await sql`
+        SELECT id, price
+        FROM package_events
+        WHERE end_time < NOW()
+          AND status != 'Cancelled'
+          AND pearls_awarded = FALSE
+          AND price > 0
+    `;
+
+    for (const event of completed) {
+        const pearls = Math.floor(Number(event.price));
+        if (pearls <= 0) continue;
+
+        const attendees = await sql`
+            SELECT user_id FROM package_event_attendees WHERE event_id = ${event.id}
+        `;
+
+        for (const attendee of attendees) {
+            await sql`
+                INSERT INTO loyalty_accounts (user_id, points)
+                VALUES (${attendee.user_id}, ${pearls})
+                ON CONFLICT (user_id) DO UPDATE
+                SET points = loyalty_accounts.points + ${pearls}
+            `;
+        }
+
+        await sql`
+            UPDATE package_events SET pearls_awarded = TRUE WHERE id = ${event.id}
+        `;
+    }
+}
+
+cron.schedule('0 * * * * *', async () => {
+    await awardPearlsForCompletedPackageEvents();
+});
+
 // Notify users 10 minutes before their reservation
 cron.schedule('0 * * * * *', async () => {
     const upcoming = await checkUpcomingReservations(10);

@@ -1,0 +1,7 @@
+ALTER TABLE reservations
+ADD COLUMN IF NOT EXISTS payment_status TEXT CHECK (payment_status IN ('unpaid','paid')) DEFAULT 'unpaid',
+ADD COLUMN IF NOT EXISTS payment_date TIMESTAMPTZ NULL,
+ADD COLUMN IF NOT EXISTS total_price NUMERIC(10,2) NOT NULL DEFAULT 0.00;
+
+ALTER TABLE package_events
+ADD COLUMN IF NOT EXISTS price NUMERIC(10,2);
