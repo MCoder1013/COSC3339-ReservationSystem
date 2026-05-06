@@ -245,6 +245,8 @@ export async function addReservationWithTransaction(sql: postgres.TransactionSql
         }, sql);
     }
 
+    let price = 0;
+
     if (r.cabin_id != null) {
         await checkCabinTime({
             start_time: r.start_time,
@@ -252,6 +254,11 @@ export async function addReservationWithTransaction(sql: postgres.TransactionSql
             id: r.cabin_id,
             cruise_id: r.cruise_id
         }, sql);
+
+        const cabin = await sql`
+        SELECT price FROM cabins WHERE id = ${r.cabin_id}
+        `;
+        price = cabin[0].price;
     }
 
     if (r.resource_id != null) {
@@ -261,10 +268,10 @@ export async function addReservationWithTransaction(sql: postgres.TransactionSql
     const result = await sql`
         INSERT INTO reservations
             (user_id, cabin_id, resource_id, staff_id, cruise_id,
-            start_time, end_time, quantity_reserved)
+            start_time, end_time, quantity_reserved, total_price)
         VALUES
             (${r.user_id}, ${r.cabin_id}, ${r.resource_id}, ${r.staff_id}, ${r.cruise_id},
-            ${r.start_time}, ${r.end_time}, ${r.quantity_reserved})
+            ${r.start_time}, ${r.end_time}, ${r.quantity_reserved}, ${price})
         RETURNING id
     `;
     const newId = result[0].id
