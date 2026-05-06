@@ -251,3 +251,18 @@ export async function getEventRatings(eventId: number) {
 export function isRatingValueValid(rating: unknown) {
     return isValidRating(rating);
 }
+
+export async function getAllRatings() {
+  return sql<RatingReviewRow[]>`
+    SELECT
+      r.id,
+      r.rating,
+      r.review,
+      r.created_at,
+      r.user_id,
+      r.reservation_id,
+      r.package_event_id
+    FROM ratings r
+    ORDER BY r.created_at DESC
+  `;
+}

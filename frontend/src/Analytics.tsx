@@ -32,6 +32,16 @@ type PackageEventRecord = {
   staff_names?: string;
 };
 
+type RatingRecord = {
+  id: number;
+  reservation_id: number | null; 
+  package_event_id: number | null;
+  user_id: number;
+  rating: number;
+  review?: string | null;
+  created_at: string;
+};
+
 type TopEntry = {
   label: string;
   value: number;
@@ -89,6 +99,11 @@ function inferUserCategory(
   return "User";
 }
 
+function formatRating(value: number | null): string {
+  if (value === null) return "N/A";
+  return value.toFixed(2);
+}
+
 export default function Analytics() {
   const shipName = "Starlight Pearl Cruises";
 
@@ -96,6 +111,7 @@ export default function Analytics() {
   const [staff, setStaff] = useState<StaffRecord[]>([]);
   const [reservations, setReservations] = useState<ReservationRecord[]>([]);
   const [packageEvents, setPackageEvents] = useState<PackageEventRecord[]>([]);
+  const [ratings, setRatings] = useState<RatingRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [formError, setFormError] = useState("");
   const [selectedMonth, setSelectedMonth] = useState("");
@@ -106,17 +122,19 @@ export default function Analytics() {
       setFormError("");
 
       try {
-        const [usersData, reservationsData, staffData, packageEventsData] = await Promise.all([
+        const [usersData, reservationsData, staffData, packageEventsData, ratingsData] = await Promise.all([
           fetchData("/api/auth/users"),
           fetchData("/api/reservations"),
           fetchData("/api/staff"),
           fetchData("/api/packages/events"),
+          fetchData("/api/ratings"),
         ]);
 
         setUsers(Array.isArray(usersData) ? (usersData as UserRecord[]) : []);
         setReservations(Array.isArray(reservationsData) ? (reservationsData as ReservationRecord[]) : []);
         setStaff(Array.isArray(staffData) ? (staffData as StaffRecord[]) : []);
         setPackageEvents(Array.isArray(packageEventsData) ? (packageEventsData as PackageEventRecord[]) : []);
+        setRatings(Array.isArray(ratingsData) ? (ratingsData as RatingRecord[]) : []);
       } catch (error) {
         console.error("Failed to load analytics:", error);
         setFormError("Unable to load analytics right now.");
@@ -169,6 +187,14 @@ export default function Analytics() {
     }
     return map;
   }, [staff]);
+
+  const reservationsById = useMemo(() => {
+    const map = new Map<number, ReservationRecord>();
+    for (const res of reservations) {
+      map.set(res.id, res);
+    }
+    return map;
+  }, [reservations]);
 
   const monthlyReservations = useMemo(() => {
     if (!selectedMonth) return [];
@@ -233,6 +259,59 @@ export default function Analytics() {
       cancellationsByCategory[category] += 1;
     }
 
+    // ── Ratings analytics ──────────────────────────────────────────────────
+
+    // All-time average rating
+    const allTimeAvgRating =
+      ratings.length > 0
+        ? ratings.reduce((sum, r) => sum + r.rating, 0) / ratings.length
+        : null;
+
+    // Monthly ratings: match by the reservation's start_time month
+    const monthlyRatings = ratings.filter((r) => {
+      if (r.reservation_id != null) {
+        const reservation = reservationsById.get(r.reservation_id);
+        if (!reservation) return false;
+        return toMonthKey(reservation.start_time) === selectedMonth;
+      }
+      if (r.package_event_id != null) {
+        const event = packageEvents.find((e) => e.id === r.package_event_id);
+        if (!event) return false;
+        return toMonthKey(event.start_time) === selectedMonth;
+      }
+      return false;
+    });
+
+    const monthlyAvgRating =
+      monthlyRatings.length > 0
+        ? monthlyRatings.reduce((sum, r) => sum + r.rating, 0) / monthlyRatings.length
+        : null;
+
+    // Highest and lowest scoring reservations of the month
+    let highestRatedReservation: { reservationId: number; rating: number; label: string } | null = null;
+    let lowestRatedReservation: { reservationId: number; rating: number; label: string } | null = null;
+
+    for (const r of monthlyRatings) {
+      let label: string;
+      if (r.reservation_id != null) {
+        const reservation = reservationsById.get(r.reservation_id);
+        const user = reservation ? usersById.get(reservation.user_id) : undefined;
+        label = user?.email || reservation?.email || `Reservation #${r.reservation_id}`;
+      } else {
+        const event = packageEvents.find((e) => e.id === r.package_event_id);
+        label = event ? `Event #${r.package_event_id}` : `Event #${r.package_event_id}`;
+      }
+
+      const targetId = r.reservation_id ?? r.package_event_id!;
+
+      if (highestRatedReservation === null || r.rating > highestRatedReservation.rating) {
+        highestRatedReservation = { reservationId: targetId, rating: r.rating, label };
+      }
+      if (lowestRatedReservation === null || r.rating < lowestRatedReservation.rating) {
+        lowestRatedReservation = { reservationId: targetId, rating: r.rating, label };
+      }
+    }
+
     return {
       allTimeRegisteredUsers: users.length,
       allTimeReservations: reservations.length,
@@ -244,8 +323,25 @@ export default function Analytics() {
       totalCancellations: cancelledReservations.length,
       totalCancellationsForSelectedMonth: cancelledReservationsMonthly.length,
       cancellationsByCategory,
+      // ratings
+      allTimeAvgRating,
+      monthlyAvgRating,
+      monthlyRatingCount: monthlyRatings.length,
+      highestRatedReservation,
+      lowestRatedReservation,
     };
-  }, [monthlyPackageEvents, monthlyReservations, reservations, staffById, users, usersById]);
+  }, [
+    monthlyPackageEvents,
+    monthlyReservations,
+    packageEvents,
+    reservations,
+    staffById,
+    users,
+    usersById,
+    ratings,
+    reservationsById,
+    selectedMonth,
+  ]);
 
   const selectedMonthLabel = selectedMonth ? formatMonthLabel(selectedMonth) : "Selected Month";
 
@@ -329,6 +425,52 @@ export default function Analytics() {
             </table>
 
             <div className="analyticsTopSection">
+              <section>
+                <h3>Ratings for ({selectedMonthLabel})</h3>
+                <table className="inventoryTable analyticsTable compactTable">
+                    <thead>
+                      <tr>
+                        <th>Metric</th>
+                        <th>Value</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>All Time Average Rating</td>
+                        <td>
+                          {analytics.allTimeAvgRating !== null
+                            ? `${formatRating(analytics.allTimeAvgRating)} / 5`
+                            : "No ratings yet"}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Average Rating for {selectedMonthLabel}</td>
+                        <td>
+                          {analytics.monthlyAvgRating !== null
+                            ? `${formatRating(analytics.monthlyAvgRating)} / 5 (${analytics.monthlyRatingCount} rating${analytics.monthlyRatingCount === 1 ? "" : "s"})`
+                            : "No ratings this month"}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Highest Rated Reservation for {selectedMonthLabel}</td>
+                        <td>
+                          {analytics.highestRatedReservation !== null
+                            ? `${analytics.highestRatedReservation.rating} / 5 — Reservation #${analytics.highestRatedReservation.reservationId} (${analytics.highestRatedReservation.label})`
+                            : "No ratings this month"}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Lowest Rated Reservation for {selectedMonthLabel}</td>
+                        <td>
+                          {analytics.lowestRatedReservation !== null
+                            ? `${analytics.lowestRatedReservation.rating} / 5 — Reservation #${analytics.lowestRatedReservation.reservationId} (${analytics.lowestRatedReservation.label})`
+                            : "No ratings this month"}
+                        </td>
+                      </tr>
+                    </tbody>
+                </table>
+              </section>
+
               <section>
                 <h3>Top 3 Requested Items ({selectedMonthLabel})</h3>
                 <table className="inventoryTable analyticsTable compactTable">
