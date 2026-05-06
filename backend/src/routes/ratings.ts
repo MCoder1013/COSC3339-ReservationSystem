@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
-import { authRequired } from './index.js';
-import { getEventRatings, getRoomRatings, isRatingValueValid, saveEventRating, saveRoomRating } from '../ratings.js';
+import { authRequired, adminRequired } from './index.js';
+import { getEventRatings, getRoomRatings, isRatingValueValid, saveEventRating, saveRoomRating, getAllRatings } from '../ratings.js';
 
 const router = Router();
 
@@ -36,6 +36,16 @@ router.post('/ratings', authRequired, async (req: Request, res: Response) => {
         console.error('Failed to save review:', error);
         res.status(400).json({ error: error.message || 'Could not save the review.' });
     }
+});
+
+router.get("/ratings", adminRequired, async (req: Request, res: Response) => {
+  try {
+    const ratings = await getAllRatings();
+    res.json(ratings);
+  } catch (err) {
+    console.error("Failed to fetch ratings:", err);
+    res.status(500).json({ error: "Failed to fetch ratings" });
+  }
 });
 
 router.get('/ratings/rooms', authRequired, async (req: Request, res: Response) => {
