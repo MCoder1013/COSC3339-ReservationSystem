@@ -21,6 +21,8 @@ type Value = ValuePiece | [ValuePiece, ValuePiece];
 type CruiseOption = {
   id: string;
   name: string;
+  departure_date?: string;
+  return_date?: string;
 };
 
 const RESERVATION_CRUISE_MAP_KEY = "reservationCruiseMapV1";
@@ -117,6 +119,8 @@ export default function Reservation() {
   const selectedCruiseLabel = cruises.find((cruise) => String(cruise.id) === String(selectedCruiseId))?.name
     ?? accessibleCruises.find((cruise) => String(cruise.id) === String(selectedCruiseId))?.name
     ?? 'the selected cruise';
+  const selectedCruise = cruises.find((cruise) => String(cruise.id) === String(selectedCruiseId))
+    ?? accessibleCruises.find((cruise) => String(cruise.id) === String(selectedCruiseId));
   const selectedRoomReviewsTitle = selectedRoom
     ? `Reviews for Cabin ${selectedRoom.cabin_number} on ${selectedCruiseLabel}`
     : 'Room reviews';
@@ -168,7 +172,9 @@ export default function Reservation() {
       function normalizeCruise(cruise: any) {
         return {
           id: cruise.id,
-          name: `${cruise.ship_name} - ${cruise.cruise_name}`
+          name: `${cruise.ship_name} - ${cruise.cruise_name}`,
+          departure_date: cruise.departure_date,
+          return_date: cruise.return_date
         };
       }
 
@@ -1031,6 +1037,17 @@ export default function Reservation() {
                 ))}
               </select>
             </label>
+
+            {selectedCruise && selectedCruise.departure_date && selectedCruise.return_date && (
+              <div style={{ marginTop: "10px", fontSize: "16px", color: "#fff", backgroundColor: "#fff", padding: "10px", borderRadius: "4px" }}>
+                <div style={{ color: "#000" }}>
+                  <strong>Departure:</strong> {new Date(selectedCruise.departure_date).toLocaleDateString()}
+                </div>
+                <div style={{ color: "#000" }}>
+                  <strong>Return:</strong> {new Date(selectedCruise.return_date).toLocaleDateString()}
+                </div>
+              </div>
+            )}
 
             {activeCategory === "Rooms" && !isCruiseLoading && cruiseOptions.length === 0 && (
               <div className="errorMessage" style={{ marginTop: "10px" }}>

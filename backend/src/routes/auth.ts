@@ -520,8 +520,8 @@ router.post('/update-user-role', adminRequired, async (req: Request, res: Respon
 
     // Update user role
     if (newRole === 'admin') {
-      // Promote to admin: set user_role to 'staff' and add to staff table with role 'Admin'
-      await database.updateUserRole(userId, 'staff');
+      // Promote to admin: set user_role to 'admin' and add/update staff table with role 'Admin'
+      await database.updateUserRole(userId, 'admin');
       // Insert or update in staff table
       await database.upsertStaffRecord(userId, 'Admin', 'Day');
       await database.replaceStaffCruiseAssignments(userId, normalizedCruiseIds);
